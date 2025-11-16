@@ -13,7 +13,7 @@ import (
 )
 
 func runSecondTestOn(t *testing.T, db eventstore.Store) {
-	db.Init()
+	_ = db.Init()
 
 	for i := 0; i < 10000; i++ {
 		eTag := make([]byte, 32)
@@ -38,7 +38,7 @@ func runSecondTestOn(t *testing.T, db eventstore.Store) {
 		if i%3 == 0 {
 			sk = sk4
 		}
-		evt.Sign(sk)
+		_ = evt.Sign(sk)
 		err := db.SaveEvent(evt)
 		require.NoError(t, err)
 	}

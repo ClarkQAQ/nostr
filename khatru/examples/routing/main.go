@@ -6,24 +6,30 @@ import (
 	"slices"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/eventstore/lmdb"
+	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 	"fiatjaf.com/nostr/khatru"
 )
 
 func main() {
 	db1 := &slicestore.SliceStore{}
-	db1.Init()
+	if e := db1.Init(); e != nil {
+		panic(e)
+	}
 	r1 := khatru.NewRelay()
 	r1.UseEventstore(db1, 400)
 
-	db2 := &lmdb.LMDBBackend{Path: "/tmp/t"}
-	db2.Init()
+	db2 := &boltdb.BoltBackend{Path: "/tmp/t"}
+	if e := db2.Init(); e != nil {
+		panic(e)
+	}
 	r2 := khatru.NewRelay()
 	r2.UseEventstore(db2, 400)
 
 	db3 := &slicestore.SliceStore{}
-	db3.Init()
+	if e := db3.Init(); e != nil {
+		panic(e)
+	}
 	r3 := khatru.NewRelay()
 	r3.UseEventstore(db3, 400)
 
@@ -57,5 +63,7 @@ func main() {
 		Relay(r3)
 
 	fmt.Println("running on :3334")
-	http.ListenAndServe(":3334", router)
+	if e := http.ListenAndServe(":3334", router); e != nil {
+		panic(e)
+	}
 }

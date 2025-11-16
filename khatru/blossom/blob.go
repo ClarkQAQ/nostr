@@ -19,8 +19,8 @@ type BlobDescriptor struct {
 
 type BlobIndex interface {
 	Keep(ctx context.Context, blob BlobDescriptor, pubkey nostr.PubKey) error
-	List(ctx context.Context, pubkey nostr.PubKey) iter.Seq[BlobDescriptor]
-	Get(ctx context.Context, sha256 string) (*BlobDescriptor, error)
+	List(ctx context.Context, pubkey nostr.PubKey, publicURL string) iter.Seq[BlobDescriptor]
+	Get(ctx context.Context, sha256 string, publicURL string) (*BlobDescriptor, error)
 	Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error
 }
 

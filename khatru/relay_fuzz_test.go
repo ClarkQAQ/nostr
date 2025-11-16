@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/eventstore/lmdb"
+	"fiatjaf.com/nostr/eventstore/boltdb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +22,7 @@ func FuzzReplaceableEvents(f *testing.F) {
 		}
 
 		relay := NewRelay()
-		store := &lmdb.LMDBBackend{Path: "/tmp/fuzz"}
+		store := &boltdb.BoltBackend{Path: "/tmp/fuzz"}
 		store.Init()
 		relay.UseEventstore(store, 4000)
 

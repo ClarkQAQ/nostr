@@ -36,7 +36,7 @@ func runFirstTestOn(t *testing.T, db eventstore.Store) {
 		if i%2 == 0 {
 			evt.Kind = 9
 		}
-		evt.Sign(sk)
+		_ = evt.Sign(sk)
 		allEvents = append(allEvents, evt)
 		err = db.SaveEvent(evt)
 		require.NoError(t, err)
@@ -181,7 +181,7 @@ func runFirstTestOn(t *testing.T, db eventstore.Store) {
 
 		sk := nostr.Generate()
 		for i := range newEvents {
-			newEvents[i].Sign(sk)
+			_ = newEvents[i].Sign(sk)
 			require.NoError(t, db.SaveEvent(newEvents[i]))
 		}
 

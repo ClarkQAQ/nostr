@@ -38,7 +38,7 @@ var queryOrSave = &cli.Command{
 	},
 }
 
-func doSave(ctx context.Context, line string, evt nostr.Event) error {
+func doSave(_ context.Context, line string, evt nostr.Event) error {
 	if err := db.SaveEvent(evt); err != nil {
 		return fmt.Errorf("failed to save event '%s': %s", line, err)
 	}
@@ -46,7 +46,7 @@ func doSave(ctx context.Context, line string, evt nostr.Event) error {
 	return nil
 }
 
-func doQuery(ctx context.Context, f *nostr.Filter) error {
+func doQuery(_ context.Context, f *nostr.Filter) error {
 	for evt := range db.QueryEvents(*f, 1_000_000) {
 		fmt.Println(evt)
 	}

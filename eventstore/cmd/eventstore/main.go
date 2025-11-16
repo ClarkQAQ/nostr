@@ -12,7 +12,6 @@ import (
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/eventstore/boltdb"
-	"fiatjaf.com/nostr/eventstore/lmdb"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 	"github.com/urfave/cli/v3"
 )
@@ -33,7 +32,7 @@ var app = &cli.Command{
 		&cli.StringFlag{
 			Name:    "type",
 			Aliases: []string{"t"},
-			Usage:   "store type ('lmdb', 'boltdb', 'mmm')",
+			Usage:   "store type ('boltdb')",
 		},
 	},
 	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
@@ -69,15 +68,8 @@ var app = &cli.Command{
 		}
 
 		switch typ {
-		case "lmdb":
-			db = &lmdb.LMDBBackend{Path: path}
 		case "boltdb":
 			db = &boltdb.BoltBackend{Path: path}
-		case "mmm":
-			var err error
-			if db, err = doMmmInit(path); err != nil {
-				return ctx, err
-			}
 		case "file":
 			db = &slicestore.SliceStore{}
 
@@ -96,7 +88,9 @@ var app = &cli.Command{
 					if err := json.Unmarshal(scanner.Bytes(), &evt); err != nil {
 						log.Printf("invalid event read at line %d: %s (`%s`)\n", i, err, scanner.Text())
 					}
-					db.SaveEvent(evt)
+					if e := db.SaveEvent(evt); e != nil {
+						log.Printf("failed to save event at line %d: %s (`%s`)\n", i, e, scanner.Text())
+					}
 					i++
 				}
 			}()

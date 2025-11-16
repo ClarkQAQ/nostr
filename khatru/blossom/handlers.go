@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -136,7 +137,7 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// keep track of the blob descriptor
 	bd := BlobDescriptor{
-		URL:      bs.ServiceURL + "/" + hhash + ext,
+		URL:      bs.getBaseURL(r) + "/" + hhash + ext,
 		SHA256:   hhash,
 		Size:     len(b),
 		Type:     mimeType,
@@ -157,7 +158,10 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// return response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(bd)
+	if e := json.NewEncoder(w).Encode(bd); e != nil {
+		blossomError(w, "failed to write response: "+e.Error(), 500)
+		return
+	}
 }
 
 func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
@@ -184,14 +188,14 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if auth.Tags.FindWithValue("x", hhash) == nil &&
-			auth.Tags.FindWithValue("server", bs.ServiceURL) == nil {
+			auth.Tags.FindWithValue("server", bs.getBaseURL(r)) == nil {
 			blossomError(w, "invalid \"Authorization\" event \"x\" or \"server\" tag", 403)
 			return
 		}
 	}
 
 	var ext string
-	bd, err := bs.Store.Get(r.Context(), hhash)
+	bd, err := bs.Store.Get(r.Context(), hhash, bs.getBaseURL(r))
 	if err != nil {
 		// can't find the BlobDescriptor, try to get the extension from the URL
 		if len(spl) == 2 {
@@ -228,7 +232,7 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 			// use unix epoch as the time if we can't find the descriptor
 			// as described in the http.ServeContent documentation
 			t := time.Unix(0, 0)
-			descriptor, err := bs.Store.Get(r.Context(), hhash)
+			descriptor, err := bs.Store.Get(r.Context(), hhash, bs.getBaseURL(r))
 			if err == nil && descriptor != nil {
 				t = descriptor.Uploaded.Time()
 			}
@@ -255,7 +259,7 @@ func (bs BlossomServer) handleHasBlob(w http.ResponseWriter, r *http.Request) {
 	}
 	hhash = hhash[1:]
 
-	bd, err := bs.Store.Get(r.Context(), hhash)
+	bd, err := bs.Store.Get(r.Context(), hhash, bs.getBaseURL(r))
 	if err != nil {
 		blossomError(w, "failed to query: "+err.Error(), 500)
 		return
@@ -273,9 +277,9 @@ func (bs BlossomServer) handleHasBlob(w http.ResponseWriter, r *http.Request) {
 
 func (bs BlossomServer) handleList(w http.ResponseWriter, r *http.Request) {
 	// check for an authorization tag, if any
-	auth, err := readAuthorization(r)
-	if err != nil {
-		blossomError(w, err.Error(), 400)
+	auth, e := readAuthorization(r)
+	if e != nil {
+		blossomError(w, e.Error(), 400)
 		return
 	}
 
@@ -287,7 +291,11 @@ func (bs BlossomServer) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pubkey, err := nostr.PubKeyFromHex(r.URL.Path[6:])
+	pubkey, e := nostr.PubKeyFromHex(r.URL.Path[6:])
+	if e != nil {
+		blossomError(w, fmt.Sprintf("invalid pubkey: %s", e.Error()), 400)
+		return
+	}
 
 	if nil != bs.RejectList {
 		reject, reason, code := bs.RejectList(r.Context(), auth, pubkey)
@@ -297,18 +305,30 @@ func (bs BlossomServer) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Write([]byte{'['})
+	if _, e := w.Write([]byte{'['}); e != nil {
+		blossomError(w, e.Error(), 500)
+		return
+	}
 	enc := json.NewEncoder(w)
 	first := true
-	for bd := range bs.Store.List(r.Context(), pubkey) {
+	for bd := range bs.Store.List(r.Context(), pubkey, bs.getBaseURL(r)) {
 		if !first {
-			w.Write([]byte{','})
+			if _, e := w.Write([]byte{','}); e != nil {
+				blossomError(w, e.Error(), 500)
+				return
+			}
 		} else {
 			first = false
 		}
-		enc.Encode(bd)
+		if e := enc.Encode(bd); e != nil {
+			blossomError(w, e.Error(), 500)
+			return
+		}
 	}
-	w.Write([]byte{']'})
+	if _, e := w.Write([]byte{']'}); e != nil {
+		blossomError(w, e.Error(), 500)
+		return
+	}
 }
 
 func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
@@ -333,13 +353,13 @@ func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	hhash = hhash[1:]
 	if auth.Tags.FindWithValue("x", hhash) == nil &&
-		auth.Tags.FindWithValue("server", bs.ServiceURL) == nil {
+		auth.Tags.FindWithValue("server", bs.getBaseURL(r)) == nil {
 		blossomError(w, "invalid \"Authorization\" event \"x\" or \"server\" tag", 403)
 		return
 	}
 
 	var ext string
-	bd, err := bs.Store.Get(r.Context(), hhash)
+	bd, err := bs.Store.Get(r.Context(), hhash, bs.getBaseURL(r))
 	if err != nil {
 		// can't find the BlobDescriptor, try to get the extension from the URL
 		if len(spl) == 2 {
@@ -365,7 +385,7 @@ func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// we will actually only delete the file if no one else owns it
-	if bd, err := bs.Store.Get(r.Context(), hhash); err == nil && bd == nil {
+	if bd, err := bs.Store.Get(r.Context(), hhash, bs.getBaseURL(r)); err == nil && bd == nil {
 		if nil != bs.DeleteBlob {
 			if err := bs.DeleteBlob(r.Context(), hhash, ext); err != nil {
 				blossomError(w, "failed to delete blob: "+err.Error(), 500)
@@ -473,7 +493,7 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 
 	// keep track of the blob descriptor
 	bd := BlobDescriptor{
-		URL:      bs.ServiceURL + "/" + hhash + ext,
+		URL:      bs.getBaseURL(r) + "/" + hhash + ext,
 		SHA256:   hhash,
 		Size:     len(body),
 		Type:     contentType,
@@ -493,13 +513,15 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// return response
-	json.NewEncoder(w).Encode(bd)
+	if e := json.NewEncoder(w).Encode(bd); e != nil {
+		blossomError(w, "failed to encode response: "+e.Error(), 500)
+		return
+	}
 }
 
 func (bs BlossomServer) handleMedia(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/upload", 307)
-	return
 }
 
-func (bs BlossomServer) handleNegentropy(w http.ResponseWriter, r *http.Request) {
-}
+// func (bs BlossomServer) handleNegentropy(w http.ResponseWriter, r *http.Request) {
+// }

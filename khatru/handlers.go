@@ -23,33 +23,28 @@ import (
 	"github.com/bep/debounce"
 	"github.com/fasthttp/websocket"
 	"github.com/puzpuzpuz/xsync/v3"
-	"github.com/rs/cors"
 )
 
 // ServeHTTP implements http.Handler interface.
 func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	corsMiddleware := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{
-			http.MethodHead,
-			http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodPatch,
-			http.MethodDelete,
-		},
-		AllowedHeaders: []string{"Authorization", "*"},
-		MaxAge:         86400,
-	})
+	if handle, ok := rl.HandleMatcher(w, r); ok && handle != nil {
+		handle.ServeHTTP(w, r)
+		return
+	}
 
-	if r.Header.Get("Upgrade") == "websocket" {
-		rl.HandleWebsocket(w, r)
-	} else if r.Header.Get("Accept") == "application/nostr+json" {
-		corsMiddleware.Handler(http.HandlerFunc(rl.HandleNIP11)).ServeHTTP(w, r)
-	} else if r.Header.Get("Content-Type") == "application/nostr+json+rpc" {
-		corsMiddleware.Handler(http.HandlerFunc(rl.HandleNIP86)).ServeHTTP(w, r)
-	} else {
-		corsMiddleware.Handler(rl.serveMux).ServeHTTP(w, r)
+	http.NotFound(w, r)
+}
+
+func (rl *Relay) HandleMatcher(w http.ResponseWriter, r *http.Request) (http.HandlerFunc, bool) {
+	switch {
+	case r.Header.Get("Upgrade") == "websocket":
+		return rl.HandleWebsocket, true
+	case r.Header.Get("Accept") == "application/nostr+json":
+		return rl.HandleNIP11, true
+	case r.Header.Get("Content-Type") == "application/nostr+json+rpc":
+		return rl.HandleNIP86, true
+	default:
+		return nil, false
 	}
 }
 
@@ -71,7 +66,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	// NIP-42 challenge
 	challenge := make([]byte, 8)
-	rand.Read(challenge)
+	_, _ = rand.Read(challenge)
 
 	ws := &WebSocket{
 		conn:               conn,
@@ -110,9 +105,9 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		defer kill()
 
 		ws.conn.SetReadLimit(rl.MaxMessageSize)
-		ws.conn.SetReadDeadline(time.Now().Add(rl.PongWait))
+		_ = ws.conn.SetReadDeadline(time.Now().Add(rl.PongWait))
 		ws.conn.SetPongHandler(func(string) error {
-			ws.conn.SetReadDeadline(time.Now().Add(rl.PongWait))
+			_ = ws.conn.SetReadDeadline(time.Now().Add(rl.PongWait))
 			return nil
 		})
 
@@ -152,7 +147,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						envelope = nip77.ParseNegMessage(message)
 					}
 					if envelope == nil {
-						ws.WriteJSON(nostr.NoticeEnvelope("failed to parse envelope: " + err.Error()))
+						_ = ws.WriteJSON(nostr.NoticeEnvelope("failed to parse envelope: " + err.Error()))
 						return
 					}
 				}
@@ -161,13 +156,13 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				case *nostr.EventEnvelope:
 					// check id
 					if !env.Event.CheckID() {
-						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "invalid: id is computed incorrectly"})
+						_ = ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "invalid: id is computed incorrectly"})
 						return
 					}
 
 					// check signature
 					if !env.Event.VerifySignature() {
-						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "invalid: signature is invalid"})
+						_ = ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "invalid: signature is invalid"})
 						return
 					}
 
@@ -176,14 +171,14 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						authed, is := GetAuthed(ctx)
 						if !is {
 							RequestAuth(ctx)
-							ws.WriteJSON(nostr.OKEnvelope{
+							_ = ws.WriteJSON(nostr.OKEnvelope{
 								EventID: env.Event.ID,
 								OK:      false,
 								Reason:  "auth-required: must be published by authenticated event author",
 							})
 							return
 						} else if authed != env.Event.PubKey {
-							ws.WriteJSON(nostr.OKEnvelope{
+							_ = ws.WriteJSON(nostr.OKEnvelope{
 								EventID: env.Event.ID,
 								OK:      false,
 								Reason:  "blocked: must be published by event author",
@@ -191,7 +186,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 							return
 						}
 					} else if nip70.HasEmbeddedProtected(env.Event) {
-						ws.WriteJSON(nostr.OKEnvelope{
+						_ = ws.WriteJSON(nostr.OKEnvelope{
 							EventID: env.Event.ID,
 							OK:      false,
 							Reason:  "blocked: can't repost nip70 protected",
@@ -279,7 +274,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						resp.HyperLogLog = hll.GetRegisters()
 					}
 
-					ws.WriteJSON(resp)
+					_ = ws.WriteJSON(resp)
 
 				case *nostr.ReqEnvelope:
 					eose := sync.WaitGroup{}
@@ -287,6 +282,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					// a context just for the "stored events" request handler
 					reqCtx, cancelReqCtx := context.WithCancelCause(ctx)
+					_ = cancelReqCtx
 
 					// expose subscription id in the context
 					reqCtx = context.WithValue(reqCtx, subscriptionIdKey, env.SubscriptionID)
@@ -304,7 +300,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 							if strings.HasPrefix(reason, "auth-required:") {
 								RequestAuth(ctx)
 							}
-							ws.WriteJSON(nostr.ClosedEnvelope{SubscriptionID: env.SubscriptionID, Reason: reason})
+							_ = ws.WriteJSON(nostr.ClosedEnvelope{SubscriptionID: env.SubscriptionID, Reason: reason})
 							cancelReqCtx(errors.New("filter rejected"))
 							return
 						} else {
@@ -315,7 +311,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					go func() {
 						// when all events have been loaded from databases and dispatched we can fire the EOSE message
 						eose.Wait()
-						ws.WriteJSON(nostr.EOSEEnvelope(env.SubscriptionID))
+						_ = ws.WriteJSON(nostr.EOSEEnvelope(env.SubscriptionID))
 					}()
 				case *nostr.CloseEnvelope:
 					id := string(*env)
@@ -340,7 +336,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 							ws.AuthedPublicKeys[idx], ws.AuthedPublicKeys[total-1] = ws.AuthedPublicKeys[total-1], ws.AuthedPublicKeys[idx]
 						}
 						ws.authLock.Unlock()
-						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: true})
+						_ = ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: true})
 					} else {
 						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "error: failed to authenticate: " + err.Error()})
 					}

@@ -12,7 +12,7 @@ import (
 )
 
 func manyAuthorsTest(t *testing.T, db eventstore.Store) {
-	db.Init()
+	_ = db.Init()
 
 	const total = 10000
 	const limit = 500

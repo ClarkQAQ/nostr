@@ -5,23 +5,27 @@ import (
 	"testing"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/eventstore/lmdb"
+	"fiatjaf.com/nostr/eventstore/boltdb"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBlugeFlow(t *testing.T) {
-	os.RemoveAll("/tmp/blugetest-lmdb")
+	os.RemoveAll("/tmp/blugetest-boltdb")
 	os.RemoveAll("/tmp/blugetest-bluge")
 
-	bb := &lmdb.LMDBBackend{Path: "/tmp/blugetest-lmdb"}
-	bb.Init()
+	bb := &boltdb.BoltBackend{Path: "/tmp/blugetest-boltdb"}
+	if e := bb.Init(); e != nil {
+		t.Fatal(e)
+	}
 	defer bb.Close()
 
 	bl := BlugeBackend{
 		Path:          "/tmp/blugetest-bluge",
 		RawEventStore: bb,
 	}
-	bl.Init()
+	if e := bl.Init(); e != nil {
+		t.Fatal(e)
+	}
 	defer bl.Close()
 
 	willDelete := make([]nostr.Event, 0, 3)
@@ -34,10 +38,16 @@ func TestBlugeFlow(t *testing.T) {
 		"the paper in this house if very good, mr",
 	} {
 		evt := nostr.Event{Content: content, Tags: nostr.Tags{}}
-		evt.Sign(nostr.MustSecretKeyFromHex("0000000000000000000000000000000000000000000000000000000000000001"))
+		if e := evt.Sign(nostr.MustSecretKeyFromHex("0000000000000000000000000000000000000000000000000000000000000001")); e != nil {
+			t.Fatal(e)
+		}
 
-		bb.SaveEvent(evt)
-		bl.SaveEvent(evt)
+		if e := bb.SaveEvent(evt); e != nil {
+			t.Fatal(e)
+		}
+		if e := bl.SaveEvent(evt); e != nil {
+			t.Fatal(e)
+		}
 
 		if i%2 == 0 {
 			willDelete = append(willDelete, evt)
@@ -53,7 +63,9 @@ func TestBlugeFlow(t *testing.T) {
 	}
 
 	for _, evt := range willDelete {
-		bl.DeleteEvent(evt.ID)
+		if e := bl.DeleteEvent(evt.ID); e != nil {
+			t.Fatal(e)
+		}
 	}
 
 	{

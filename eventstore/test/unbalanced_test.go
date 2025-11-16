@@ -13,7 +13,7 @@ import (
 
 // this is testing what happens when most results come from the same abstract query -- but not all
 func unbalancedTest(t *testing.T, db eventstore.Store) {
-	db.Init()
+	_ = db.Init()
 
 	const total = 10000
 	const limit = 160

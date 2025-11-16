@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"fiatjaf.com/nostr/eventstore/lmdb"
+	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/khatru"
 	"fiatjaf.com/nostr/khatru/blossom"
 )
@@ -16,19 +16,19 @@ import (
 func main() {
 	relay := khatru.NewRelay()
 
-	db := &lmdb.LMDBBackend{Path: "/tmp/khatru-lmdb-tmp"}
+	db := &boltdb.BoltBackend{Path: "/tmp/khatru-boltdb-tmp"}
 	if err := db.Init(); err != nil {
 		panic(err)
 	}
 
 	relay.UseEventstore(db, 400)
 
-	bdb := &lmdb.LMDBBackend{Path: "/tmp/khatru-lmdb-blossom-tmp"}
+	bdb := &boltdb.BoltBackend{Path: "/tmp/khatru-boltdb-blossom-tmp"}
 	if err := bdb.Init(); err != nil {
 		panic(err)
 	}
-	bl := blossom.New(relay, "http://localhost:3334")
-	bl.Store = blossom.EventStoreBlobIndexWrapper{Store: bdb, ServiceURL: bl.ServiceURL}
+	bl := blossom.New()
+	bl.Store = blossom.EventStoreBlobIndexWrapper{Store: bdb}
 	bl.StoreBlob = func(ctx context.Context, sha256 string, ext string, body []byte) error {
 		fmt.Println("storing", sha256, len(body))
 		return nil
@@ -40,5 +40,7 @@ func main() {
 	}
 
 	fmt.Println("running on :3334")
-	http.ListenAndServe(":3334", relay)
+	if e := http.ListenAndServe(":3334", relay); e != nil {
+		panic(e)
+	}
 }

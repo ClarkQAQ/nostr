@@ -11,7 +11,9 @@ This is a fork of [nostrlib](https://gitworkshop.dev/fiatjaf.com/nostrlib) with 
 ## Installation
 
 ```sh
-go get fiatjaf.com/nostr
+go get -u github.com/ClarkQAQ/go-nostr
+go mod edit -replace fiatjaf.com/nostr=github.com/ClarkQAQ/go-nostr@latest
+go mod tidy
 ```
 
 ## Components

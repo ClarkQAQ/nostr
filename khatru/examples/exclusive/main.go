@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/eventstore/lmdb"
+	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/khatru"
 	"fiatjaf.com/nostr/khatru/policies"
 )
@@ -15,8 +15,10 @@ import (
 func main() {
 	relay := khatru.NewRelay()
 
-	db := &lmdb.LMDBBackend{Path: "/tmp/exclusive"}
-	os.MkdirAll(db.Path, 0o755)
+	db := &boltdb.BoltBackend{Path: "/tmp/exclusive"}
+	if e := os.MkdirAll(db.Path, 0o755); e != nil {
+		panic(e)
+	}
 	if err := db.Init(); err != nil {
 		panic(err)
 	}
@@ -30,8 +32,7 @@ func main() {
 	}
 
 	fmt.Println("running on :3334")
-	http.ListenAndServe(":3334", relay)
-}
-
-func deleteStuffThatCanBeFoundElsewhere() {
+	if e := http.ListenAndServe(":3334", relay); e != nil {
+		panic(e)
+	}
 }

@@ -67,12 +67,12 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 
 		// sign events with appropriate keys
-		events[0].Sign(sk3)
-		events[1].Sign(sk3)
-		events[2].Sign(sk3)
-		events[3].Sign(sk3)
-		events[4].Sign(sk3)
-		events[5].Sign(sk4)
+		_ = events[0].Sign(sk3)
+		_ = events[1].Sign(sk3)
+		_ = events[2].Sign(sk3)
+		_ = events[3].Sign(sk3)
+		_ = events[4].Sign(sk3)
+		_ = events[5].Sign(sk4)
 
 		// save all events
 		for _, evt := range events {
@@ -141,7 +141,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			},
 			Kind: 23122,
 		}
-		evt1.Sign(sk3)
+		_ = evt1.Sign(sk3)
 		require.NoError(t, db.SaveEvent(evt1))
 
 		{
@@ -175,7 +175,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			},
 			Kind: 23122,
 		}
-		evt2.Sign(sk3)
+		_ = evt2.Sign(sk3)
 		require.NoError(t, db.SaveEvent(evt2))
 
 		evt3 := nostr.Event{
@@ -186,7 +186,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			},
 			Kind: 23122,
 		}
-		evt3.Sign(sk3)
+		_ = evt3.Sign(sk3)
 		require.NoError(t, db.SaveEvent(evt3))
 
 		{
@@ -221,7 +221,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{},
 			Kind:      0,
 		}
-		originalProfile.Sign(sk3)
+		_ = originalProfile.Sign(sk3)
 
 		err = db.ReplaceEvent(originalProfile)
 		require.NoError(t, err)
@@ -241,7 +241,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{},
 			Kind:      0,
 		}
-		newProfile.Sign(sk3)
+		_ = newProfile.Sign(sk3)
 
 		// replace with newer event
 		err = db.ReplaceEvent(newProfile)
@@ -262,7 +262,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{},
 			Kind:      0,
 		}
-		olderProfile.Sign(sk3)
+		_ = olderProfile.Sign(sk3)
 
 		err = db.ReplaceEvent(olderProfile)
 		require.NoError(t, err)
@@ -282,7 +282,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{{"d", "my-article"}}, // addressable identifier
 			Kind:      30023,                           // article - addressable
 		}
-		articleV1.Sign(sk3)
+		_ = articleV1.Sign(sk3)
 
 		err = db.ReplaceEvent(articleV1)
 		require.NoError(t, err)
@@ -303,7 +303,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{{"d", "my-article"}}, // same identifier
 			Kind:      30023,
 		}
-		articleV2.Sign(sk3)
+		_ = articleV2.Sign(sk3)
 
 		err = db.ReplaceEvent(articleV2)
 		require.NoError(t, err)
@@ -325,7 +325,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{{"d", "other-article"}}, // different identifier
 			Kind:      30023,
 		}
-		differentArticle.Sign(sk3)
+		_ = differentArticle.Sign(sk3)
 
 		err = db.ReplaceEvent(differentArticle)
 		require.NoError(t, err)
@@ -347,7 +347,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{},
 			Kind:      1,
 		}
-		otherEvent1.Sign(sk3)
+		_ = otherEvent1.Sign(sk3)
 		err = db.SaveEvent(otherEvent1)
 		require.NoError(t, err)
 
@@ -357,7 +357,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{},
 			Kind:      2,
 		}
-		otherEvent2.Sign(sk4)
+		_ = otherEvent2.Sign(sk4)
 		err = db.SaveEvent(otherEvent2)
 		require.NoError(t, err)
 
@@ -368,7 +368,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Tags:      nostr.Tags{},
 			Kind:      1,
 		}
-		deleteEvent.Sign(sk3)
+		_ = deleteEvent.Sign(sk3)
 		err = db.SaveEvent(deleteEvent)
 		require.NoError(t, err)
 

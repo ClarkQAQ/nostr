@@ -9,20 +9,24 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
-	"fiatjaf.com/nostr/eventstore/lmdb"
+	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 )
 
 func BenchmarkSliceStore(b *testing.B) {
 	s := &slicestore.SliceStore{}
-	s.Init()
+	if e := s.Init(); e != nil {
+		b.Fatal(e)
+	}
 	runBenchmarkOn(b, s)
 }
 
-func BenchmarkLMDB(b *testing.B) {
-	os.RemoveAll(dbpath + "lmdb")
-	l := &lmdb.LMDBBackend{Path: dbpath + "lmdb"}
-	l.Init()
+func BenchmarkBoltDB(b *testing.B) {
+	os.RemoveAll(dbpath + "boltdb")
+	l := &boltdb.BoltBackend{Path: dbpath + "boltdb"}
+	if e := l.Init(); e != nil {
+		b.Fatal(e)
+	}
 
 	runBenchmarkOn(b, l)
 }
@@ -51,8 +55,12 @@ func runBenchmarkOn(b *testing.B, db eventstore.Store) {
 		if i%3 == 0 {
 			sk = sk4
 		}
-		evt.Sign(sk)
-		db.SaveEvent(evt)
+		if e := evt.Sign(sk); e != nil {
+			b.Fatal(e)
+		}
+		if e := db.SaveEvent(evt); e != nil {
+			b.Fatal(e)
+		}
 	}
 
 	filters := make([]nostr.Filter, 0, 10)
@@ -89,9 +97,13 @@ func runBenchmarkOn(b *testing.B, db eventstore.Store) {
 
 	b.Run("insert", func(b *testing.B) {
 		evt := nostr.Event{Kind: 788, CreatedAt: nostr.Now(), Content: "blergh", Tags: nostr.Tags{{"t", "spam"}}}
-		evt.Sign(sk4)
+		if e := evt.Sign(sk4); e != nil {
+			b.Fatal(e)
+		}
 		for i := 0; i < b.N; i++ {
-			db.SaveEvent(evt)
+			if e := db.SaveEvent(evt); e != nil {
+				b.Fatal(e)
+			}
 		}
 	})
 }

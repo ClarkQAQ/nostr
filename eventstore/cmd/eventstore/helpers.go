@@ -87,18 +87,6 @@ func getStdinLinesOrFirstArgument(c *cli.Command) chan string {
 	return multi
 }
 
-func getStdinLinesOrBlank() chan string {
-	multi := make(chan string)
-	if hasStdinLines := writeStdinLinesOrNothing(multi); !hasStdinLines {
-		single := make(chan string, 1)
-		single <- ""
-		close(single)
-		return single
-	} else {
-		return multi
-	}
-}
-
 func writeStdinLinesOrNothing(ch chan string) (hasStdinLines bool) {
 	if isPiped() {
 		// piped

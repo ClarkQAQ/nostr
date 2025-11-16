@@ -5,7 +5,6 @@ go 1.24.1
 require (
 	github.com/FastFilter/xorfilter v0.2.1
 	github.com/ImVexed/fasturl v0.0.0-20230304231329-4e41488060f3
-	github.com/PowerDNS/lmdb-go v1.9.3
 	github.com/bep/debounce v1.2.1
 	github.com/bluekeyes/go-gitdiff v0.7.1
 	github.com/blugelabs/bluge v0.2.2
@@ -23,7 +22,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/puzpuzpuz/xsync/v3 v3.5.1
 	github.com/rs/cors v1.11.1
-	github.com/rs/zerolog v1.33.0
 	github.com/segmentio/encoding v0.5.3
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
@@ -73,8 +71,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect

@@ -2,6 +2,7 @@ package blossom
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"strconv"
 
@@ -12,8 +13,6 @@ import (
 // EventStoreBlobIndexWrapper uses fake events to keep track of what blobs we have stored and who owns them
 type EventStoreBlobIndexWrapper struct {
 	eventstore.Store
-
-	ServiceURL string
 }
 
 func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescriptor, pubkey nostr.PubKey) error {
@@ -35,24 +34,26 @@ func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescript
 			CreatedAt: blob.Uploaded,
 		}
 		evt.ID = evt.GetID()
-		es.Store.SaveEvent(evt)
+		if e := es.Store.SaveEvent(evt); e != nil {
+			return fmt.Errorf("save event: %w", e)
+		}
 	}
 
 	return nil
 }
 
-func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey) iter.Seq[BlobDescriptor] {
+func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey, publicURL string) iter.Seq[BlobDescriptor] {
 	return func(yield func(BlobDescriptor) bool) {
 		for evt := range es.Store.QueryEvents(nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
 			Kinds:   []nostr.Kind{24242},
 		}, 1000) {
-			yield(es.parseEvent(evt))
+			yield(es.parseEvent(evt, publicURL))
 		}
 	}
 }
 
-func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string) (*BlobDescriptor, error) {
+func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL string) (*BlobDescriptor, error) {
 	next, stop := iter.Pull(
 		es.Store.QueryEvents(nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
 	)
@@ -60,7 +61,7 @@ func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string) (*B
 	defer stop()
 
 	if evt, found := next(); found {
-		bd := es.parseEvent(evt)
+		bd := es.parseEvent(evt, publicURL)
 		return &bd, nil
 	}
 
@@ -86,7 +87,7 @@ func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, 
 	return nil
 }
 
-func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event) BlobDescriptor {
+func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event, publicURL string) BlobDescriptor {
 	hhash := evt.Tags[0][1]
 	mimetype := evt.Tags[1][1]
 	ext := getExtension(mimetype)
@@ -95,7 +96,7 @@ func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event) BlobDescriptor 
 	return BlobDescriptor{
 		Owner:    evt.PubKey,
 		Uploaded: evt.CreatedAt,
-		URL:      es.ServiceURL + "/" + hhash + ext,
+		URL:      publicURL + "/" + hhash + ext,
 		SHA256:   hhash,
 		Type:     mimetype,
 		Size:     size,
