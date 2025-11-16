@@ -18,7 +18,7 @@ func BenchmarkParseMessage(b *testing.B) {
 				for b.Loop() {
 					for _, msg := range messages {
 						var v any
-						stdlibjson.Unmarshal(unsafe.Slice(unsafe.StringData(msg), len(msg)), &v)
+						_ = stdlibjson.Unmarshal(unsafe.Slice(unsafe.StringData(msg), len(msg)), &v)
 					}
 				}
 			})
@@ -101,17 +101,6 @@ func generateRandomEvent() Event {
 	event.PubKey, _ = PubKeyFromHexCheap(generateRandomHex(64))
 
 	return event
-}
-
-func generateAuthMessage() []byte {
-	if rand.IntN(2) == 0 {
-		challenge := fmt.Sprintf("challenge_%d", rand.IntN(1000000))
-		return []byte(fmt.Sprintf(`["AUTH","%s"]`, challenge))
-	} else {
-		event := generateRandomEvent()
-		eventJSON, _ := json.Marshal(event)
-		return []byte(fmt.Sprintf(`["AUTH",%s]`, string(eventJSON)))
-	}
 }
 
 func generateNoticeMessage() []byte {

@@ -42,7 +42,7 @@ func FuzzSortedMerge(f *testing.F) {
 		}
 
 		// assert sorted descending
-		slices.IsSortedFunc(result, func(a, b nostr.Event) int { return -1 * cmp.Compare(a.CreatedAt, b.CreatedAt) })
+		_ = slices.IsSortedFunc(result, func(a, b nostr.Event) int { return -1 * cmp.Compare(a.CreatedAt, b.CreatedAt) })
 		for i := 1; i < len(result); i++ {
 			if result[i].CreatedAt > result[i-1].CreatedAt {
 				t.Fatalf("events not sorted descending at index %d: %d > %d", i, result[i].CreatedAt, result[i-1].CreatedAt)

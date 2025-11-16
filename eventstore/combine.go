@@ -55,7 +55,5 @@ func SortedMerge(it1, it2 iter.Seq[nostr.Event]) iter.Seq[nostr.Event] {
 				goto only2
 			}
 		}
-
-		return
 	}
 }

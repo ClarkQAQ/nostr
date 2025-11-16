@@ -7,7 +7,7 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/slicestore"
-	"fiatjaf.com/nostr/khatru"
+	"fiatjaf.com/nostr/relay"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,11 +15,11 @@ func TestStreamLiveFeed(t *testing.T) {
 	ctx := context.Background()
 
 	// start 3 local relays
-	relay1 := khatru.NewRelay()
-	relay2 := khatru.NewRelay()
-	relay3 := khatru.NewRelay()
+	relay1 := relay.NewRelay()
+	relay2 := relay.NewRelay()
+	relay3 := relay.NewRelay()
 
-	for _, r := range []*khatru.Relay{relay1, relay2, relay3} {
+	for _, r := range []*relay.Relay{relay1, relay2, relay3} {
 		db := &slicestore.SliceStore{}
 		db.Init()
 		r.UseEventstore(db, 4000)

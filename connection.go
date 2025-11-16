@@ -45,7 +45,9 @@ func newConnection(
 	dialCtx := ctx
 	if _, ok := dialCtx.Deadline(); !ok {
 		// if no timeout is set, force it to 7 seconds
-		dialCtx, _ = context.WithTimeoutCause(ctx, 7*time.Second, errors.New("connection took too long"))
+		timeoutCtx, timeoutCancel := context.WithTimeoutCause(ctx, 7*time.Second, errors.New("connection took too long"))
+		defer timeoutCancel()
+		dialCtx = timeoutCtx
 	}
 
 	c, _, err := ws.Dial(dialCtx, url, getConnectionOptions(requestHeader, tlsConfig))
@@ -131,7 +133,7 @@ func newConnection(
 				return
 			}
 
-			readQueue <- string(buf.Bytes())
+			readQueue <- buf.String()
 		}
 	}()
 

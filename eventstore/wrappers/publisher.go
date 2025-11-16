@@ -26,9 +26,6 @@ func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	if evt.Kind.IsRegular() {
 		// regular events are just saved directly
 		if err := w.SaveEvent(evt); err != nil && err != eventstore.ErrDupEvent {
@@ -38,7 +35,9 @@ func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {
 	}
 
 	// others are replaced
-	w.Store.ReplaceEvent(evt)
+	if e := w.Store.ReplaceEvent(evt); e != nil {
+		return fmt.Errorf("failed to replace: %w", e)
+	}
 
 	return nil
 }
