@@ -5,8 +5,7 @@ A comprehensive Go library for the Nostr protocol, providing everything needed t
 This is a fork of [nostrlib](https://gitworkshop.dev/fiatjaf.com/nostrlib) with the following custom optimizations:
 
 - **Removed CGO dependencies**: Pure Go implementation for better cross-platform compatibility
-- **Enhanced performance**: Optimized for better memory usage and execution speed
-- **Additional features**: Extended NIP support and improved API design
+- **Additional features**: improved API design
 
 ## Installation
 
