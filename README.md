@@ -10,8 +10,8 @@ This is a fork of [nostrlib](https://gitworkshop.dev/fiatjaf.com/nostrlib) with 
 ## Installation
 
 ```sh
-go get -u github.com/ClarkQAQ/go-nostr
-go mod edit -replace fiatjaf.com/nostr=github.com/ClarkQAQ/go-nostr@latest
+go get -u github.com/ClarkQAQ/nostr
+go mod edit -replace fiatjaf.com/nostr=github.com/ClarkQAQ/nostr@latest
 go mod tidy
 ```
 
