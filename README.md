@@ -2,7 +2,11 @@
 
 A comprehensive Go library for the Nostr protocol, providing everything needed to build relays, clients, or hybrid applications.
 
-This is a fork of [go-nostr](https://github.com/nbd-wtf/go-nostr) with enhanced types, additional features, and extensive NIP support.
+This is a fork of [nostrlib](https://gitworkshop.dev/fiatjaf.com/nostrlib) with the following custom optimizations:
+
+- **Removed CGO dependencies**: Pure Go implementation for better cross-platform compatibility
+- **Enhanced performance**: Optimized for better memory usage and execution speed
+- **Additional features**: Extended NIP support and improved API design
 
 ## Installation
 
