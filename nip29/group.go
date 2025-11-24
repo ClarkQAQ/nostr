@@ -42,8 +42,18 @@ type Group struct {
 	Picture string
 	About   string
 	Members map[nostr.PubKey][]*Role
+
+	// indicates that only members can read group messages
 	Private bool
-	Closed  bool
+
+	// indicates that only members can write messages to the group
+	Restricted bool
+
+	// indicates that relays should hide group metadata from non-members
+	Hidden bool
+
+	// indicates that join requests are ignored unless they include an invite code
+	Closed bool
 
 	Roles       []*Role
 	InviteCodes []string
@@ -56,10 +66,18 @@ type Group struct {
 
 func (group Group) String() string {
 	maybePrivate := ""
+	maybeRestricted := ""
+	maybeHidden := ""
 	maybeClosed := ""
 
 	if group.Private {
 		maybePrivate = " private"
+	}
+	if group.Restricted {
+		maybeRestricted = " restricted"
+	}
+	if group.Hidden {
+		maybeHidden = " hidden"
 	}
 	if group.Closed {
 		maybeClosed = " closed"
@@ -83,10 +101,12 @@ func (group Group) String() string {
 		i++
 	}
 
-	return fmt.Sprintf(`<Group %s name="%s"%s%s picture="%s" about="%s" members=[%v]>`,
+	return fmt.Sprintf(`<Group %s name="%s"%s%s%s%s picture="%s" about="%s" members=[%v]>`,
 		group.Address,
 		group.Name,
 		maybePrivate,
+		maybeRestricted,
+		maybeHidden,
 		maybeClosed,
 		group.Picture,
 		group.About,
@@ -143,13 +163,15 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	// status
 	if group.Private {
 		evt.Tags = append(evt.Tags, nostr.Tag{"private"})
-	} else {
-		evt.Tags = append(evt.Tags, nostr.Tag{"public"})
+	}
+	if group.Restricted {
+		evt.Tags = append(evt.Tags, nostr.Tag{"restricted"})
+	}
+	if group.Hidden {
+		evt.Tags = append(evt.Tags, nostr.Tag{"hidden"})
 	}
 	if group.Closed {
 		evt.Tags = append(evt.Tags, nostr.Tag{"closed"})
-	} else {
-		evt.Tags = append(evt.Tags, nostr.Tag{"open"})
 	}
 
 	return evt
@@ -237,6 +259,12 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 
 	if tag := evt.Tags.Find("private"); tag != nil {
 		group.Private = true
+	}
+	if tag := evt.Tags.Find("restricted"); tag != nil {
+		group.Restricted = true
+	}
+	if tag := evt.Tags.Find("hidden"); tag != nil {
+		group.Hidden = true
 	}
 	if tag := evt.Tags.Find("closed"); tag != nil {
 		group.Closed = true

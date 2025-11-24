@@ -47,7 +47,7 @@ func main() {
 		}
 
 		err := nip77.NegentropySync(ctx,
-			local, "ws://localhost:7777", nostr.Filter{}, nip77.Both)
+			"ws://localhost:7777", nostr.Filter{}, local, local, nip77.SyncEventsFromIDs)
 		if err != nil {
 			panic(err)
 		}

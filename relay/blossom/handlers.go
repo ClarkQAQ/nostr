@@ -2,7 +2,6 @@ package blossom
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -129,7 +128,7 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hash := sha256.Sum256(b)
-	hhash := hex.EncodeToString(hash[:])
+	hhash := nostr.HexEncodeToString(hash[:])
 	mimeType := mime.TypeByExtension(ext)
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
@@ -463,7 +462,7 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 
 	// calculate sha256
 	hash := sha256.Sum256(body)
-	hhash := hex.EncodeToString(hash[:])
+	hhash := nostr.HexEncodeToString(hash[:])
 
 	// verify hash against x tag
 	if auth.Tags.FindWithValue("x", hhash) == nil {

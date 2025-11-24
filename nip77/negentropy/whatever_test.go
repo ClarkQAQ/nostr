@@ -77,7 +77,7 @@ func runTestWith(t *testing.T,
 
 	{
 		n1s := vector.New()
-		n1 = negentropy.New(n1s, 1<<16)
+		n1 = negentropy.New(n1s, 1<<16, true, true)
 		for _, r := range n1Ranges {
 			for i := r[0]; i < r[1]; i++ {
 				n1s.Insert(events[i].CreatedAt, events[i].ID)
@@ -90,7 +90,7 @@ func runTestWith(t *testing.T,
 
 	{
 		n2s := vector.New()
-		n2 = negentropy.New(n2s, 1<<16)
+		n2 = negentropy.New(n2s, 1<<16, false, false)
 		for _, r := range n2Ranges {
 			for i := r[0]; i < r[1]; i++ {
 				n2s.Insert(events[i].CreatedAt, events[i].ID)

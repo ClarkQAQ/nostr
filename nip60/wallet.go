@@ -2,7 +2,6 @@ package nip60
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -344,7 +343,7 @@ func (w *Wallet) SetPrivateKey(ctx context.Context, privateKey string) error {
 		return fmt.Errorf("can't do write operations: missing PublishUpdate function")
 	}
 
-	skb, err := hex.DecodeString(privateKey)
+	skb, err := nostr.HexDecodeString(privateKey)
 	if err != nil {
 		return err
 	}
@@ -378,7 +377,7 @@ func (w *Wallet) toEvent(ctx context.Context, kr nostr.Keyer, evt *nostr.Event) 
 
 	encryptedTags := make(nostr.Tags, 0, 1+len(w.Mints))
 	if w.PrivateKey != nil {
-		encryptedTags = append(encryptedTags, nostr.Tag{"privkey", hex.EncodeToString(w.PrivateKey.Serialize())})
+		encryptedTags = append(encryptedTags, nostr.Tag{"privkey", nostr.HexEncodeToString(w.PrivateKey.Serialize())})
 	}
 
 	for _, mint := range w.Mints {
@@ -433,7 +432,7 @@ func (w *Wallet) parse(ctx context.Context, kr nostr.Keyer, evt *nostr.Event) er
 		case "mint":
 			mints = append(mints, tag[1])
 		case "privkey":
-			skb, err := hex.DecodeString(tag[1])
+			skb, err := nostr.HexDecodeString(tag[1])
 			if err != nil {
 				return fmt.Errorf("failed to parse private key: %w", err)
 			}

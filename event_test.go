@@ -1,13 +1,13 @@
 package nostr
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/templexxx/xhex"
 )
 
 func TestEventParsingAndVerifying(t *testing.T) {
@@ -36,7 +36,7 @@ func TestEventParsingAndVerifying(t *testing.T) {
 
 func TestEventSerialization(t *testing.T) {
 	sig := [64]byte{}
-	hex.Decode(sig[:], []byte("ed08d2dd5b0f7b6a3cdc74643d4adee3158ddede9cc848e8cd97630c097001acc2d052d2d3ec2b7ac4708b2314b797106d1b3c107322e61b5e5cc2116e099b79"))
+	xhex.Decode(sig[:], []byte("ed08d2dd5b0f7b6a3cdc74643d4adee3158ddede9cc848e8cd97630c097001acc2d052d2d3ec2b7ac4708b2314b797106d1b3c107322e61b5e5cc2116e099b79"))
 
 	events := []Event{
 		{

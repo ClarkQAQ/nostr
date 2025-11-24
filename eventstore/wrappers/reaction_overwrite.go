@@ -1,4 +1,4 @@
-package policies
+package wrappers
 
 import (
 	"fiatjaf.com/nostr"

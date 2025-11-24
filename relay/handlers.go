@@ -3,7 +3,6 @@ package relay
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"slices"
@@ -71,7 +70,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	ws := &WebSocket{
 		conn:               conn,
 		Request:            r,
-		Challenge:          rl.ChallengePrefix + hex.EncodeToString(challenge),
+		Challenge:          rl.ChallengePrefix + nostr.HexEncodeToString(challenge),
 		AuthedPublicKeys:   make([]nostr.PubKey, 0),
 		negentropySessions: xsync.NewMapOf[string, *NegentropySession](),
 	}
@@ -361,7 +360,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					}
 
 					// reconcile to get the next message and return it
-					neg := negentropy.New(vec, 1024*1024)
+					neg := negentropy.New(vec, 1024*1024, false, false)
 					out, err := neg.Reconcile(env.Message)
 					if err != nil {
 						ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: err.Error()})

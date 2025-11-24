@@ -1,7 +1,6 @@
 package nip61
 
 import (
-	"encoding/hex"
 	"encoding/json"
 
 	"fiatjaf.com/nostr"
@@ -52,7 +51,7 @@ func verifyProofDLEQ(
 		return false
 	}
 
-	CBytes, err := hex.DecodeString(proof.C)
+	CBytes, err := nostr.HexDecodeString(proof.C)
 	if err != nil {
 		return false
 	}
@@ -88,7 +87,7 @@ func VerifyBlindSignatureDLEQ(
 		return false
 	}
 
-	B_bytes, err := hex.DecodeString(B_str)
+	B_bytes, err := nostr.HexDecodeString(B_str)
 	if err != nil {
 		return false
 	}
@@ -97,7 +96,7 @@ func VerifyBlindSignatureDLEQ(
 		return false
 	}
 
-	C_bytes, err := hex.DecodeString(C_str)
+	C_bytes, err := nostr.HexDecodeString(C_str)
 	if err != nil {
 		return false
 	}
@@ -115,13 +114,13 @@ func parseDLEQ(dleq cashu.DLEQProof) (
 	*btcec.PrivateKey,
 	error,
 ) {
-	ebytes, err := hex.DecodeString(dleq.E)
+	ebytes, err := nostr.HexDecodeString(dleq.E)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	e := secp256k1.PrivKeyFromBytes(ebytes)
 
-	sbytes, err := hex.DecodeString(dleq.S)
+	sbytes, err := nostr.HexDecodeString(dleq.S)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -131,7 +130,7 @@ func parseDLEQ(dleq cashu.DLEQProof) (
 		return e, s, nil, nil
 	}
 
-	rbytes, err := hex.DecodeString(dleq.R)
+	rbytes, err := nostr.HexDecodeString(dleq.R)
 	if err != nil {
 		return nil, nil, nil, err
 	}

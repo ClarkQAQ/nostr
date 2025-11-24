@@ -2,7 +2,6 @@ package negentropy
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -31,19 +30,26 @@ type Negentropy struct {
 	HaveNots chan nostr.ID
 }
 
-func New(storage Storage, frameSizeLimit int) *Negentropy {
+func New(storage Storage, frameSizeLimit int, up, down bool) *Negentropy {
 	if frameSizeLimit == 0 {
 		frameSizeLimit = math.MaxInt
 	} else if frameSizeLimit < 4096 {
 		panic(fmt.Errorf("frameSizeLimit can't be smaller than 4096, was %d", frameSizeLimit))
 	}
 
-	return &Negentropy{
+	n := &Negentropy{
 		storage:        storage,
 		frameSizeLimit: frameSizeLimit,
-		Haves:          make(chan nostr.ID, buckets*4),
-		HaveNots:       make(chan nostr.ID, buckets*4),
 	}
+
+	if up {
+		n.Haves = make(chan nostr.ID, buckets*4)
+	}
+	if down {
+		n.HaveNots = make(chan nostr.ID, buckets*4)
+	}
+
+	return n
 }
 
 func (n *Negentropy) String() string {
@@ -65,12 +71,12 @@ func (n *Negentropy) Start() string {
 	output.WriteByte(protocolVersion)
 	n.SplitRange(0, n.storage.Size(), InfiniteBound, output)
 
-	return hex.EncodeToString(output.Bytes())
+	return nostr.HexEncodeToString(output.Bytes())
 }
 
 func (n *Negentropy) Reconcile(msg string) (string, error) {
 	n.initialized = true
-	msgb, err := hex.DecodeString(msg)
+	msgb, err := nostr.HexDecodeString(msg)
 	if err != nil {
 		return "", err
 	}
@@ -83,12 +89,16 @@ func (n *Negentropy) Reconcile(msg string) (string, error) {
 	}
 
 	if len(output) == 1 && n.isClient {
-		close(n.Haves)
-		close(n.HaveNots)
+		if n.Haves != nil {
+			close(n.Haves)
+		}
+		if n.HaveNots != nil {
+			close(n.HaveNots)
+		}
 		return "", nil
 	}
 
-	return hex.EncodeToString(output), nil
+	return nostr.HexEncodeToString(output), nil
 }
 
 func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
@@ -112,7 +122,8 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 
 	var prevBound Bound
 	prevIndex := 0
-	skipping := false // this means we are currently coalescing ranges into skip
+	skipping := false                    // this means we are currently coalescing ranges into skip
+	var theirItems map[nostr.ID]struct{} // used to track stuff in IdListMode
 
 	partialOutput := bytes.NewBuffer(make([]byte, 0, 100))
 	for reader.Len() > 0 {
@@ -165,8 +176,13 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 				return nil, fmt.Errorf("failed to decode number of ids: %w", err)
 			}
 
+			if theirItems == nil {
+				theirItems = make(map[nostr.ID]struct{}, numIds)
+			} else {
+				clear(theirItems) // reusing this from the last run
+			}
+
 			// what they have
-			theirItems := make(map[nostr.ID]struct{}, numIds)
 			for i := 0; i < numIds; i++ {
 				var id [32]byte
 				if _, err := reader.Read(id[:]); err != nil {
@@ -178,20 +194,20 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 
 			// what we have
 			for _, item := range n.storage.Range(lower, upper) {
-				id := item.ID
-
-				if _, theyHave := theirItems[id]; theyHave {
+				if _, theyHave := theirItems[item.ID]; theyHave {
 					// if we have and they have, ignore
-					delete(theirItems, id)
+					delete(theirItems, item.ID)
 				} else {
-					// if we have and they don't, notify client
-					if n.isClient {
-						n.Haves <- id
+					if n.Haves != nil {
+						// if we have and they don't, notify client
+						if n.isClient {
+							n.Haves <- item.ID
+						}
 					}
 				}
 			}
 
-			if n.isClient {
+			if n.isClient && n.HaveNots != nil {
 				// notify client of what they have and we don't
 				for id := range theirItems {
 					// skip empty strings here because those were marked to be excluded as such in the previous step

@@ -1,11 +1,11 @@
 package nostr
 
 import (
-	"encoding/hex"
 	"testing"
 	"unsafe"
 
 	"github.com/stretchr/testify/require"
+	"github.com/templexxx/xhex"
 )
 
 func TestParseMessage(t *testing.T) {
@@ -139,6 +139,6 @@ func TestParseMessage(t *testing.T) {
 
 func mustSigFromHex(sigStr string) [64]byte {
 	var sig [64]byte
-	hex.Decode(sig[:], unsafe.Slice(unsafe.StringData(sigStr), 128))
+	xhex.Decode(sig[:], unsafe.Slice(unsafe.StringData(sigStr), 128))
 	return sig
 }

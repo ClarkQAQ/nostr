@@ -2,7 +2,6 @@ package nip60
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"slices"
 
@@ -42,7 +41,7 @@ func (opts SendOptions) asSpendingCondition(refund *btcec.PublicKey) *nut10.Spen
 
 		return &nut10.SpendingCondition{
 			Kind: nut10.HTLC,
-			Data: hex.EncodeToString(opts.Hashlock[:]),
+			Data: nostr.HexEncodeToString(opts.Hashlock[:]),
 			Tags: nut11.SerializeP2PKTags(tags),
 		}
 	} else if opts.P2PK != nil {
@@ -62,7 +61,7 @@ func (opts SendOptions) asSpendingCondition(refund *btcec.PublicKey) *nut10.Spen
 
 		return &nut10.SpendingCondition{
 			Kind: nut10.P2PK,
-			Data: hex.EncodeToString(opts.P2PK.SerializeCompressed()),
+			Data: nostr.HexEncodeToString(opts.P2PK.SerializeCompressed()),
 			Tags: nut11.SerializeP2PKTags(tags),
 		}
 	} else {

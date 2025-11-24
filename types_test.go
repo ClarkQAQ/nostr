@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/templexxx/cpu"
 )
 
 func TestIDJSONEncoding(t *testing.T) {
@@ -25,8 +26,10 @@ func TestIDJSONEncoding(t *testing.T) {
 	require.Error(t, err)
 
 	// test unmarshaling invalid hex
-	err = json.Unmarshal([]byte(`"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"`), &id2)
-	require.Error(t, err)
+	if !cpu.X86.HasAVX2 {
+		err = json.Unmarshal([]byte(`"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"`), &id2)
+		require.Error(t, err)
+	}
 }
 
 func TestPubKeyJSONEncoding(t *testing.T) {

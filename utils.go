@@ -3,9 +3,11 @@ package nostr
 import (
 	"bytes"
 	"cmp"
-	"encoding/hex"
 	"net/url"
 	"slices"
+	"unsafe"
+
+	"github.com/templexxx/xhex"
 )
 
 // IsValidRelayURL checks if a URL is a valid relay URL (ws:// or wss://).
@@ -20,6 +22,27 @@ func IsValidRelayURL(u string) bool {
 	return true
 }
 
+// HexEncodeToString encodes src into a hex string.
+func HexEncodeToString(src []byte) string {
+	dst := make([]byte, len(src)*2)
+	xhex.Encode(dst, src)
+	return unsafe.String(unsafe.SliceData(dst), len(dst))
+}
+
+// HexDecodeString decodes a hex string into bytes.
+func HexDecodeString(s string) ([]byte, error) {
+	src := unsafe.Slice(unsafe.StringData(s), len(s))
+	if len(src)%2 != 0 {
+		return nil, xhex.ErrLength
+	}
+	dst := make([]byte, len(src)/2)
+	err := xhex.Decode(dst, src)
+	if err != nil {
+		return nil, err
+	}
+	return dst, nil
+}
+
 // IsValid32ByteHex checks if a string is a valid 32-byte hex string.
 func IsValid32ByteHex(thing string) bool {
 	if !isLowerHex(thing) {
@@ -28,7 +51,7 @@ func IsValid32ByteHex(thing string) bool {
 	if len(thing) != 64 {
 		return false
 	}
-	_, err := hex.DecodeString(thing)
+	_, err := HexDecodeString(thing)
 	return err == nil
 }
 

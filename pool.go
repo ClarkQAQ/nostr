@@ -537,7 +537,7 @@ func (pool *Pool) subMany(
 				// until the context is canceled
 				debugLogf("[pool] retrying %s in %s\n", nm, interval)
 				time.Sleep(interval)
-				interval = interval * 17 / 10 // the next time we try we will wait longer
+				interval = min(10*time.Minute, interval*17/10) // the next time we try we will wait longer
 			}
 		}(url)
 	}

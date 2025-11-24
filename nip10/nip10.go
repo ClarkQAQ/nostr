@@ -21,7 +21,7 @@ func GetThreadRoot(tags nostr.Tags) nostr.Pointer {
 
 func GetImmediateParent(tags nostr.Tags) nostr.Pointer {
 	var parent nostr.Tag
-	var lastE nostr.Tag
+	var last nostr.Tag
 
 	for i := 0; i <= len(tags)-1; i++ {
 		tag := tags[i]
@@ -38,32 +38,37 @@ func GetImmediateParent(tags nostr.Tags) nostr.Pointer {
 				parent = tag
 				break
 			}
-			if tag[3] == "parent" {
-				// will be used as our first fallback
-				parent = tag
-				continue
-			}
 			if tag[3] == "mention" {
 				// this invalidates this tag as a second fallback mechanism (clients that don't add markers)
 				continue
 			}
 		}
 
-		lastE = tag // will be used as our second fallback (clients that don't add markers)
+		last = tag // will be used as our second fallback (clients that don't add markers)
 	}
 
 	// if we reached this point we don't have a "reply", but if we have a "parent"
 	// that means this event is a direct reply to the parent
 	if parent != nil {
-		p, _ := nostr.EventPointerFromTag(parent)
-		return p
+		if parent[0] == "e" {
+			p, _ := nostr.EventPointerFromTag(parent)
+			return p
+		} else {
+			a, _ := nostr.EntityPointerFromTag(parent)
+			return a
+		}
 	}
 
-	if lastE != nil {
+	if last != nil {
 		// if we reached this point and we have at least one "e" we'll use that (the last)
 		// (we don't bother looking for relay or author hints because these clients don't add these anyway)
-		p, _ := nostr.EventPointerFromTag(lastE)
-		return p
+		if last[0] == "e" {
+			p, _ := nostr.EventPointerFromTag(last)
+			return p
+		} else {
+			a, _ := nostr.EntityPointerFromTag(last)
+			return a
+		}
 	}
 
 	return nil

@@ -92,20 +92,11 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 		}
 
 		y := true
-		n := false
-
-		if evt.Tags.Has("public") {
-			edit.PrivateValue = &n
-			ok = true
-		} else if evt.Tags.Has("private") {
+		if evt.Tags.Has("private") {
 			edit.PrivateValue = &y
 			ok = true
 		}
-
-		if evt.Tags.Has("open") {
-			edit.ClosedValue = &n
-			ok = true
-		} else if evt.Tags.Has("closed") {
+		if evt.Tags.Has("closed") {
 			edit.ClosedValue = &y
 			ok = true
 		}
@@ -205,12 +196,14 @@ func (a RemoveUser) Apply(group *Group) {
 }
 
 type EditMetadata struct {
-	NameValue    *string
-	PictureValue *string
-	AboutValue   *string
-	PrivateValue *bool
-	ClosedValue  *bool
-	When         nostr.Timestamp
+	NameValue       *string
+	PictureValue    *string
+	AboutValue      *string
+	PrivateValue    *bool
+	RestrictedValue *bool
+	HiddenValue     *bool
+	ClosedValue     *bool
+	When            nostr.Timestamp
 }
 
 func (_ EditMetadata) Name() string { return "edit-metadata" }
@@ -227,6 +220,12 @@ func (a EditMetadata) Apply(group *Group) {
 	}
 	if a.PrivateValue != nil {
 		group.Private = *a.PrivateValue
+	}
+	if a.RestrictedValue != nil {
+		group.Restricted = *a.RestrictedValue
+	}
+	if a.HiddenValue != nil {
+		group.Hidden = *a.HiddenValue
 	}
 	if a.ClosedValue != nil {
 		group.Closed = *a.ClosedValue
@@ -254,6 +253,8 @@ func (a DeleteGroup) Apply(group *Group) {
 	group.Members = make(map[nostr.PubKey][]*Role)
 	group.Closed = true
 	group.Private = true
+	group.Restricted = true
+	group.Hidden = true
 	group.Name = "[deleted]"
 	group.About = ""
 	group.Picture = ""

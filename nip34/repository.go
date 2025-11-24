@@ -1,6 +1,8 @@
 package nip34
 
 import (
+	"fmt"
+
 	"fiatjaf.com/nostr"
 )
 
@@ -14,7 +16,7 @@ type Repository struct {
 	Clone                  []string
 	Relays                 []string
 	EarliestUniqueCommitID string
-	Maintainers            []string
+	Maintainers            []nostr.PubKey
 }
 
 func ParseRepository(event nostr.Event) Repository {
@@ -42,14 +44,18 @@ func ParseRepository(event nostr.Event) Repository {
 		case "r":
 			repo.EarliestUniqueCommitID = tag[1]
 		case "maintainers":
-			repo.Maintainers = append(repo.Maintainers, tag[1:]...)
+			for _, pkh := range tag[1:] {
+				if pk, err := nostr.PubKeyFromHex(pkh); err == nil {
+					repo.Maintainers = append(repo.Maintainers, pk)
+				}
+			}
 		}
 	}
 
 	return repo
 }
 
-func (r Repository) ToEvent() *nostr.Event {
+func (r Repository) ToEvent() nostr.Event {
 	tags := make(nostr.Tags, 0, 10)
 
 	tags = append(tags, nostr.Tag{"d", r.ID})
@@ -66,7 +72,9 @@ func (r Repository) ToEvent() *nostr.Event {
 	if len(r.Maintainers) > 0 {
 		tag := make(nostr.Tag, 1, 1+len(r.Maintainers))
 		tag[0] = "maintainers"
-		tag = append(tag, r.Maintainers...)
+		for _, pk := range r.Maintainers {
+			tag = append(tag, pk.Hex())
+		}
 		tags = append(tags, tag)
 	}
 	if len(r.Web) > 0 {
@@ -88,9 +96,47 @@ func (r Repository) ToEvent() *nostr.Event {
 		tags = append(tags, tag)
 	}
 
-	return &nostr.Event{
+	return nostr.Event{
 		Kind:      nostr.KindRepositoryAnnouncement,
 		Tags:      tags,
 		CreatedAt: nostr.Now(),
 	}
+}
+
+func (r Repository) String() string {
+	return fmt.Sprintf("Repository{ID: %s, Name: %s, Description: %s, Web: %v, Clone: %v, Relays: %v, EarliestUniqueCommitID: %s, Maintainers: %v}", r.ID, r.Name, r.Description, r.Web, r.Clone, r.Relays, r.EarliestUniqueCommitID, r.Maintainers)
+}
+
+func (r Repository) Equals(other Repository) bool {
+	if r.ID != other.ID || r.Name != other.Name || r.Description != other.Description {
+		return false
+	}
+	if r.EarliestUniqueCommitID != other.EarliestUniqueCommitID {
+		return false
+	}
+	if len(r.Web) != len(other.Web) || len(r.Clone) != len(other.Clone) ||
+		len(r.Relays) != len(other.Relays) || len(r.Maintainers) != len(other.Maintainers) {
+		return false
+	}
+	for i := range r.Web {
+		if r.Web[i] != other.Web[i] {
+			return false
+		}
+	}
+	for i := range r.Clone {
+		if r.Clone[i] != other.Clone[i] {
+			return false
+		}
+	}
+	for i := range r.Relays {
+		if r.Relays[i] != other.Relays[i] {
+			return false
+		}
+	}
+	for i := range r.Maintainers {
+		if r.Maintainers[i] != other.Maintainers[i] {
+			return false
+		}
+	}
+	return true
 }

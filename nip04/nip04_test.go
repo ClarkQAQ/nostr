@@ -1,7 +1,6 @@
 package nip04
 
 import (
-	"encoding/hex"
 	"strings"
 	"testing"
 
@@ -56,8 +55,8 @@ func TestEncryptionAndDecryptionWithMultipleLengths(t *testing.T) {
 }
 
 func TestNostrToolsCompatibility(t *testing.T) {
-	sk1, _ := hex.DecodeString("92996316beebf94171065a714cbf164d1f56d7ad9b35b329d9fc97535bf25352")
-	sk2, _ := hex.DecodeString("591c0c249adfb9346f8d37dfeed65725e2eea1d7a6e99fa503342f367138de84")
+	sk1, _ := nostr.HexDecodeString("92996316beebf94171065a714cbf164d1f56d7ad9b35b329d9fc97535bf25352")
+	sk2, _ := nostr.HexDecodeString("591c0c249adfb9346f8d37dfeed65725e2eea1d7a6e99fa503342f367138de84")
 	pk2 := nostr.GetPublicKey([32]byte(sk2))
 	shared, _ := ComputeSharedSecret(pk2, [32]byte(sk1))
 	ciphertext := "A+fRnU4aXS4kbTLfowqAww==?iv=QFYUrl5or/n/qamY79ze0A=="

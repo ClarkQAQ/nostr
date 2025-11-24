@@ -1,4 +1,4 @@
-package bluge
+package bleve
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"fiatjaf.com/nostr/eventstore/internal"
 )
 
-func (b *BlugeBackend) ReplaceEvent(evt nostr.Event) error {
+func (b *BleveBackend) ReplaceEvent(evt nostr.Event) error {
 	b.Lock()
 	defer b.Unlock()
 

@@ -1,10 +1,9 @@
 package nostr
 
 import (
-	"encoding/hex"
-
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/templexxx/xhex"
 )
 
 func easyjsonDecodeEvent(in *jlexer.Lexer, out *Event) {
@@ -29,12 +28,12 @@ func easyjsonDecodeEvent(in *jlexer.Lexer, out *Event) {
 		case "id":
 			b := in.UnsafeBytes()
 			if len(b) == 64 {
-				hex.Decode(out.ID[:], b)
+				xhex.Decode(out.ID[:], b)
 			}
 		case "pubkey":
 			b := in.UnsafeBytes()
 			if len(b) == 64 {
-				hex.Decode(out.PubKey[:], b)
+				xhex.Decode(out.PubKey[:], b)
 			}
 		case "created_at":
 			out.CreatedAt = Timestamp(in.Int64())
@@ -73,7 +72,7 @@ func easyjsonDecodeEvent(in *jlexer.Lexer, out *Event) {
 		case "sig":
 			b := in.UnsafeBytes()
 			if len(b) == 128 {
-				hex.Decode(out.Sig[:], b)
+				xhex.Decode(out.Sig[:], b)
 			}
 		}
 		in.WantComma()
@@ -92,12 +91,12 @@ func easyjsonEncodeEvent(out *jwriter.Writer, in Event) {
 
 	if in.ID != ZeroID {
 		out.RawString(",\"id\":\"")
-		out.RawString(hex.EncodeToString(in.ID[:]) + "\"")
+		out.RawString(HexEncodeToString(in.ID[:]) + "\"")
 	}
 
 	if in.PubKey != ZeroPK {
 		out.RawString(",\"pubkey\":\"")
-		out.RawString(hex.EncodeToString(in.PubKey[:]) + "\"")
+		out.RawString(HexEncodeToString(in.PubKey[:]) + "\"")
 	}
 
 	out.RawString(",\"created_at\":")
@@ -125,7 +124,7 @@ func easyjsonEncodeEvent(out *jwriter.Writer, in Event) {
 
 	if in.Sig != [64]byte{} {
 		out.RawString(",\"sig\":\"")
-		out.RawString(hex.EncodeToString(in.Sig[:]) + "\"")
+		out.RawString(HexEncodeToString(in.Sig[:]) + "\"")
 	}
 
 	out.RawByte('}')

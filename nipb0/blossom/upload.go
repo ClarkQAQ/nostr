@@ -3,7 +3,6 @@ package blossom
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"mime"
@@ -47,7 +46,7 @@ func (c *Client) UploadBlob(ctx context.Context, file io.ReadSeeker, contentType
 	err = c.httpCall(ctx, "PUT", "upload", contentType, func() string {
 		return c.authorizationHeader(ctx, func(evt *nostr.Event) {
 			evt.Tags = append(evt.Tags, nostr.Tag{"t", "upload"})
-			evt.Tags = append(evt.Tags, nostr.Tag{"x", hex.EncodeToString(hash[:])})
+			evt.Tags = append(evt.Tags, nostr.Tag{"x", nostr.HexEncodeToString(hash[:])})
 		})
 	}, file, size, &bd)
 	if err != nil {

@@ -104,12 +104,13 @@ func Decode(bech32string string) (prefix string, value any, err error) {
 		}
 	case "naddr":
 		var result nostr.EntityPointer
+		var hasIdentifier bool
 		curr := 0
 		for {
 			t, v := readTLVEntry(data[curr:])
 			if v == nil {
 				// end here
-				if result.Kind == 0 || result.Identifier == "" || result.PublicKey == nostr.ZeroPK {
+				if result.Kind == 0 || !hasIdentifier || result.PublicKey == nostr.ZeroPK {
 					return prefix, result, fmt.Errorf("incomplete naddr")
 				}
 
@@ -119,6 +120,7 @@ func Decode(bech32string string) (prefix string, value any, err error) {
 			switch t {
 			case TLVDefault:
 				result.Identifier = string(v)
+				hasIdentifier = true
 			case TLVRelay:
 				result.Relays = append(result.Relays, string(v))
 			case TLVAuthor:

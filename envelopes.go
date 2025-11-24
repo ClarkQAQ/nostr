@@ -1,7 +1,6 @@
 package nostr
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/mailru/easyjson"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/templexxx/xhex"
 	"github.com/tidwall/gjson"
 )
 
@@ -187,7 +187,7 @@ func (v *CountEnvelope) FromJSON(data string) error {
 	if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(arr[2].Raw), len(arr[2].Raw)), &countResult); err == nil && countResult.Count != nil {
 		v.Count = countResult.Count
 		if len(countResult.HLL) == 512 {
-			v.HyperLogLog, err = hex.DecodeString(countResult.HLL)
+			v.HyperLogLog, err = HexDecodeString(countResult.HLL)
 			if err != nil {
 				return fmt.Errorf("invalid \"hll\" value in COUNT message: %w", err)
 			}
@@ -214,7 +214,7 @@ func (v CountEnvelope) MarshalJSON() ([]byte, error) {
 		if v.HyperLogLog != nil {
 			w.RawString(`,"hll":"`)
 			hllHex := make([]byte, 512)
-			hex.Encode(hllHex, v.HyperLogLog)
+			xhex.Encode(hllHex, v.HyperLogLog)
 			w.Buffer.AppendBytes(hllHex)
 			w.RawString(`"`)
 		}
@@ -365,7 +365,7 @@ func (v *OKEnvelope) FromJSON(data string) error {
 	if len(arr) < 4 {
 		return fmt.Errorf("failed to decode OK envelope: missing fields")
 	}
-	if _, err := hex.Decode(v.EventID[:], []byte(arr[1].Str)); err != nil {
+	if err := xhex.Decode(v.EventID[:], []byte(arr[1].Str)); err != nil {
 		return err
 	}
 	v.OK = arr[2].Raw == "true"
@@ -377,7 +377,7 @@ func (v *OKEnvelope) FromJSON(data string) error {
 func (v OKEnvelope) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{NoEscapeHTML: true}
 	w.RawString(`["OK","`)
-	w.RawString(hex.EncodeToString(v.EventID[:]))
+	w.RawString(HexEncodeToString(v.EventID[:]))
 	w.RawString(`",`)
 	ok := "false"
 	if v.OK {

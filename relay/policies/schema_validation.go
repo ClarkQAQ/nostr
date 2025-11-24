@@ -7,12 +7,12 @@ import (
 	"fiatjaf.com/nostr/schema"
 )
 
-func ValidateAgainstSchema(ctx context.Context, evt nostr.Event) (bool, string) {
-	v := schema.NewDefaultValidator()
-	v.FailOnUnknown = true
-	err := v.ValidateEvent(evt)
-	if err != nil {
-		return true, err.Error()
+func ValidateAgainstSchema(v schema.Validator) func(ctx context.Context, evt nostr.Event) (bool, string) {
+	return func(ctx context.Context, evt nostr.Event) (bool, string) {
+		err := v.ValidateEvent(evt)
+		if err != nil {
+			return true, err.Error()
+		}
+		return false, ""
 	}
-	return false, ""
 }

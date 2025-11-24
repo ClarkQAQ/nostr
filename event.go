@@ -2,10 +2,10 @@ package nostr
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"strconv"
 
 	"github.com/mailru/easyjson"
+	"github.com/templexxx/xhex"
 )
 
 // Event represents a Nostr event.
@@ -38,15 +38,12 @@ func (evt Event) CheckID() bool {
 func (evt Event) Serialize() []byte {
 	// the serialization process is just putting everything into a JSON array
 	// so the order is kept. See NIP-01
-	dst := make([]byte, 0, 100+len(evt.Content)+len(evt.Tags)*80)
-	return serializeEventInto(evt, dst)
-}
+	dst := make([]byte, 4+64, 100+len(evt.Content)+len(evt.Tags)*80)
 
-func serializeEventInto(evt Event, dst []byte) []byte {
 	// the header portion is easy to serialize
 	// [0,"pubkey",created_at,kind,[
-	dst = append(dst, `[0,"`...)
-	dst = hex.AppendEncode(dst, evt.PubKey[:])
+	copy(dst, `[0,"`)
+	xhex.Encode(dst[4:4+64], evt.PubKey[:]) // there will always be such capacity
 	dst = append(dst, `",`...)
 	dst = append(dst, strconv.FormatInt(int64(evt.CreatedAt), 10)...)
 	dst = append(dst, `,`...)

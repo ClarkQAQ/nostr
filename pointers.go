@@ -1,7 +1,6 @@
 package nostr
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -56,13 +55,13 @@ func ProfilePointerFromTag(refTag Tag) (ProfilePointer, error) {
 // MatchesEvent checks if the pointer matches an event.
 func (ep ProfilePointer) MatchesEvent(_ Event) bool { return false }
 func (ep ProfilePointer) AsFilter() Filter          { return Filter{Authors: []PubKey{ep.PublicKey}} }
-func (ep ProfilePointer) AsTagReference() string    { return hex.EncodeToString(ep.PublicKey[:]) }
+func (ep ProfilePointer) AsTagReference() string    { return HexEncodeToString(ep.PublicKey[:]) }
 
 func (ep ProfilePointer) AsTag() Tag {
 	if len(ep.Relays) > 0 {
-		return Tag{"p", hex.EncodeToString(ep.PublicKey[:]), ep.Relays[0]}
+		return Tag{"p", HexEncodeToString(ep.PublicKey[:]), ep.Relays[0]}
 	}
-	return Tag{"p", hex.EncodeToString(ep.PublicKey[:])}
+	return Tag{"p", HexEncodeToString(ep.PublicKey[:])}
 }
 
 // EventPointer represents a pointer to a nostr event.
@@ -98,18 +97,18 @@ func EventPointerFromTag(refTag Tag) (EventPointer, error) {
 
 func (ep EventPointer) MatchesEvent(evt Event) bool { return evt.ID == ep.ID }
 func (ep EventPointer) AsFilter() Filter            { return Filter{IDs: []ID{ep.ID}} }
-func (ep EventPointer) AsTagReference() string      { return hex.EncodeToString(ep.ID[:]) }
+func (ep EventPointer) AsTagReference() string      { return HexEncodeToString(ep.ID[:]) }
 
 // AsTag converts the pointer to a Tag.
 func (ep EventPointer) AsTag() Tag {
 	if len(ep.Relays) > 0 {
 		if ep.Author != [32]byte{} {
-			return Tag{"e", hex.EncodeToString(ep.ID[:]), ep.Relays[0], hex.EncodeToString(ep.Author[:])}
+			return Tag{"e", HexEncodeToString(ep.ID[:]), ep.Relays[0], HexEncodeToString(ep.Author[:])}
 		} else {
-			return Tag{"e", hex.EncodeToString(ep.ID[:]), ep.Relays[0]}
+			return Tag{"e", HexEncodeToString(ep.ID[:]), ep.Relays[0]}
 		}
 	}
-	return Tag{"e", hex.EncodeToString(ep.ID[:])}
+	return Tag{"e", HexEncodeToString(ep.ID[:])}
 }
 
 // EntityPointer represents a pointer to a nostr entity (addressable event).
@@ -167,7 +166,7 @@ func (ep EntityPointer) MatchesEvent(evt Event) bool {
 }
 
 func (ep EntityPointer) AsTagReference() string {
-	return fmt.Sprintf("%d:%s:%s", ep.Kind, ep.PublicKey, ep.Identifier)
+	return fmt.Sprintf("%d:%s:%s", ep.Kind, ep.PublicKey.Hex(), ep.Identifier)
 }
 
 func (ep EntityPointer) AsFilter() Filter {

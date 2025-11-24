@@ -1,4 +1,4 @@
-package bluge
+package bleve
 
 import (
 	"os"
@@ -9,18 +9,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBlugeFlow(t *testing.T) {
-	os.RemoveAll("/tmp/blugetest-boltdb")
-	os.RemoveAll("/tmp/blugetest-bluge")
+func TestBleveFlow(t *testing.T) {
+	os.RemoveAll("/tmp/blevetest-boltdb")
+	os.RemoveAll("/tmp/blevetest-bleve")
 
-	bb := &boltdb.BoltBackend{Path: "/tmp/blugetest-boltdb"}
+	bb := &boltdb.BoltBackend{Path: "/tmp/blevetest-boltdb"}
 	if e := bb.Init(); e != nil {
 		t.Fatal(e)
 	}
 	defer bb.Close()
 
-	bl := BlugeBackend{
-		Path:          "/tmp/blugetest-bluge",
+	bl := BleveBackend{
+		Path:          "/tmp/blevetest-bleve",
 		RawEventStore: bb,
 	}
 	if e := bl.Init(); e != nil {
@@ -56,9 +56,11 @@ func TestBlugeFlow(t *testing.T) {
 
 	{
 		n := 0
+		t.Logf("searching for 'good' (should find 3)")
 		for range bl.QueryEvents(nostr.Filter{Search: "good"}, 400) {
 			n++
 		}
+		t.Logf("found %d results", n)
 		assert.Equal(t, 3, n)
 	}
 
@@ -70,12 +72,12 @@ func TestBlugeFlow(t *testing.T) {
 
 	{
 		n := 0
-		for res := range bl.QueryEvents(nostr.Filter{Search: "good"}, 400) {
+		for evt := range bl.QueryEvents(nostr.Filter{Search: "good"}, 400) {
 			n++
-			assert.Equal(t, res.Content, "good night")
+			assert.Equal(t, evt.Content, "good night")
 			assert.Equal(t,
 				nostr.MustPubKeyFromHex("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"),
-				res.PubKey,
+				evt.PubKey,
 			)
 		}
 		assert.Equal(t, 1, n)

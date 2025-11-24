@@ -2,7 +2,6 @@ package nostr
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	stdjson "encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/templexxx/xhex"
 )
 
 var KeyOne = SecretKey{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
@@ -36,11 +36,11 @@ func Generate() SecretKey {
 type SecretKey [32]byte
 
 func (sk SecretKey) String() string { return "sk::" + sk.Hex() }
-func (sk SecretKey) Hex() string    { return hex.EncodeToString(sk[:]) }
+func (sk SecretKey) Hex() string    { return HexEncodeToString(sk[:]) }
 func (sk SecretKey) Public() PubKey { return GetPublicKey(sk) }
 func (pk SecretKey) MarshalJSON() ([]byte, error) {
 	res := make([]byte, 66)
-	hex.Encode(res[1:], pk[:])
+	xhex.Encode(res[1:], pk[:])
 	res[0] = '"'
 	res[65] = '"'
 	return res, nil
@@ -50,7 +50,7 @@ func (pk *SecretKey) UnmarshalJSON(buf []byte) error {
 	if len(buf) != 66 {
 		return fmt.Errorf("must be a hex string of 64 characters")
 	}
-	if _, err := hex.Decode(pk[:], buf[1:65]); err != nil {
+	if err := xhex.Decode(pk[:], buf[1:65]); err != nil {
 		return err
 	}
 	return nil
@@ -65,7 +65,7 @@ func SecretKeyFromHex(skh string) (SecretKey, error) {
 		return sk, fmt.Errorf("secret key should be at most 64-char hex, got '%s'", skh)
 	}
 
-	if _, err := hex.Decode(sk[:], unsafe.Slice(unsafe.StringData(skh), 64)); err != nil {
+	if err := xhex.Decode(sk[:], unsafe.Slice(unsafe.StringData(skh), 64)); err != nil {
 		return sk, fmt.Errorf("'%s' is not valid hex: %w", skh, err)
 	}
 
@@ -78,7 +78,7 @@ func SecretKeyFromHex(skh string) (SecretKey, error) {
 
 func MustSecretKeyFromHex(idh string) SecretKey {
 	id := SecretKey{}
-	if _, err := hex.Decode(id[:], unsafe.Slice(unsafe.StringData(idh), 64)); err != nil {
+	if err := xhex.Decode(id[:], unsafe.Slice(unsafe.StringData(idh), 64)); err != nil {
 		panic(err)
 	}
 	return id
@@ -107,10 +107,10 @@ var (
 )
 
 func (pk PubKey) String() string { return "pk::" + pk.Hex() }
-func (pk PubKey) Hex() string    { return hex.EncodeToString(pk[:]) }
+func (pk PubKey) Hex() string    { return HexEncodeToString(pk[:]) }
 func (pk PubKey) MarshalJSON() ([]byte, error) {
 	res := make([]byte, 66)
-	hex.Encode(res[1:], pk[:])
+	xhex.Encode(res[1:], pk[:])
 	res[0] = '"'
 	res[65] = '"'
 	return res, nil
@@ -120,7 +120,7 @@ func (pk *PubKey) UnmarshalJSON(buf []byte) error {
 	if len(buf) != 66 {
 		return fmt.Errorf("must be a hex string of 64 characters")
 	}
-	if _, err := hex.Decode(pk[:], buf[1:65]); err != nil {
+	if err := xhex.Decode(pk[:], buf[1:65]); err != nil {
 		return err
 	}
 	if _, err := schnorr.ParsePubKey(pk[:]); err != nil {
@@ -134,7 +134,7 @@ func PubKeyFromHex(pkh string) (PubKey, error) {
 	if len(pkh) != 64 {
 		return pk, fmt.Errorf("pubkey should be 64-char hex, got '%s'", pkh)
 	}
-	if _, err := hex.Decode(pk[:], unsafe.Slice(unsafe.StringData(pkh), 64)); err != nil {
+	if err := xhex.Decode(pk[:], unsafe.Slice(unsafe.StringData(pkh), 64)); err != nil {
 		return pk, fmt.Errorf("'%s' is not valid hex: %w", pkh, err)
 	}
 	if _, err := schnorr.ParsePubKey(pk[:]); err != nil {
@@ -148,7 +148,7 @@ func PubKeyFromHexCheap(pkh string) (PubKey, error) {
 	if len(pkh) != 64 {
 		return pk, fmt.Errorf("pubkey should be 64-char hex, got '%s'", pkh)
 	}
-	if _, err := hex.Decode(pk[:], unsafe.Slice(unsafe.StringData(pkh), 64)); err != nil {
+	if err := xhex.Decode(pk[:], unsafe.Slice(unsafe.StringData(pkh), 64)); err != nil {
 		return pk, fmt.Errorf("'%s' is not valid hex: %w", pkh, err)
 	}
 
@@ -157,7 +157,9 @@ func PubKeyFromHexCheap(pkh string) (PubKey, error) {
 
 func MustPubKeyFromHex(pkh string) PubKey {
 	pk := PubKey{}
-	hex.Decode(pk[:], unsafe.Slice(unsafe.StringData(pkh), 64))
+	if err := xhex.Decode(pk[:], unsafe.Slice(unsafe.StringData(pkh), 64)); err != nil {
+		panic(err)
+	}
 	return pk
 }
 

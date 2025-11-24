@@ -2,7 +2,6 @@ package nip46
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"sync"
 
@@ -90,7 +89,7 @@ func (p *StaticKeySigner) HandleRequest(_ context.Context, event nostr.Event) (
 		result = "ack"
 		harmless = true
 	case "get_public_key":
-		result = hex.EncodeToString(session.PublicKey[:])
+		result = nostr.HexEncodeToString(session.PublicKey[:])
 		harmless = true
 	case "sign_event":
 		if len(req.Params) != 1 {

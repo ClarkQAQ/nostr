@@ -1,10 +1,9 @@
 package nostr
 
 import (
-	"encoding/hex"
-
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/templexxx/xhex"
 )
 
 func easyjson33014d6eDecodeFiatjafComNostr(in *jlexer.Lexer, out *ProfilePointer) {
@@ -30,7 +29,7 @@ func easyjson33014d6eDecodeFiatjafComNostr(in *jlexer.Lexer, out *ProfilePointer
 			if in.IsNull() {
 				in.Skip()
 			} else {
-				hex.Decode(out.PublicKey[:], in.UnsafeBytes())
+				xhex.Decode(out.PublicKey[:], in.UnsafeBytes())
 			}
 		case "relays":
 			if in.IsNull() {
@@ -137,7 +136,7 @@ func easyjson33014d6eDecodeFiatjafComNostr1(in *jlexer.Lexer, out *EventPointer)
 			if in.IsNull() {
 				in.Skip()
 			} else {
-				hex.Decode(out.ID[:], in.UnsafeBytes())
+				xhex.Decode(out.ID[:], in.UnsafeBytes())
 			}
 		case "relays":
 			if in.IsNull() {
@@ -164,7 +163,7 @@ func easyjson33014d6eDecodeFiatjafComNostr1(in *jlexer.Lexer, out *EventPointer)
 			if in.IsNull() {
 				in.Skip()
 			} else {
-				hex.Decode(out.Author[:], in.UnsafeBytes())
+				xhex.Decode(out.Author[:], in.UnsafeBytes())
 			}
 		case "kind":
 			out.Kind = Kind(in.Uint16())
@@ -262,7 +261,7 @@ func easyjson33014d6eDecodeFiatjafComNostr2(in *jlexer.Lexer, out *EntityPointer
 			if in.IsNull() {
 				in.Skip()
 			} else {
-				hex.Decode(out.PublicKey[:], in.UnsafeBytes())
+				xhex.Decode(out.PublicKey[:], in.UnsafeBytes())
 			}
 		case "kind":
 			out.Kind = Kind(in.Uint16())

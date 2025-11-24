@@ -2,7 +2,6 @@ package blossom
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	"fiatjaf.com/nostr"
@@ -16,7 +15,7 @@ func (c *Client) List(ctx context.Context) ([]BlobDescriptor, error) {
 	}
 
 	bds := make([]BlobDescriptor, 0, 100)
-	err = c.httpCall(ctx, "GET", "list/"+hex.EncodeToString(pubkey[:]), "", func() string {
+	err = c.httpCall(ctx, "GET", "list/"+nostr.HexEncodeToString(pubkey[:]), "", func() string {
 		return c.authorizationHeader(ctx, func(evt *nostr.Event) {
 			evt.Tags = append(evt.Tags, nostr.Tag{"t", "list"})
 		})

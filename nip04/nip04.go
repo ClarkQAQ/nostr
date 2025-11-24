@@ -6,7 +6,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -23,7 +22,7 @@ func ComputeSharedSecret(pub nostr.PubKey, sk [32]byte) (sharedSecret []byte, er
 	// adding 02 to signal that this is a compressed public key (33 bytes)
 	pubKey, err := btcec.ParsePubKey(append([]byte{2}, pub[:]...))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing receiver public key '%s': %w", "02"+hex.EncodeToString(pub[:]), err)
+		return nil, fmt.Errorf("error parsing receiver public key '%s': %w", "02"+nostr.HexEncodeToString(pub[:]), err)
 	}
 
 	return btcec.GenerateSharedSecret(privKey, pubKey), nil

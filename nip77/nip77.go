@@ -10,43 +10,42 @@ import (
 	"fiatjaf.com/nostr/nip77/negentropy/storage/vector"
 )
 
-type direction struct {
-	label  string
-	items  chan nostr.ID
-	source nostr.QuerierPublisher
-	target nostr.QuerierPublisher
+type Direction struct {
+	From  nostr.Querier
+	To    nostr.Publisher
+	Items chan nostr.ID
 }
-
-type Direction int
-
-const (
-	Up   = 0
-	Down = 1
-	Both = 2
-)
 
 func NegentropySync(
 	ctx context.Context,
-	store nostr.QuerierPublisher,
-	url string,
+
+	relayUrl string,
 	filter nostr.Filter,
-	dir Direction,
+
+	// where our local events will be read from.
+	// if it is nil the sync will be unidirectional: download-only.
+	source nostr.Querier,
+
+	// where new events received from the relay will be written to.
+	// if it is nil the sync will be unidirectional: upload-only.
+	// it can also be a nostr.QuerierPublisher in case source isn't provided
+	// and you need a download-only sync that respects local data.
+	target nostr.Publisher,
+
+	// handle ids received on each direction, usually called with Sync() so the corresponding events are
+	// fetched from the source and published to the target
+	handle func(ctx context.Context, directions Direction),
 ) error {
 	id := "nl-tmp" // for now we can't have more than one subscription in the same connection
 
 	vec := vector.New()
-	neg := negentropy.New(vec, 1024*1024)
+	neg := negentropy.New(vec, 60_000, source != nil, target != nil)
 
-	for evt := range store.QueryEvents(filter) {
-		vec.Insert(evt.CreatedAt, evt.ID)
-	}
-	vec.Seal()
-
-	result := make(chan error)
-
+	// connect to relay
 	var err error
-	var r *nostr.Relay
-	r, err = nostr.RelayConnect(ctx, url, nostr.RelayOptions{
+	errch := make(chan error)
+	var relay *nostr.Relay
+	relay, err = nostr.RelayConnect(ctx, relayUrl, nostr.RelayOptions{
 		CustomHandler: func(data string) {
 			envelope := ParseNegMessage(data)
 			if envelope == nil {
@@ -54,21 +53,21 @@ func NegentropySync(
 			}
 			switch env := envelope.(type) {
 			case *OpenEnvelope, *CloseEnvelope:
-				result <- fmt.Errorf("unexpected %s received from relay", env.Label())
+				errch <- fmt.Errorf("unexpected %s received from relay", env.Label())
 				return
 			case *ErrorEnvelope:
-				result <- fmt.Errorf("relay returned a %s: %s", env.Label(), env.Reason)
+				errch <- fmt.Errorf("relay returned a %s: %s", env.Label(), env.Reason)
 				return
 			case *MessageEnvelope:
 				nextmsg, err := neg.Reconcile(env.Message)
 				if err != nil {
-					result <- fmt.Errorf("failed to reconcile: %w", err)
+					errch <- fmt.Errorf("failed to reconcile: %w", err)
 					return
 				}
 
 				if nextmsg != "" {
 					msgb, _ := MessageEnvelope{id, nextmsg}.MarshalJSON()
-					r.Write(msgb)
+					relay.Write(msgb)
 				}
 			}
 		},
@@ -77,77 +76,94 @@ func NegentropySync(
 		return err
 	}
 
+	// fill our local vector
+	var usedSource nostr.Querier
+	if source != nil {
+		for evt := range source.QueryEvents(filter) {
+			vec.Insert(evt.CreatedAt, evt.ID)
+		}
+		usedSource = source
+	}
+	if target != nil {
+		if targetSource, ok := target.(nostr.Querier); ok && targetSource != usedSource {
+			for evt := range targetSource.QueryEvents(filter) {
+				vec.Insert(evt.CreatedAt, evt.ID)
+			}
+		}
+	}
+	vec.Seal()
+
+	// kickstart the process
 	msg := neg.Start()
 	open, _ := OpenEnvelope{id, filter, msg}.MarshalJSON()
-	err = r.WriteWithError(open)
+	err = relay.WriteWithError(open)
 	if err != nil {
 		return fmt.Errorf("failed to write to relay: %w", err)
 	}
 
 	defer func() {
 		clse, _ := CloseEnvelope{id}.MarshalJSON()
-		r.Write(clse)
+		relay.Write(clse)
 	}()
 
 	wg := sync.WaitGroup{}
-	pool := sync.Pool{
-		New: func() any { return make([]nostr.ID, 0, 50) },
+
+	// handle emitted events from either direction
+	if source != nil {
+		wg.Go(func() {
+			handle(ctx, Direction{
+				From:  source,
+				To:    relay,
+				Items: neg.Haves,
+			})
+		})
 	}
-
-	// Define sync directions
-	directions := [][]direction{
-		{{"up", neg.Haves, store, r}},
-		{{"down", neg.HaveNots, r, store}},
-		{{"up", neg.Haves, store, r}, {"down", neg.HaveNots, r, store}},
-	}
-
-	for _, dir := range directions[dir] {
-		wg.Add(1)
-		go func(dir direction) {
-			defer wg.Done()
-
-			seen := make(map[nostr.ID]struct{})
-
-			doSync := func(ids []nostr.ID) {
-				defer wg.Done()
-				defer pool.Put(ids)
-
-				if len(ids) == 0 {
-					return
-				}
-				for evt := range dir.source.QueryEvents(nostr.Filter{IDs: ids}) {
-					dir.target.Publish(ctx, evt)
-				}
-			}
-
-			ids := pool.Get().([]nostr.ID)
-			for item := range dir.items {
-				if _, ok := seen[item]; ok {
-					continue
-				}
-				seen[item] = struct{}{}
-
-				ids = append(ids, item)
-				if len(ids) == 50 {
-					wg.Add(1)
-					go doSync(ids)
-					ids = pool.Get().([]nostr.ID)
-				}
-			}
-			wg.Add(1)
-			doSync(ids)
-		}(dir)
+	if target != nil {
+		wg.Go(func() {
+			handle(ctx, Direction{
+				From:  relay,
+				To:    target,
+				Items: neg.HaveNots,
+			})
+		})
 	}
 
 	go func() {
 		wg.Wait()
-		result <- nil
+		errch <- nil
 	}()
 
-	err = <-result
+	err = <-errch
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func SyncEventsFromIDs(ctx context.Context, dir Direction) {
+	// this is only necessary because relays are too ratelimiting
+	batch := make([]nostr.ID, 0, 50)
+
+	seen := make(map[nostr.ID]struct{})
+	for item := range dir.Items {
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+
+		batch = append(batch, item)
+		if len(batch) == 50 {
+			for evt := range dir.From.QueryEvents(nostr.Filter{IDs: batch}) {
+				dir.To.Publish(ctx, evt)
+			}
+			batch = batch[:0]
+		}
+	}
+
+	if len(batch) > 0 {
+		for evt := range dir.From.QueryEvents(nostr.Filter{IDs: batch}) {
+			dir.To.Publish(ctx, evt)
+		}
+	}
 }

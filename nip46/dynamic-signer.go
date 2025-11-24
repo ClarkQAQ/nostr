@@ -2,7 +2,6 @@ package nip46
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"sync"
 
@@ -131,7 +130,7 @@ func (p *DynamicSigner) HandleRequest(ctx context.Context, event nostr.Event) (
 
 		result = "ack"
 	case "get_public_key":
-		result = hex.EncodeToString(session.PublicKey[:])
+		result = nostr.HexEncodeToString(session.PublicKey[:])
 	case "sign_event":
 		if len(req.Params) != 1 {
 			resultErr = fmt.Errorf("wrong number of arguments to 'sign_event'")

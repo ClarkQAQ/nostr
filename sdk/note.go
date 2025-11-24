@@ -2,7 +2,6 @@ package sdk
 
 import (
 	"context"
-	"encoding/hex"
 	"regexp"
 	"strings"
 	"time"
@@ -57,7 +56,7 @@ func (sys *System) PrepareNoteEvent(ctx context.Context, evt *nostr.Event) (targ
 		case nostr.ProfilePointer:
 			pk = b.PublicKey
 			// add p tag if not already present
-			if tag := evt.Tags.FindWithValue("p", hex.EncodeToString(b.PublicKey[:])); tag == nil {
+			if tag := evt.Tags.FindWithValue("p", nostr.HexEncodeToString(b.PublicKey[:])); tag == nil {
 				evt.Tags = append(evt.Tags, b.AsTag())
 			}
 		case nostr.EventPointer:
@@ -77,7 +76,7 @@ func (sys *System) PrepareNoteEvent(ctx context.Context, evt *nostr.Event) (targ
 			}
 
 			// add e tag if not already present
-			if tag := evt.Tags.FindWithValue("q", hex.EncodeToString(b.ID[:])); tag != nil {
+			if tag := evt.Tags.FindWithValue("q", nostr.HexEncodeToString(b.ID[:])); tag != nil {
 				if len(tag) == 2 {
 					tag = append(tag, relay) // shove this relay hint here
 				}

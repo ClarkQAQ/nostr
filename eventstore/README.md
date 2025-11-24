@@ -33,7 +33,7 @@ type Store interface {
 
 ## Available Implementations
 
-- **bluge**: Full-text search and indexing using the Bluge search library
+- **bleve**: Full-text search and indexing using the Bleve search library
 - **boltdb**: Embedded key-value database using BoltDB
 - **lmdb**: High-performance embedded database using LMDB
 - **mmm**: Custom memory-mapped storage with advanced indexing

@@ -2,7 +2,6 @@ package nip46
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -56,7 +55,7 @@ func ConnectBunker(
 		pool,
 		onAuth,
 	)
-	_, err = bunker.RPC(ctx, "connect", []string{hex.EncodeToString(parsed.HostPubKey[:]), parsed.Secret})
+	_, err = bunker.RPC(ctx, "connect", []string{nostr.HexEncodeToString(parsed.HostPubKey[:]), parsed.Secret})
 	return bunker, err
 }
 

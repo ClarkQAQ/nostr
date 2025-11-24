@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	ws "github.com/coder/websocket"
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
@@ -26,7 +27,12 @@ type Relay struct {
 	URL           string
 	requestHeader http.Header // e.g. for origin header
 
-	connection    *connection
+	// websocket connection
+	conn         *ws.Conn
+	writeQueue   chan writeRequest
+	closed       *atomic.Bool
+	closedNotify chan struct{}
+
 	Subscriptions *xsync.MapOf[int64, *Subscription]
 
 	ConnectionError         error
@@ -98,7 +104,7 @@ func (r *Relay) String() string {
 func (r *Relay) Context() context.Context { return r.connectionContext }
 
 // IsConnected returns true if the connection to this relay seems to be active.
-func (r *Relay) IsConnected() bool { return !r.connection.closed.Load() }
+func (r *Relay) IsConnected() bool { return !r.closed.Load() }
 
 // Connect tries to establish a websocket connection to r.URL.
 // If the context expires before the connection is complete, an error is returned.
@@ -121,11 +127,9 @@ func (r *Relay) ConnectWithTLS(ctx context.Context, tlsConfig *tls.Config) error
 		return fmt.Errorf("invalid relay URL '%s'", r.URL)
 	}
 
-	conn, err := newConnection(ctx, r.connectionContextCancel, r.URL, r.handleMessage, r.requestHeader, tlsConfig)
-	if err != nil {
+	if err := r.newConnection(ctx, tlsConfig); err != nil {
 		return fmt.Errorf("error opening websocket to '%s': %w", r.URL, err)
 	}
-	r.connection = conn
 
 	return nil
 }
@@ -153,7 +157,7 @@ func (r *Relay) handleMessage(message string) {
 	envelope, err := ParseMessage(message)
 	if envelope == nil {
 		if r.customHandler != nil && err == UnknownLabel {
-			r.customHandler(message)
+			go r.customHandler(message)
 		}
 		return
 	}
@@ -219,33 +223,34 @@ func (r *Relay) handleMessage(message string) {
 
 // Write queues an arbitrary message to be sent to the relay.
 func (r *Relay) Write(msg []byte) {
-	r.connection.closeMutex.Lock()
-	defer r.connection.closeMutex.Unlock()
+	r.closeMutex.Lock()
+	defer r.closeMutex.Unlock()
 	select {
-	case <-r.connection.closedNotify:
+	case <-r.closedNotify:
 		return
 	default:
 	}
+
 	select {
 	case <-r.connectionContext.Done():
-	case r.connection.writeQueue <- writeRequest{msg: msg, answer: nil}:
+	case r.writeQueue <- writeRequest{msg: msg, answer: nil}:
 	}
 }
 
 // WriteWithError is like Write, but returns an error if the write fails (and the connection gets closed).
 func (r *Relay) WriteWithError(msg []byte) error {
 	ch := make(chan error)
-	r.connection.closeMutex.Lock()
-	defer r.connection.closeMutex.Unlock()
+	r.closeMutex.Lock()
+	defer r.closeMutex.Unlock()
 	select {
-	case <-r.connection.closedNotify:
+	case <-r.closedNotify:
 		return fmt.Errorf("failed to write to %s: <closed>", r.URL)
 	default:
 	}
 	select {
 	case <-r.connectionContext.Done():
 		return fmt.Errorf("failed to write to %s: %w", r.URL, context.Cause(r.connectionContext))
-	case r.connection.writeQueue <- writeRequest{msg: msg, answer: ch}:
+	case r.writeQueue <- writeRequest{msg: msg, answer: ch}:
 	}
 	return <-ch
 }
@@ -357,7 +362,7 @@ func (r *Relay) publish(ctx context.Context, id ID, env Envelope) error {
 func (r *Relay) Subscribe(ctx context.Context, filter Filter, opts SubscriptionOptions) (*Subscription, error) {
 	sub := r.PrepareSubscription(ctx, filter, opts)
 
-	if r.connection == nil {
+	if r.conn == nil {
 		return nil, fmt.Errorf("not connected to %s", r.URL)
 	}
 
@@ -367,7 +372,7 @@ func (r *Relay) Subscribe(ctx context.Context, filter Filter, opts SubscriptionO
 
 	go func() {
 		select {
-		case <-r.connection.closedNotify:
+		case <-r.closedNotify:
 			sub.unsub(ErrDisconnected)
 		case <-ctx.Done():
 		}
@@ -510,12 +515,12 @@ func (r *Relay) close(reason error) error {
 	if r.connectionContextCancel == nil {
 		return fmt.Errorf("relay already closed")
 	}
-	r.connectionContextCancel(reason)
-	r.connectionContextCancel = nil
 
-	if r.connection == nil {
+	if r.conn == nil {
 		return fmt.Errorf("relay not connected")
 	}
+
+	r.connectionContextCancel(reason)
 
 	return nil
 }

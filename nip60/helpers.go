@@ -3,13 +3,13 @@ package nip60
 import (
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"fiatjaf.com/nostr"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -66,7 +66,7 @@ func createBlindedMessages(
 			if _, err := rand.Read(secretBytes); err != nil {
 				return nil, nil, nil, err
 			}
-			secret = hex.EncodeToString(secretBytes)
+			secret = nostr.HexEncodeToString(secretBytes)
 		}
 
 		B_, r, err := crypto.BlindMessage(secret, r)
@@ -92,7 +92,7 @@ func signInput(
 		return "", fmt.Errorf("failed to sign: %w", err)
 	}
 	witness, _ := json.Marshal(nut11.P2PKWitness{
-		Signatures: []string{hex.EncodeToString(signature.Serialize())},
+		Signatures: []string{nostr.HexEncodeToString(signature.Serialize())},
 	})
 	return string(witness), nil
 }
@@ -101,14 +101,14 @@ func signOutput(
 	privateKey *btcec.PrivateKey,
 	output cashu.BlindedMessage,
 ) (string, error) {
-	msg, _ := hex.DecodeString(output.B_)
+	msg, _ := nostr.HexDecodeString(output.B_)
 	hash := sha256.Sum256(msg)
 	signature, err := schnorr.Sign(privateKey, hash[:])
 	if err != nil {
 		return "", fmt.Errorf("failed to sign: %w", err)
 	}
 	witness, _ := json.Marshal(nut11.P2PKWitness{
-		Signatures: []string{hex.EncodeToString(signature.Serialize())},
+		Signatures: []string{nostr.HexEncodeToString(signature.Serialize())},
 	})
 	return string(witness), nil
 }
@@ -143,7 +143,7 @@ func constructProofs(
 				dleq = &cashu.DLEQProof{
 					E: blindedSignature.DLEQ.E,
 					S: blindedSignature.DLEQ.S,
-					R: hex.EncodeToString(prep.rs[i].Serialize()),
+					R: nostr.HexEncodeToString(prep.rs[i].Serialize()),
 				}
 			}
 		}
@@ -170,7 +170,7 @@ func unblindSignature(C_str string, r *secp256k1.PrivateKey, key *secp256k1.Publ
 	string,
 	error,
 ) {
-	C_bytes, err := hex.DecodeString(C_str)
+	C_bytes, err := nostr.HexDecodeString(C_str)
 	if err != nil {
 		return "", err
 	}
@@ -180,14 +180,14 @@ func unblindSignature(C_str string, r *secp256k1.PrivateKey, key *secp256k1.Publ
 	}
 
 	C := crypto.UnblindSignature(C_, r, key)
-	Cstr := hex.EncodeToString(C.SerializeCompressed())
+	Cstr := nostr.HexEncodeToString(C.SerializeCompressed())
 	return Cstr, nil
 }
 
 func ParseKeysetKeys(keys nut01.KeysMap) (map[uint64]*btcec.PublicKey, error) {
 	parsedKeys := make(map[uint64]*btcec.PublicKey)
 	for amount, pkh := range keys {
-		pkb, err := hex.DecodeString(pkh)
+		pkb, err := nostr.HexDecodeString(pkh)
 		if err != nil {
 			return nil, err
 		}

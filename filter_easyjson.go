@@ -1,10 +1,9 @@
 package nostr
 
 import (
-	"encoding/hex"
-
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	"github.com/templexxx/xhex"
 )
 
 func easyjsonDecodeFilter(in *jlexer.Lexer, out *Filter) {
@@ -42,7 +41,7 @@ func easyjsonDecodeFilter(in *jlexer.Lexer, out *Filter) {
 				id := ID{}
 				b := in.UnsafeBytes()
 				if len(b) == 64 {
-					hex.Decode(id[:], b)
+					xhex.Decode(id[:], b)
 				}
 				out.IDs = append(out.IDs, id)
 				in.WantComma()
@@ -79,7 +78,7 @@ func easyjsonDecodeFilter(in *jlexer.Lexer, out *Filter) {
 				pk := PubKey{}
 				b := in.UnsafeBytes()
 				if len(b) == 64 {
-					hex.Decode(pk[:], b)
+					xhex.Decode(pk[:], b)
 				}
 				out.Authors = append(out.Authors, pk)
 				in.WantComma()
@@ -140,7 +139,7 @@ func easyjsonEncodeFilter(out *jwriter.Writer, in Filter) {
 				if i > 0 {
 					out.RawByte(',')
 				}
-				out.RawString("\"" + hex.EncodeToString(id[:]) + "\"")
+				out.RawString("\"" + HexEncodeToString(id[:]) + "\"")
 			}
 			out.RawByte(']')
 		}
@@ -178,7 +177,7 @@ func easyjsonEncodeFilter(out *jwriter.Writer, in Filter) {
 				if i > 0 {
 					out.RawByte(',')
 				}
-				out.RawString("\"" + hex.EncodeToString(pk[:]) + "\"")
+				out.RawString("\"" + HexEncodeToString(pk[:]) + "\"")
 			}
 			out.RawByte(']')
 		}

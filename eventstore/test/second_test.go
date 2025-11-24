@@ -2,7 +2,6 @@ package test
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"slices"
 	"testing"
@@ -29,7 +28,7 @@ func runSecondTestOn(t *testing.T, db eventstore.Store) {
 			Content:   fmt.Sprintf("hello %d", i),
 			Tags: nostr.Tags{
 				{"t", fmt.Sprintf("t%d", i)},
-				{"e", hex.EncodeToString(eTag)},
+				{"e", nostr.HexEncodeToString(eTag)},
 				{"p", ref.Hex()},
 			},
 			Kind: nostr.Kind(i % 10),
@@ -49,7 +48,7 @@ func runSecondTestOn(t *testing.T, db eventstore.Store) {
 	for i := 0; i < 20; i++ {
 		eTag := make([]byte, 32)
 		binary.BigEndian.PutUint16(eTag, uint16(i))
-		eTags[i] = hex.EncodeToString(eTag)
+		eTags[i] = nostr.HexEncodeToString(eTag)
 	}
 
 	filters := []nostr.Filter{

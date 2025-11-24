@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"iter"
 	"slices"
@@ -12,6 +11,7 @@ import (
 	"strings"
 
 	"fiatjaf.com/nostr"
+	"github.com/templexxx/xhex"
 	"go.etcd.io/bbolt"
 )
 
@@ -284,7 +284,7 @@ func (b *BoltBackend) getTagIndexPrefix(tagName string, tagValue string) (bucket
 	if len(tagValue) == 64 {
 		// but we actually only use the first 8 bytes, with letter (tag name) prefix
 		k = make([]byte, 1+8+4+8)
-		if _, err := hex.Decode(k[1:1+8], []byte(tagValue[0:8*2])); err == nil {
+		if err := xhex.Decode(k[1:1+8], []byte(tagValue[0:8*2])); err == nil {
 			k[0] = letterPrefix
 			return indexTag32, k
 		}
@@ -294,7 +294,7 @@ func (b *BoltBackend) getTagIndexPrefix(tagName string, tagValue string) (bucket
 	spl := strings.Split(tagValue, ":")
 	if len(spl) == 3 && len(spl[1]) == 64 {
 		k = make([]byte, 1+2+8+30+4+8)
-		if _, err := hex.Decode(k[1+2:1+2+8], []byte(spl[1][0:8*2])); err == nil {
+		if err := xhex.Decode(k[1+2:1+2+8], []byte(spl[1][0:8*2])); err == nil {
 			if kind, err := strconv.ParseUint(spl[0], 10, 16); err == nil {
 				k[0] = letterPrefix
 				k[1] = byte(kind >> 8)

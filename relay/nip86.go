@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -99,7 +98,7 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 			goto respond
 		}
 
-		if pht := evt.Tags.FindWithValue("payload", hex.EncodeToString(payloadHash[:])); pht == nil {
+		if pht := evt.Tags.FindWithValue("payload", nostr.HexEncodeToString(payloadHash[:])); pht == nil {
 			resp.Error = "invalid auth event payload hash"
 			goto respond
 		}

@@ -1,13 +1,13 @@
 package nostr
 
 import (
-	"encoding/hex"
 	"strconv"
 	"strings"
 	"sync"
 	"unsafe"
 
 	jsoniter "github.com/json-iterator/go"
+	"github.com/templexxx/xhex"
 	"golang.org/x/exp/constraints"
 )
 
@@ -186,7 +186,7 @@ func extractEventID(jsonStr string) ID {
 
 	// get 64 characters of the id
 	var id [32]byte
-	hex.Decode(id[:], unsafe.Slice(unsafe.StringData(jsonStr[start:start+64]), 64))
+	xhex.Decode(id[:], unsafe.Slice(unsafe.StringData(jsonStr[start:start+64]), 64))
 	return id
 }
 
@@ -203,7 +203,7 @@ func extractEventPubKey(jsonStr string) PubKey {
 
 	// get 64 characters of the pubkey
 	var pk [32]byte
-	hex.Decode(pk[:], unsafe.Slice(unsafe.StringData(jsonStr[start:start+64]), 64))
+	xhex.Decode(pk[:], unsafe.Slice(unsafe.StringData(jsonStr[start:start+64]), 64))
 	return pk
 }
 

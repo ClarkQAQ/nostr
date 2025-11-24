@@ -45,9 +45,9 @@ func TestFetch(t *testing.T) {
 		{"wss://nostr.wine", false, "", "wss://nostr.wine"},
 		{"https://nostr.wine", false, "", "wss://nostr.wine"},
 		{"nostr.wine", false, "", "wss://nostr.wine"},
-		{"no.str.cr", false, "", "wss://no.str.cr"},
-		{"https://no.str.cr", false, "", "wss://no.str.cr"},
-		{"wss://no.str.cr", false, "", "wss://no.str.cr"},
+		{"relay.damus.io", false, "", "wss://relay.damus.io"},
+		{"https://relay.damus.io", false, "", "wss://relay.damus.io"},
+		{"wss://relay.damus.io", false, "", "wss://relay.damus.io"},
 		{"wlenwqkeqwe.asjdaskd", true, "", "wss://wlenwqkeqwe.asjdaskd"},
 	}
 

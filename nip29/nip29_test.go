@@ -33,9 +33,6 @@ func TestGroupEventBackAndForth(t *testing.T) {
 
 	group2, _ := NewGroup("groups.com'abc")
 	group2.Members[ALICE] = []*Role{{Name: "nada"}}
-	group2.Members[BOB] = []*Role{{Name: "nada"}}
-	group2.Members[CAROL] = nil
-	group2.Members[DEREK] = nil
 	admins2 := group2.ToAdminsEvent()
 
 	require.Equal(t, "abc", admins2.Tags.GetD(), "translation of group2 to admins event failed")
@@ -60,7 +57,6 @@ func TestGroupEventBackAndForth(t *testing.T) {
 	require.Equal(t, 4, len(group1.Members), "merge of admins2 into group1 failed")
 
 	require.Equal(t, "nada", group1.Members[ALICE][0].Name, "merge of admins2 into group1 failed")
-	require.Len(t, group1.Members[DEREK], 0, "merge of admins2 into group1 failed")
 
 	_ = group2.MergeInMetadataEvent(&meta1)
 	require.Equal(t, "banana", group2.Name, "merge of meta1 into group2 failed")

@@ -1,8 +1,7 @@
 package nip06
 
 import (
-	"encoding/hex"
-
+	"fiatjaf.com/nostr"
 	"github.com/tyler-smith/go-bip32"
 	"github.com/tyler-smith/go-bip39"
 )
@@ -47,7 +46,7 @@ func PrivateKeyFromSeed(seed []byte) (string, error) {
 		}
 	}
 
-	return hex.EncodeToString(next.Key), nil
+	return nostr.HexEncodeToString(next.Key), nil
 }
 
 func ValidateWords(words string) bool {

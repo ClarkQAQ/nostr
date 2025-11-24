@@ -17,9 +17,7 @@ type Client struct {
 
 // NewClient creates a new Blossom client
 func NewClient(mediaserver string, signer nostr.Signer) *Client {
-	if !strings.HasPrefix(mediaserver, "http") {
-		mediaserver = "https://" + mediaserver
-	}
+	mediaserver = "http" + nostr.NormalizeURL(mediaserver)[2:]
 
 	return &Client{
 		mediaserver: strings.TrimSuffix(mediaserver, "/") + "/",

@@ -2,12 +2,12 @@ package nip44
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"testing"
 
 	"fiatjaf.com/nostr"
 	"github.com/stretchr/testify/require"
+	"github.com/templexxx/xhex"
 )
 
 func assertCryptPriv(t *testing.T, skh1 string, skh2 string, conversationKey string, salt string, plaintext string, expected string) {
@@ -19,7 +19,7 @@ func assertCryptPriv(t *testing.T, skh1 string, skh2 string, conversationKey str
 
 	assertConversationKeyGenerationPub(t, skh1, pub2.Hex(), conversationKey)
 
-	customNonce, err := hex.DecodeString(salt)
+	customNonce, err := nostr.HexDecodeString(salt)
 	require.NoErrorf(t, err, "hex decode failed for salt: %v", err)
 
 	actual, err := Encrypt(plaintext, k1, WithCustomNonce(customNonce))
@@ -70,13 +70,13 @@ func assertMessageKeyGeneration(t *testing.T, conversationKey string, salt strin
 	convNonce, err := hexDecode32Array(salt)
 	require.NoErrorf(t, err, "hex decode failed for nonce: %v", err)
 
-	expectedChaChaKey, err := hex.DecodeString(chachaKey)
+	expectedChaChaKey, err := nostr.HexDecodeString(chachaKey)
 	require.NoErrorf(t, err, "hex decode failed for chacha key: %v", err)
 
-	expectedChaChaNonce, err := hex.DecodeString(chachaSalt)
+	expectedChaChaNonce, err := nostr.HexDecodeString(chachaSalt)
 	require.NoErrorf(t, err, "hex decode failed for chacha nonce: %v", err)
 
-	expectedHmacKey, err := hex.DecodeString(hmacKey)
+	expectedHmacKey, err := nostr.HexDecodeString(hmacKey)
 	require.NoErrorf(t, err, "hex decode failed for hmac key: %v", err)
 
 	actualChaChaKey, actualChaChaNonce, actualHmacKey, err := messageKeys(convKey, convNonce)
@@ -92,7 +92,7 @@ func assertCryptLong(t *testing.T, conversationKey string, salt string, pattern 
 	convKey, err := hexDecode32Array(conversationKey)
 	require.NoErrorf(t, err, "hex decode failed for convKey: %v", err)
 
-	customNonce, err := hex.DecodeString(salt)
+	customNonce, err := nostr.HexDecodeString(salt)
 	require.NoErrorf(t, err, "hex decode failed for salt: %v", err)
 
 	plaintext := ""
@@ -101,7 +101,7 @@ func assertCryptLong(t *testing.T, conversationKey string, salt string, pattern 
 	}
 	h := sha256.New()
 	h.Write([]byte(plaintext))
-	actualPlaintextSha256 := hex.EncodeToString(h.Sum(nil))
+	actualPlaintextSha256 := nostr.HexEncodeToString(h.Sum(nil))
 	require.Equalf(t, plaintextSha256, actualPlaintextSha256, "invalid plaintext sha256 hash: %v", err)
 
 	actualPayload, err := Encrypt(plaintext, convKey, WithCustomNonce(customNonce))
@@ -109,7 +109,7 @@ func assertCryptLong(t *testing.T, conversationKey string, salt string, pattern 
 
 	h.Reset()
 	h.Write([]byte(actualPayload))
-	actualPayloadSha256 := hex.EncodeToString(h.Sum(nil))
+	actualPayloadSha256 := nostr.HexEncodeToString(h.Sum(nil))
 	require.Equalf(t, payloadSha256, actualPayloadSha256, "invalid payload sha256 hash: %v", err)
 }
 
@@ -1051,7 +1051,7 @@ func TestMessageKeyGeneration033(t *testing.T) {
 }
 
 func hexDecode32Array(hexString string) (res [32]byte, err error) {
-	_, err = hex.Decode(res[:], []byte(hexString))
+	err = xhex.Decode(res[:], []byte(hexString))
 	return res, err
 }
 

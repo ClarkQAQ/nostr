@@ -31,10 +31,10 @@ func FuzzWhatever(f *testing.F) {
 		// prepare the two sides
 		s1 := vector.New()
 		l1 := make([]nostr.ID, 0, 500)
-		neg1 := negentropy.New(s1, int(frameSizeLimit))
+		neg1 := negentropy.New(s1, int(frameSizeLimit), true, true)
 		s2 := vector.New()
 		l2 := make([]nostr.ID, 0, 500)
-		neg2 := negentropy.New(s2, int(frameSizeLimit))
+		neg2 := negentropy.New(s2, int(frameSizeLimit), false, false)
 
 		start := 0
 		for s := 0; s < int(sectors); s++ {

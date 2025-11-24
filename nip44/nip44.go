@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -162,7 +161,7 @@ func Decrypt(b64ciphertextWrapped string, conversationKey [32]byte) (string, err
 	return string(unpadded), nil
 }
 
-var maxThreshold, _ = hex.DecodeString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
+var maxThreshold, _ = nostr.HexDecodeString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
 
 func GenerateConversationKey(pub nostr.PubKey, sk nostr.SecretKey) ([32]byte, error) {
 	var ck [32]byte
@@ -236,7 +235,7 @@ func computeSharedSecret(pub nostr.PubKey, sk [32]byte) (sharedSecret [32]byte, 
 	pubKey, err := btcec.ParsePubKey(append([]byte{2}, pub[:]...))
 	if err != nil {
 		return sharedSecret, fmt.Errorf("error parsing receiver public key '%s': %w",
-			"02"+hex.EncodeToString(pub[:]), err)
+			"02"+nostr.HexEncodeToString(pub[:]), err)
 	}
 
 	var point, result secp256k1.JacobianPoint

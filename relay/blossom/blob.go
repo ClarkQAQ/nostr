@@ -24,4 +24,7 @@ type BlobIndex interface {
 	Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error
 }
 
-var _ BlobIndex = (*EventStoreBlobIndexWrapper)(nil)
+var (
+	_ BlobIndex = (*EventStoreBlobIndexWrapper)(nil)
+	_ BlobIndex = (*MemoryBlobIndex)(nil)
+)

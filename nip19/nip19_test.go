@@ -1,12 +1,12 @@
 package nip19
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"fiatjaf.com/nostr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/templexxx/xhex"
 )
 
 func TestEncodeNpub(t *testing.T) {
@@ -17,7 +17,7 @@ func TestEncodeNpub(t *testing.T) {
 func TestEncodeNsec(t *testing.T) {
 	skh := "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
 	var sk [32]byte
-	hex.Decode(sk[:], []byte(skh))
+	xhex.Decode(sk[:], []byte(skh))
 	nsec := EncodeNsec(sk)
 	assert.Equal(t, "nsec180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsgyumg0", nsec, "produced an unexpected nsec string")
 }
