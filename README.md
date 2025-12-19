@@ -17,9 +17,9 @@ go mod tidy
 
 ## Components
 
-- **eventstore**: Pluggable storage backends (Bleve, BoltDB, in-memory)
-- **khatru**: Flexible framework for building Nostr relays
-- **khatru/blossom**: Plugin for a Khatru server that adds flexible Blossom server support
-- **khatru/grasp**: Plugin for a Khatru server that adds Grasp server support
+- **eventstore**: Pluggable storage backends (BadgerDB, Bleve, BoltDB, in-memory)
+- **relay**: Flexible framework for building Nostr relays
+- **relay/blossom**: Plugin for a relay server that adds flexible Blossom server support
+- **relay/grasp**: Plugin for a relay server that adds Grasp server support
 - **sdk**: Client SDK with caching, data loading, and outbox relay management
 - **keyer**: Key and bunker management utilities

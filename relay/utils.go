@@ -43,6 +43,19 @@ func GetAuthed(ctx context.Context) (nostr.PubKey, bool) {
 	return nostr.ZeroPK, false
 }
 
+// GetAllAuthed returns all authenticated public keys.
+//
+// In a NIP-86 context it returns the single pubkey that authenticated for that method call.
+func GetAllAuthed(ctx context.Context) []nostr.PubKey {
+	if conn := GetConnection(ctx); conn != nil {
+		return conn.AuthedPublicKeys
+	}
+	if nip86Auth := ctx.Value(nip86HeaderAuthKey); nip86Auth != nil {
+		return []nostr.PubKey{nip86Auth.(nostr.PubKey)}
+	}
+	return []nostr.PubKey{}
+}
+
 // IsAuthed checks if the given public key is among the multiple that may have potentially authenticated.
 func IsAuthed(ctx context.Context, pubkey nostr.PubKey) bool {
 	if conn := GetConnection(ctx); conn != nil {

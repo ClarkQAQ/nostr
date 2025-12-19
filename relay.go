@@ -114,11 +114,20 @@ func (r *Relay) IsConnected() bool { return !r.closed.Load() }
 // The given context here is only used during the connection phase. The long-living
 // relay connection will be based on the context given to NewRelay().
 func (r *Relay) Connect(ctx context.Context) error {
-	return r.ConnectWithTLS(ctx, nil)
+	return r.ConnectWithClient(ctx, nil)
 }
 
 // ConnectWithTLS is like Connect(), but takes a special tls.Config if you need that.
 func (r *Relay) ConnectWithTLS(ctx context.Context, tlsConfig *tls.Config) error {
+	return r.ConnectWithClient(ctx, &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	})
+}
+
+// ConnectWithClient is like Connect(), but takes a special *http.Client if you need that.
+func (r *Relay) ConnectWithClient(ctx context.Context, client *http.Client) error {
 	if r.connectionContext == nil || r.Subscriptions == nil {
 		return fmt.Errorf("relay must be initialized with a call to NewRelay()")
 	}
@@ -127,7 +136,7 @@ func (r *Relay) ConnectWithTLS(ctx context.Context, tlsConfig *tls.Config) error
 		return fmt.Errorf("invalid relay URL '%s'", r.URL)
 	}
 
-	if err := r.newConnection(ctx, tlsConfig); err != nil {
+	if err := r.newConnection(ctx, client); err != nil {
 		return fmt.Errorf("error opening websocket to '%s': %w", r.URL, err)
 	}
 

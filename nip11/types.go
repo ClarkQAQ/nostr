@@ -28,6 +28,9 @@ type RelayInformationDocument struct {
 	Retention      []*RelayRetentionDocument `json:"retention,omitempty"`
 	Icon           string                    `json:"icon,omitempty"`
 	Banner         string                    `json:"banner,omitempty"`
+
+	// nip-34 grasp stuff
+	SupportedGrasps []string `json:"supported_grasps,omitempty"`
 }
 
 func (info *RelayInformationDocument) AddSupportedNIP(number int) {

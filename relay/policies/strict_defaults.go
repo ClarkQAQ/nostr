@@ -12,7 +12,7 @@ var EventRejectionStrictDefaults = SeqEvent(
 	PreventTooManyIndexableTags(1200, nil, []nostr.Kind{3}),
 	PreventLargeContent(5000),
 	RejectUnprefixedNostrReferences,
-	EventIPRateLimiter(2, time.Minute*3, 10),
+	EventIPRateLimiter(2, time.Minute*3, 18),
 )
 
 var RequestRejectionStrictDefaults = SeqRequest(

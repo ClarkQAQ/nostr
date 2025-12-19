@@ -183,5 +183,13 @@ func (filter Filter) GetTheoreticalLimit() int {
 		}
 	}
 
+	if filter.Limit > 0 {
+		return filter.Limit
+	}
+
+	if filter.LimitZero {
+		return 0
+	}
+
 	return math.MaxInt
 }

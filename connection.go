@@ -3,10 +3,11 @@ package nostr
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/textproto"
 	"sync/atomic"
 	"time"
 
@@ -20,7 +21,7 @@ type writeRequest struct {
 	answer chan error
 }
 
-func (r *Relay) newConnection(ctx context.Context, tlsConfig *tls.Config) error {
+func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) error {
 	debugLogf("{%s} connecting!\n", r.URL)
 
 	dialCtx := ctx
@@ -31,7 +32,18 @@ func (r *Relay) newConnection(ctx context.Context, tlsConfig *tls.Config) error 
 		dialCtx = timeoutCtx
 	}
 
-	c, _, err := ws.Dial(dialCtx, r.URL, getConnectionOptions(r.requestHeader, tlsConfig))
+	dialOpts := &ws.DialOptions{
+		HTTPHeader: http.Header{
+			textproto.CanonicalMIMEHeaderKey("User-Agent"): {"fiatjaf.com/nostr"},
+		},
+		CompressionMode: ws.CompressionContextTakeover,
+		HTTPClient:      httpClient,
+	}
+	for k, v := range r.requestHeader {
+		dialOpts.HTTPHeader[k] = v
+	}
+
+	c, _, err := ws.Dial(dialCtx, r.URL, dialOpts)
 	if err != nil {
 		return err
 	}

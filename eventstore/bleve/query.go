@@ -11,11 +11,10 @@ import (
 
 func (b *BleveBackend) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
 	return func(yield func(nostr.Event) bool) {
-		limit := maxLimit
-		if filter.LimitZero {
+		if tlimit := filter.GetTheoreticalLimit(); tlimit == 0 {
 			return
-		} else if filter.Limit > 0 && filter.Limit < limit {
-			limit = filter.Limit
+		} else if tlimit < maxLimit {
+			maxLimit = tlimit
 		}
 
 		if len(filter.Search) < 2 {
@@ -72,7 +71,7 @@ func (b *BleveBackend) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[n
 		}
 
 		req := bleve.NewSearchRequest(q)
-		req.Size = limit
+		req.Size = maxLimit
 		req.From = 0
 
 		result, err := b.index.Search(req)

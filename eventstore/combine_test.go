@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"fiatjaf.com/nostr"
+	"github.com/stretchr/testify/require"
 )
 
 func FuzzSortedMerge(f *testing.F) {
@@ -19,7 +20,7 @@ func FuzzSortedMerge(f *testing.F) {
 		merged := SortedMerge(
 			func(yield func(nostr.Event) bool) {
 				for range len1 {
-					if !yield(nostr.Event{CreatedAt: nostr.Timestamp(start1)}) {
+					if !yield(nostr.Event{ID: nostr.ID(nostr.Generate()), CreatedAt: nostr.Timestamp(start1)}) {
 						return
 					}
 					start1 -= uint(diff1)
@@ -27,19 +28,18 @@ func FuzzSortedMerge(f *testing.F) {
 			},
 			func(yield func(nostr.Event) bool) {
 				for range len2 {
-					if !yield(nostr.Event{CreatedAt: nostr.Timestamp(start2)}) {
+					if !yield(nostr.Event{ID: nostr.ID(nostr.Generate()), CreatedAt: nostr.Timestamp(start2)}) {
 						return
 					}
 					start2 -= uint(diff2)
 				}
 			},
+			int(max(len1, len2)),
 		)
 		result := slices.Collect(merged)
 
 		// assert length
-		if len(result) != int(len1+len2) {
-			t.Fatalf("expected %d events, got %d", len1+len2, len(result))
-		}
+		require.Equal(t, int(max(len1, len2)), len(result), "got a different number of results than expected")
 
 		// assert sorted descending
 		_ = slices.IsSortedFunc(result, func(a, b nostr.Event) int { return -1 * cmp.Compare(a.CreatedAt, b.CreatedAt) })

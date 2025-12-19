@@ -29,8 +29,10 @@ func (b *SliceStore) Close() {}
 
 func (b *SliceStore) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
 	return func(yield func(nostr.Event) bool) {
-		if filter.Limit > maxLimit || (filter.Limit == 0 && !filter.LimitZero) {
-			filter.Limit = maxLimit
+		if tlimit := filter.GetTheoreticalLimit(); tlimit == 0 {
+			return
+		} else if tlimit < maxLimit {
+			maxLimit = tlimit
 		}
 
 		// efficiently determine where to start and end
@@ -50,7 +52,7 @@ func (b *SliceStore) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[nos
 
 		count := 0
 		for _, event := range b.internal[start:end] {
-			if count == filter.Limit {
+			if count == maxLimit {
 				break
 			}
 

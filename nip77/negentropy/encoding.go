@@ -7,8 +7,8 @@ import (
 	"fiatjaf.com/nostr"
 )
 
-func (n *Negentropy) readTimestamp(reader *bytes.Reader) (nostr.Timestamp, error) {
-	delta, err := readVarInt(reader)
+func (br *BoundReader) ReadTimestamp(reader *bytes.Reader) (nostr.Timestamp, error) {
+	delta, err := ReadVarInt(reader)
 	if err != nil {
 		return 0, err
 	}
@@ -16,7 +16,7 @@ func (n *Negentropy) readTimestamp(reader *bytes.Reader) (nostr.Timestamp, error
 	if delta == 0 {
 		// zeroes are infinite
 		timestamp := maxTimestamp
-		n.lastTimestampIn = timestamp
+		br.lastTimestampIn = timestamp
 		return timestamp, nil
 	}
 
@@ -24,21 +24,21 @@ func (n *Negentropy) readTimestamp(reader *bytes.Reader) (nostr.Timestamp, error
 	delta--
 
 	// we add the previously cached timestamp to get the current
-	timestamp := n.lastTimestampIn + nostr.Timestamp(delta)
+	timestamp := br.lastTimestampIn + nostr.Timestamp(delta)
 
 	// cache this so we can apply it to the delta next time
-	n.lastTimestampIn = timestamp
+	br.lastTimestampIn = timestamp
 
 	return timestamp, nil
 }
 
-func (n *Negentropy) readBound(reader *bytes.Reader) (Bound, error) {
-	timestamp, err := n.readTimestamp(reader)
+func (br *BoundReader) ReadBound(reader *bytes.Reader) (Bound, error) {
+	timestamp, err := br.ReadTimestamp(reader)
 	if err != nil {
 		return Bound{}, fmt.Errorf("failed to decode bound timestamp: %w", err)
 	}
 
-	length, err := readVarInt(reader)
+	length, err := ReadVarInt(reader)
 	if err != nil {
 		return Bound{}, fmt.Errorf("failed to decode bound length: %w", err)
 	}
@@ -51,28 +51,28 @@ func (n *Negentropy) readBound(reader *bytes.Reader) (Bound, error) {
 	return Bound{timestamp, pfb}, nil
 }
 
-func (n *Negentropy) writeTimestamp(w *bytes.Buffer, timestamp nostr.Timestamp) {
+func (bw *BoundWriter) WriteTimestamp(w *bytes.Buffer, timestamp nostr.Timestamp) {
 	if timestamp == maxTimestamp {
 		// zeroes are infinite
-		n.lastTimestampOut = maxTimestamp // cache this (see below)
-		writeVarInt(w, 0)
+		bw.lastTimestampOut = maxTimestamp // cache this (see below)
+		WriteVarInt(w, 0)
 		return
 	}
 
 	// we will only encode the difference between this timestamp and the previous
-	delta := timestamp - n.lastTimestampOut
+	delta := timestamp - bw.lastTimestampOut
 
 	// we cache this here as the next timestamp we encode will be just a delta from this
-	n.lastTimestampOut = timestamp
+	bw.lastTimestampOut = timestamp
 
 	// add 1 to prevent zeroes from being read as infinites
-	writeVarInt(w, int(delta+1))
+	WriteVarInt(w, int(delta+1))
 	return
 }
 
-func (n *Negentropy) writeBound(w *bytes.Buffer, bound Bound) {
-	n.writeTimestamp(w, bound.Timestamp)
-	writeVarInt(w, len(bound.IDPrefix))
+func (bw *BoundWriter) WriteBound(w *bytes.Buffer, bound Bound) {
+	bw.WriteTimestamp(w, bound.Timestamp)
+	WriteVarInt(w, len(bound.IDPrefix))
 	w.Write(bound.IDPrefix)
 }
 
@@ -93,7 +93,7 @@ func getMinimalBound(prev, curr Item) Bound {
 	return Bound{curr.Timestamp, curr.ID[:(sharedPrefixBytes + 1)]}
 }
 
-func readVarInt(reader *bytes.Reader) (int, error) {
+func ReadVarInt(reader *bytes.Reader) (int, error) {
 	var res int = 0
 
 	for {
@@ -111,7 +111,7 @@ func readVarInt(reader *bytes.Reader) (int, error) {
 	return res, nil
 }
 
-func writeVarInt(w *bytes.Buffer, n int) {
+func WriteVarInt(w *bytes.Buffer, n int) {
 	if n == 0 {
 		w.WriteByte(0)
 		return

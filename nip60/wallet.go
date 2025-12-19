@@ -81,21 +81,17 @@ func loadWalletFromPool(
 		kinds = append(kinds, 7376)
 	}
 
-	eoseChanE := make(chan struct{})
-	events := pool.SubscribeManyNotifyEOSE(
+	events, eoseChanE := pool.SubscribeManyNotifyEOSE(
 		ctx,
 		relays,
 		nostr.Filter{Kinds: kinds, Authors: []nostr.PubKey{pk}},
-		eoseChanE,
 		nostr.SubscriptionOptions{},
 	)
 
-	eoseChanD := make(chan struct{})
-	deletions := pool.SubscribeManyNotifyEOSE(
+	deletions, eoseChanD := pool.SubscribeManyNotifyEOSE(
 		ctx,
 		relays,
 		nostr.Filter{Kinds: []nostr.Kind{5}, Tags: nostr.TagMap{"k": []string{"7375"}}, Authors: []nostr.PubKey{pk}},
-		eoseChanD,
 		nostr.SubscriptionOptions{},
 	)
 

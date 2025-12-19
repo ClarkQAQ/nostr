@@ -18,28 +18,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultSchemaURL = "https://raw.githubusercontent.com/nostr-protocol/registry-of-kinds/daaa3a2a5573606aa0a4c4a98c25460ea9a1e388/schema.yaml"
+const DefaultSchemaURL = "https://raw.githubusercontent.com/nostr-protocol/registry-of-kinds/952c36fcd7129aa85be22d00c2b381ae47ee9c18/schema.yaml"
 
 // this is used by hex.Decode in the "hex" validator -- we don't care about data races
 var hexdummydecoder = make([]byte, 128)
 
-func fetchSchemaFromURL(schemaURL string) (string, error) {
+func FetchSchemaFromURL(schemaURL string) (Schema, error) {
 	resp, err := http.Get(schemaURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch schema from URL: %w", err)
+		return Schema{}, fmt.Errorf("failed to fetch schema from URL: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to fetch schema: HTTP %d", resp.StatusCode)
+		return Schema{}, fmt.Errorf("failed to fetch schema: HTTP %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read schema response: %w", err)
+		return Schema{}, fmt.Errorf("failed to read schema response: %w", err)
 	}
 
-	return string(body), nil
+	var schema Schema
+	if err := yaml.Unmarshal(body, &schema); err != nil {
+		return Schema{}, fmt.Errorf("failed to parse schema: %w", err)
+	}
+
+	return schema, nil
 }
 
 type Schema struct {
@@ -48,9 +53,11 @@ type Schema struct {
 }
 
 type KindSchema struct {
-	Content  nextSpec  `yaml:"content"`
-	Required []string  `yaml:"required"`
-	Tags     []tagSpec `yaml:"tags"`
+	Description string    `yaml:"description"`
+	InUse       bool      `yaml:"in_use"`
+	Content     nextSpec  `yaml:"content"`
+	Required    []string  `yaml:"required"`
+	Tags        []tagSpec `yaml:"tags"`
 }
 
 type tagSpec struct {
@@ -149,7 +156,7 @@ func NewValidatorFromSchema(sch Schema) Validator {
 				}
 				return nil
 			},
-			"numeric": func(value string, spec *nextSpec) error {
+			"timestamp": func(value string, spec *nextSpec) error {
 				_, err := strconv.ParseUint(value, 10, 64)
 				return err
 			},
@@ -185,11 +192,11 @@ func NewValidatorFromFile(filename string) (Validator, error) {
 }
 
 func NewValidatorFromURL(schemaURL string) (Validator, error) {
-	schemaData, err := fetchSchemaFromURL(schemaURL)
+	schema, err := FetchSchemaFromURL(schemaURL)
 	if err != nil {
 		return Validator{}, err
 	}
-	return NewValidatorFromBytes([]byte(schemaData))
+	return NewValidatorFromSchema(schema), nil
 }
 
 var (

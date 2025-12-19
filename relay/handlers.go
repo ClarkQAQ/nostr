@@ -318,8 +318,8 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				case *nostr.AuthEnvelope:
 					wsBaseUrl := strings.Replace(rl.getBaseURL(r), "http", "ws", 1)
 					if pubkey, err := nip42.ValidateAuthEvent(env.Event, ws.Challenge, wsBaseUrl); err == nil {
-						total := len(ws.AuthedPublicKeys)
 						ws.authLock.Lock()
+						total := len(ws.AuthedPublicKeys)
 						if idx := slices.Index(ws.AuthedPublicKeys, pubkey); idx == -1 {
 							// this public key is not authenticated
 							if total < rl.MaxAuthenticatedClients {
@@ -370,7 +370,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					// if the message is not empty that means we'll probably have more reconciliation sessions, so store this
 					if out != "" {
-						deb := debounce.New(time.Second * 7)
+						deb := debounce.New(time.Minute * 2)
 						negSession := &NegentropySession{
 							neg: neg,
 							postponeClose: func() {
@@ -401,9 +401,10 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					// if there is more reconciliation to do, postpone this
 					if out != "" {
-						negSession.postponeClose()
+						negSession.postponeClose() // we will close this session after 2 minutes of no activity
 					} else {
 						// otherwise we can just close it
+						ws.WriteJSON(nip77.CloseEnvelope{SubscriptionID: env.SubscriptionID})
 						ws.negentropySessions.Delete(env.SubscriptionID)
 					}
 				case *nip77.CloseEnvelope:

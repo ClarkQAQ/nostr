@@ -30,13 +30,10 @@ func (b *BoltBackend) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[no
 		}
 
 		// max number of events we'll return
-		if tlimit := filter.GetTheoreticalLimit(); tlimit == 0 || filter.LimitZero {
+		if tlimit := filter.GetTheoreticalLimit(); tlimit == 0 {
 			return
 		} else if tlimit < maxLimit {
 			maxLimit = tlimit
-		}
-		if filter.Limit > 0 && filter.Limit < maxLimit {
-			maxLimit = filter.Limit
 		}
 
 		// do a normal query based on various filters

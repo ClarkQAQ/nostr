@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	protocolVersion byte = 0x61 // version 1
+	ProtocolVersion byte = 0x61 // version 1
 	maxTimestamp         = nostr.Timestamp(math.MaxInt64)
 	buckets              = 16
 )
@@ -19,15 +19,24 @@ const (
 var InfiniteBound = Bound{Timestamp: maxTimestamp}
 
 type Negentropy struct {
-	storage          Storage
-	initialized      bool
-	frameSizeLimit   int
-	isClient         bool
-	lastTimestampIn  nostr.Timestamp
-	lastTimestampOut nostr.Timestamp
+	storage        Storage
+	initialized    bool
+	frameSizeLimit int
+	isClient       bool
+
+	BoundWriter
+	BoundReader
 
 	Haves    chan nostr.ID
 	HaveNots chan nostr.ID
+}
+
+type BoundReader struct {
+	lastTimestampIn nostr.Timestamp
+}
+
+type BoundWriter struct {
+	lastTimestampOut nostr.Timestamp
 }
 
 func New(storage Storage, frameSizeLimit int, up, down bool) *Negentropy {
@@ -68,7 +77,7 @@ func (n *Negentropy) Start() string {
 	n.isClient = true
 
 	output := bytes.NewBuffer(make([]byte, 0, 1+n.storage.Size()*64))
-	output.WriteByte(protocolVersion)
+	output.WriteByte(ProtocolVersion)
 	n.SplitRange(0, n.storage.Size(), InfiniteBound, output)
 
 	return nostr.HexEncodeToString(output.Bytes())
@@ -105,13 +114,13 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 	n.lastTimestampIn, n.lastTimestampOut = 0, 0 // reset for each message
 
 	fullOutput := bytes.NewBuffer(make([]byte, 0, 5000))
-	fullOutput.WriteByte(protocolVersion)
+	fullOutput.WriteByte(ProtocolVersion)
 
 	pv, err := reader.ReadByte()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read pv: %w", err)
 	}
-	if pv != protocolVersion {
+	if pv != ProtocolVersion {
 		if n.isClient {
 			return nil, fmt.Errorf("unsupported negentropy protocol version %v", pv)
 		}
@@ -133,16 +142,16 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 			// end skip range, if necessary, so we can start a new bound that isn't a skip
 			if skipping {
 				skipping = false
-				n.writeBound(partialOutput, prevBound)
+				n.WriteBound(partialOutput, prevBound)
 				partialOutput.WriteByte(byte(SkipMode))
 			}
 		}
 
-		currBound, err := n.readBound(reader)
+		currBound, err := n.ReadBound(reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode bound: %w", err)
 		}
-		modeVal, err := readVarInt(reader)
+		modeVal, err := ReadVarInt(reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode mode: %w", err)
 		}
@@ -171,7 +180,7 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 			}
 
 		case IdListMode:
-			numIds, err := readVarInt(reader)
+			numIds, err := ReadVarInt(reader)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode number of ids: %w", err)
 			}
@@ -235,9 +244,9 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 					responses++
 				}
 
-				n.writeBound(partialOutput, endBound)
+				n.WriteBound(partialOutput, endBound)
 				partialOutput.WriteByte(byte(IdListMode))
-				writeVarInt(partialOutput, responses)
+				WriteVarInt(partialOutput, responses)
 				partialOutput.Write(responseIds)
 
 				io.Copy(fullOutput, partialOutput)
@@ -251,7 +260,7 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 		if n.frameSizeLimit-200 < fullOutput.Len()+partialOutput.Len() {
 			// frame size limit exceeded, handle by encoding a boundary and fingerprint for the remaining range
 			remainingFingerprint := n.storage.Fingerprint(upper, n.storage.Size())
-			n.writeBound(fullOutput, InfiniteBound)
+			n.WriteBound(fullOutput, InfiniteBound)
 			fullOutput.WriteByte(byte(FingerprintMode))
 			fullOutput.Write(remainingFingerprint[:])
 
@@ -273,9 +282,9 @@ func (n *Negentropy) SplitRange(lower, upper int, upperBound Bound, output *byte
 
 	if numElems < buckets*2 {
 		// we just send the full ids here
-		n.writeBound(output, upperBound)
+		n.WriteBound(output, upperBound)
 		output.WriteByte(byte(IdListMode))
-		writeVarInt(output, numElems)
+		WriteVarInt(output, numElems)
 
 		for _, item := range n.storage.Range(lower, upper) {
 			output.Write(item.ID[:])
@@ -311,7 +320,7 @@ func (n *Negentropy) SplitRange(lower, upper int, upperBound Bound, output *byte
 				nextBound = minBound
 			}
 
-			n.writeBound(output, nextBound)
+			n.WriteBound(output, nextBound)
 			output.WriteByte(byte(FingerprintMode))
 			output.Write(ourFingerprint[:])
 		}

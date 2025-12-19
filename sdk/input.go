@@ -17,16 +17,14 @@ func InputToProfile(ctx context.Context, input string) *nostr.ProfilePointer {
 
 	// handle nip19 codes, if that's the case
 	prefix, data, err := nip19.Decode(input)
-	if err != nil {
-		return nil
-	}
-
-	switch prefix {
-	case "npub":
-		return &nostr.ProfilePointer{PublicKey: data.(nostr.PubKey)}
-	case "nprofile":
-		pp := data.(nostr.ProfilePointer)
-		return &pp
+	if err == nil {
+		switch prefix {
+		case "npub":
+			return &nostr.ProfilePointer{PublicKey: data.(nostr.PubKey)}
+		case "nprofile":
+			pp := data.(nostr.ProfilePointer)
+			return &pp
+		}
 	}
 
 	// handle nip05 ids, if that's the case

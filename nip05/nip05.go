@@ -14,9 +14,9 @@ import (
 var NIP05_REGEX = regexp.MustCompile(`^(?:([\w.+-]+)@)?([\w_-]+(\.[\w_-]+)+)$`)
 
 type WellKnownResponse struct {
-	Names  map[string]string   `json:"names"`
-	Relays map[string][]string `json:"relays,omitempty"`
-	NIP46  map[string][]string `json:"nip46,omitempty"`
+	Names  map[string]nostr.PubKey   `json:"names"`
+	Relays map[nostr.PubKey][]string `json:"relays,omitempty"`
+	NIP46  map[nostr.PubKey][]string `json:"nip46,omitempty"`
 }
 
 func IsValidIdentifier(input string) bool {
@@ -40,17 +40,12 @@ func QueryIdentifier(ctx context.Context, fullname string) (*nostr.ProfilePointe
 		return nil, err
 	}
 
-	pubkeyh, ok := result.Names[name]
+	pubkey, ok := result.Names[name]
 	if !ok {
 		return nil, fmt.Errorf("no entry for name '%s'", name)
 	}
 
-	pubkey, err := nostr.PubKeyFromHex(pubkeyh)
-	if err != nil {
-		return nil, fmt.Errorf("got an invalid public key '%s'", pubkeyh)
-	}
-
-	relays, _ := result.Relays[pubkeyh]
+	relays, _ := result.Relays[pubkey]
 	return &nostr.ProfilePointer{
 		PublicKey: pubkey,
 		Relays:    relays,

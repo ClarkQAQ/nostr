@@ -20,7 +20,7 @@ func TestRelayWrapper(t *testing.T) {
 	_ = s.Init()
 	defer s.Close()
 
-	w := StorePublisher{Store: s}
+	w := StorePublisher{Store: s, MaxLimit: 500}
 
 	evt1 := nostr.Event{
 		Kind:      3,

@@ -100,6 +100,14 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 			edit.ClosedValue = &y
 			ok = true
 		}
+		if evt.Tags.Has("restricted") {
+			edit.RestrictedValue = &y
+			ok = true
+		}
+		if evt.Tags.Has("hidden") {
+			edit.HiddenValue = &y
+			ok = true
+		}
 
 		if ok {
 			return edit, nil

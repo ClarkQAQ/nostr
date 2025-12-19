@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"fiatjaf.com/nostr"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -61,20 +62,24 @@ func (rl *Relay) handleDeleteRequest(ctx context.Context, evt nostr.Event) error
 
 			ctx := context.WithValue(ctx, internalCallKey, struct{}{})
 
+			errg, ctx := errgroup.WithContext(ctx)
 			for target := range rl.QueryStored(ctx, f) {
 				// got the event, now check if the user can delete it
 				if target.PubKey == evt.PubKey {
 					// delete it
-					if err := rl.DeleteEvent(ctx, target.ID); err != nil {
-						return err
-					}
+					errg.Go(func() error {
+						if err := rl.DeleteEvent(ctx, target.ID); err != nil {
+							return err
+						}
 
-					// if it was tracked to be expired that is not needed anymore
-					if rl.expirationManager != nil {
-						rl.expirationManager.removeEvent(target.ID)
-					}
+						// if it was tracked to be expired that is not needed anymore
+						if rl.expirationManager != nil {
+							rl.expirationManager.removeEvent(target.ID)
+						}
 
-					haveDeletedSomething = true
+						haveDeletedSomething = true
+						return nil
+					})
 				} else {
 					// fail and stop here
 					return ErrNotAuthor
@@ -82,6 +87,10 @@ func (rl *Relay) handleDeleteRequest(ctx context.Context, evt nostr.Event) error
 
 				// don't try to query this same event again
 				break
+			}
+
+			if err := errg.Wait(); err != nil {
+				return err
 			}
 		}
 	}

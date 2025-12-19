@@ -11,6 +11,14 @@ import (
 
 func (b *BoltBackend) ReplaceEvent(evt nostr.Event) error {
 	return b.DB.Update(func(txn *bbolt.Tx) error {
+		rawBucket := txn.Bucket(rawEventStore)
+
+		// check if we already have this id
+		bin := rawBucket.Get(evt.ID[16:24])
+		if bin != nil {
+			return nil
+		}
+
 		filter := nostr.Filter{Kinds: []nostr.Kind{evt.Kind}, Authors: []nostr.PubKey{evt.PubKey}}
 		if evt.Kind.IsAddressable() {
 			// when addressable, add the "d" tag to the filter
