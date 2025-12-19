@@ -2,12 +2,14 @@ package test
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
+	"fiatjaf.com/nostr/eventstore/badgerdb"
 	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 )
@@ -23,6 +25,19 @@ func BenchmarkSliceStore(b *testing.B) {
 func BenchmarkBoltDB(b *testing.B) {
 	os.RemoveAll(dbpath + "boltdb")
 	l := &boltdb.BoltBackend{Path: dbpath + "boltdb"}
+	if e := l.Init(); e != nil {
+		b.Fatal(e)
+	}
+
+	runBenchmarkOn(b, l)
+}
+
+func BenchmarkBadgerDB(b *testing.B) {
+	os.RemoveAll(dbpath + "badger")
+	l, e := badgerdb.NewBadgerBackend(dbpath + "badger")
+	if e != nil {
+		b.Fatal(e)
+	}
 	if e := l.Init(); e != nil {
 		b.Fatal(e)
 	}
@@ -100,7 +115,7 @@ func runBenchmarkOn(b *testing.B, db eventstore.Store) {
 			b.Fatal(e)
 		}
 		for i := 0; i < b.N; i++ {
-			if e := db.SaveEvent(evt); e != nil {
+			if e := db.SaveEvent(evt); e != nil && !errors.Is(e, eventstore.ErrDupEvent) {
 				b.Fatal(e)
 			}
 		}

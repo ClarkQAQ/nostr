@@ -6,6 +6,7 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
+	"fiatjaf.com/nostr/eventstore/badgerdb"
 	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 )
@@ -37,5 +38,17 @@ func TestBoltDB(t *testing.T) {
 	for _, test := range tests {
 		os.RemoveAll(dbpath + "boltdb")
 		t.Run(test.name, func(t *testing.T) { test.run(t, &boltdb.BoltBackend{Path: dbpath + "boltdb"}) })
+	}
+}
+
+func TestBadgerDB(t *testing.T) {
+	for _, test := range tests {
+		os.RemoveAll(dbpath + "badger")
+		db, e := badgerdb.NewBadgerBackend(dbpath + "badger")
+		if e != nil {
+			t.Fatal(e)
+		}
+
+		t.Run(test.name, func(t *testing.T) { test.run(t, db) })
 	}
 }

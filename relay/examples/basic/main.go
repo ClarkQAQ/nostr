@@ -5,17 +5,22 @@ import (
 	"net/http"
 	"os"
 
-	"fiatjaf.com/nostr/eventstore/boltdb"
+	"fiatjaf.com/nostr/eventstore/badgerdb"
 	"fiatjaf.com/nostr/relay"
 )
 
 func main() {
 	r := relay.NewRelay()
 
-	db := &boltdb.BoltBackend{Path: "/tmp/relay-tmp"}
-	_ = os.MkdirAll(db.Path, 0o755)
-	if err := db.Init(); err != nil {
-		panic(err)
+	path, e := os.MkdirTemp("", "relay-tmp")
+	if e != nil {
+		panic(e)
+	}
+	defer os.RemoveAll(path)
+
+	db := &badgerdb.BadgerBackend{Path: path}
+	if e := db.Init(); e != nil {
+		panic(e)
 	}
 
 	r.UseEventstore(db, 400)
