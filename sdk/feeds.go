@@ -129,7 +129,7 @@ func (sys *System) FetchFeedPage(
 			filter.Until = until
 
 			count := 0
-			for evt := range sys.Store.QueryEvents(filter, limitPerKey) {
+			for evt := range sys.Store.QueryEvents(ctx, filter, limitPerKey) {
 				events = append(events, evt)
 				count++
 				if count >= limitPerKey {

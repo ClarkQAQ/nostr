@@ -1,6 +1,7 @@
 package badgerdb
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -15,7 +16,7 @@ func newTestBackend(t *testing.T) eventstore.Store {
 		t.Fatalf("failed to open backend: %v", e)
 	}
 
-	if e := backend.Init(); e != nil {
+	if e := backend.Init(context.Background()); e != nil {
 		t.Fatalf("failed to init backend: %v", e)
 	}
 
@@ -51,7 +52,7 @@ func TestCombinedQueries(t *testing.T) {
 	e4 := makeEvent(2, k1, 4000, nostr.Tags{{"t", "bitcoin"}}, "e4") // pk1, k2, bitcoin
 
 	for _, e := range []nostr.Event{e1, e2, e3, e4} {
-		if err := b.SaveEvent(e); err != nil {
+		if err := b.SaveEvent(context.Background(), e); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -101,7 +102,7 @@ func TestCombinedQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			count := 0
-			for range b.QueryEvents(tt.filter, 100) {
+			for range b.QueryEvents(context.Background(), tt.filter, 100) {
 				count++
 			}
 			if count != tt.want {
@@ -120,7 +121,7 @@ func TestTimeRangeQueries(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		ts := int64(100 + i*10)
 		evt := makeEvent(1, k, ts, nil, fmt.Sprintf("val-%d", i))
-		if e := b.SaveEvent(evt); e != nil {
+		if e := b.SaveEvent(context.Background(), evt); e != nil {
 			t.Fatalf("failed to save event: %v", e)
 		}
 	}
@@ -148,7 +149,7 @@ func TestTimeRangeQueries(t *testing.T) {
 		}
 
 		count := 0
-		for range b.QueryEvents(f, 100) {
+		for range b.QueryEvents(context.Background(), f, 100) {
 			count++
 		}
 		if count != tt.want {
@@ -167,19 +168,19 @@ func TestComplexTagQueries(t *testing.T) {
 	e2 := makeEvent(1, k, 200, nostr.Tags{{"x", "a"}, {"y", "c"}}, "")
 	e3 := makeEvent(1, k, 300, nostr.Tags{{"x", "z"}}, "")
 
-	if e := b.SaveEvent(e1); e != nil {
+	if e := b.SaveEvent(context.Background(), e1); e != nil {
 		t.Fatalf("failed to save event: %v", e)
 	}
-	if e := b.SaveEvent(e2); e != nil {
+	if e := b.SaveEvent(context.Background(), e2); e != nil {
 		t.Fatalf("failed to save event: %v", e)
 	}
-	if e := b.SaveEvent(e3); e != nil {
+	if e := b.SaveEvent(context.Background(), e3); e != nil {
 		t.Fatalf("failed to save event: %v", e)
 	}
 
 	f1 := nostr.Filter{Tags: nostr.TagMap{"x": []string{"a"}, "y": []string{"b"}, "z": []string{"c"}}}
 	count := 0
-	for range b.QueryEvents(f1, 100) {
+	for range b.QueryEvents(context.Background(), f1, 100) {
 		count++
 	}
 	if count != 1 {
@@ -188,7 +189,7 @@ func TestComplexTagQueries(t *testing.T) {
 
 	f2 := nostr.Filter{Tags: nostr.TagMap{"x": []string{"a"}}}
 	count = 0
-	for range b.QueryEvents(f2, 100) {
+	for range b.QueryEvents(context.Background(), f2, 100) {
 		count++
 	}
 	if count != 2 {
@@ -206,18 +207,18 @@ func TestComplexTagQueriesCount(t *testing.T) {
 	e2 := makeEvent(1, k, 200, nostr.Tags{{"x", "a"}, {"y", "c"}}, "")
 	e3 := makeEvent(1, k, 300, nostr.Tags{{"x", "z"}}, "")
 
-	if e := b.SaveEvent(e1); e != nil {
+	if e := b.SaveEvent(context.Background(), e1); e != nil {
 		t.Fatalf("failed to save event: %v", e)
 	}
-	if e := b.SaveEvent(e2); e != nil {
+	if e := b.SaveEvent(context.Background(), e2); e != nil {
 		t.Fatalf("failed to save event: %v", e)
 	}
-	if e := b.SaveEvent(e3); e != nil {
+	if e := b.SaveEvent(context.Background(), e3); e != nil {
 		t.Fatalf("failed to save event: %v", e)
 	}
 
 	f1 := nostr.Filter{Tags: nostr.TagMap{"x": []string{"a"}, "y": []string{"b"}, "z": []string{"c"}}}
-	count, e := b.CountEvents(f1)
+	count, e := b.CountEvents(context.Background(), f1)
 	if e != nil {
 		t.Fatalf("failed to count events: %v", e)
 	}
@@ -227,7 +228,7 @@ func TestComplexTagQueriesCount(t *testing.T) {
 	}
 
 	f2 := nostr.Filter{Tags: nostr.TagMap{"x": []string{"a"}}}
-	count, e = b.CountEvents(f2)
+	count, e = b.CountEvents(context.Background(), f2)
 	if e != nil {
 		t.Fatalf("failed to count events: %v", e)
 	}
@@ -244,12 +245,12 @@ func TestCountEvents(t *testing.T) {
 	k := nostr.Generate()
 
 	for i := 0; i < 50; i++ {
-		if e := b.SaveEvent(makeEvent(1, k, int64(i), nil, "")); e != nil {
+		if e := b.SaveEvent(context.Background(), makeEvent(1, k, int64(i), nil, "")); e != nil {
 			t.Fatalf("failed to save event: %v", e)
 		}
 	}
 
-	c, err := b.CountEvents(nostr.Filter{Kinds: []nostr.Kind{1}})
+	c, err := b.CountEvents(context.Background(), nostr.Filter{Kinds: []nostr.Kind{1}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +258,7 @@ func TestCountEvents(t *testing.T) {
 		t.Errorf("count all: got %d", c)
 	}
 
-	c2, _ := b.CountEvents(nostr.Filter{Kinds: []nostr.Kind{1}, Limit: 20})
+	c2, _ := b.CountEvents(context.Background(), nostr.Filter{Kinds: []nostr.Kind{1}, Limit: 20})
 	if c2 != 20 {
 		t.Errorf("count limit: got %d", c2)
 	}
@@ -270,7 +271,7 @@ func TestDeleteEvent(t *testing.T) {
 	k := nostr.Generate()
 
 	evt := makeEvent(1, k, 100, nil, "del")
-	if e := b.SaveEvent(evt); e != nil {
+	if e := b.SaveEvent(context.Background(), evt); e != nil {
 		t.Fatalf("failed to save event: %v", e)
 	}
 
@@ -279,26 +280,26 @@ func TestDeleteEvent(t *testing.T) {
 	copy(targetID[:], id)
 
 	found := false
-	for range b.QueryEvents(nostr.Filter{IDs: []nostr.ID{targetID}}, 100) {
+	for range b.QueryEvents(context.Background(), nostr.Filter{IDs: []nostr.ID{targetID}}, 100) {
 		found = true
 	}
 	if !found {
 		t.Fatal("saved event not found")
 	}
 
-	if err := b.DeleteEvent(targetID); err != nil {
+	if err := b.DeleteEvent(context.Background(), targetID); err != nil {
 		t.Fatal(err)
 	}
 
 	found = false
-	for range b.QueryEvents(nostr.Filter{IDs: []nostr.ID{targetID}}, 100) {
+	for range b.QueryEvents(context.Background(), nostr.Filter{IDs: []nostr.ID{targetID}}, 100) {
 		found = true
 	}
 	if found {
 		t.Error("event still exists after delete")
 	}
 
-	c, _ := b.CountEvents(nostr.Filter{IDs: []nostr.ID{targetID}})
+	c, _ := b.CountEvents(context.Background(), nostr.Filter{IDs: []nostr.ID{targetID}})
 	if c != 0 {
 		t.Error("count should be 0 after delete")
 	}
@@ -315,24 +316,24 @@ func TestAddressableReplace(t *testing.T) {
 	e2 := makeEvent(30001, k, 2000, nostr.Tags{{"d", dTag}}, "ver2")
 	e3 := makeEvent(30001, k, 3000, nostr.Tags{{"d", "other"}}, "other")
 
-	if e := b.ReplaceEvent(e1); e != nil {
+	if e := b.ReplaceEvent(context.Background(), e1); e != nil {
 		t.Errorf("expected nil, got %v", e)
 	}
-	if e := b.ReplaceEvent(e3); e != nil {
+	if e := b.ReplaceEvent(context.Background(), e3); e != nil {
 		t.Errorf("expected nil, got %v", e)
 	}
 
-	count, _ := b.CountEvents(nostr.Filter{Authors: []nostr.PubKey{e1.PubKey}, Kinds: []nostr.Kind{30001}})
+	count, _ := b.CountEvents(context.Background(), nostr.Filter{Authors: []nostr.PubKey{e1.PubKey}, Kinds: []nostr.Kind{30001}})
 	if count != 2 {
 		t.Errorf("expected 2 distinct parameterized events, got %d", count)
 	}
 
-	if e := b.ReplaceEvent(e2); e != nil {
+	if e := b.ReplaceEvent(context.Background(), e2); e != nil {
 		t.Errorf("expected nil, got %v", e)
 	}
 
 	events := []nostr.Event{}
-	for ev := range b.QueryEvents(nostr.Filter{Tags: nostr.TagMap{"d": []string{dTag}}}, 10) {
+	for ev := range b.QueryEvents(context.Background(), nostr.Filter{Tags: nostr.TagMap{"d": []string{dTag}}}, 10) {
 		events = append(events, ev)
 	}
 
@@ -351,13 +352,13 @@ func TestMaxLimit(t *testing.T) {
 	k := nostr.Generate()
 
 	for i := 0; i < 20; i++ {
-		if e := b.SaveEvent(makeEvent(1, k, int64(100+i), nil, "")); e != nil {
+		if e := b.SaveEvent(context.Background(), makeEvent(1, k, int64(100+i), nil, "")); e != nil {
 			t.Fatalf("failed to save event: %v", e)
 		}
 	}
 
 	count := 0
-	for range b.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{1}}, 5) {
+	for range b.QueryEvents(context.Background(), nostr.Filter{Kinds: []nostr.Kind{1}}, 5) {
 		count++
 	}
 	if count != 5 {
@@ -366,7 +367,7 @@ func TestMaxLimit(t *testing.T) {
 
 	count = 0
 	f := nostr.Filter{Kinds: []nostr.Kind{1}, Limit: 10}
-	for range b.QueryEvents(f, 100) {
+	for range b.QueryEvents(context.Background(), f, 100) {
 		count++
 	}
 	if count != 10 {

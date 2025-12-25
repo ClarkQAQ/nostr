@@ -16,7 +16,7 @@ import (
 func main() {
 	ctx := context.Background()
 	db := &slicestore.SliceStore{}
-	db.Init()
+	db.Init(ctx)
 
 	sk := nostr.Generate()
 	local := wrappers.StorePublisher{Store: db, MaxLimit: math.MaxInt}
@@ -31,7 +31,7 @@ func main() {
 					Tags:      nostr.Tags{},
 				}
 				evt.Sign(sk)
-				db.SaveEvent(evt)
+				db.SaveEvent(ctx, evt)
 			}
 
 			{
@@ -42,7 +42,7 @@ func main() {
 					Tags:      nostr.Tags{},
 				}
 				evt.Sign(sk)
-				db.SaveEvent(evt)
+				db.SaveEvent(ctx, evt)
 			}
 		}
 

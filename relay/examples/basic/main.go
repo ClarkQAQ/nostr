@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,7 +20,7 @@ func main() {
 	defer os.RemoveAll(path)
 
 	db := &badgerdb.BadgerBackend{Path: path}
-	if e := db.Init(); e != nil {
+	if e := db.Init(context.Background()); e != nil {
 		panic(e)
 	}
 

@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"context"
 	"fmt"
 
 	"fiatjaf.com/nostr"
@@ -8,7 +9,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func (b *BoltBackend) DeleteEvent(id nostr.ID) error {
+func (b *BoltBackend) DeleteEvent(ctx context.Context, id nostr.ID) error {
 	return b.DB.Update(func(txn *bbolt.Tx) error {
 		return b.delete(txn, id)
 	})

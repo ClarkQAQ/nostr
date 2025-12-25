@@ -17,7 +17,7 @@ func TestRelayWrapper(t *testing.T) {
 	ctx := context.Background()
 
 	s := &slicestore.SliceStore{}
-	_ = s.Init()
+	_ = s.Init(context.Background())
 	defer s.Close()
 
 	w := StorePublisher{Store: s, MaxLimit: 500}

@@ -17,7 +17,7 @@ type StorePublisher struct {
 }
 
 func (w StorePublisher) QueryEvents(filter nostr.Filter) iter.Seq[nostr.Event] {
-	return w.Store.QueryEvents(filter, w.MaxLimit)
+	return w.Store.QueryEvents(context.Background(), filter, w.MaxLimit)
 }
 
 func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {
@@ -28,7 +28,7 @@ func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {
 
 	if evt.Kind.IsRegular() {
 		// regular events are just saved directly
-		if err := w.SaveEvent(evt); err != nil && err != eventstore.ErrDupEvent {
+		if err := w.SaveEvent(context.Background(), evt); err != nil && err != eventstore.ErrDupEvent {
 			return fmt.Errorf("failed to save: %w", err)
 		} else {
 			return err
@@ -36,7 +36,7 @@ func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {
 	}
 
 	// others are replaced
-	if e := w.Store.ReplaceEvent(evt); e != nil {
+	if e := w.Store.ReplaceEvent(context.Background(), evt); e != nil {
 		return fmt.Errorf("failed to replace: %w", e)
 	}
 

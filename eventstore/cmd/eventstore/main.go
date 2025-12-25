@@ -88,7 +88,7 @@ var app = &cli.Command{
 					if err := json.Unmarshal(scanner.Bytes(), &evt); err != nil {
 						log.Printf("invalid event read at line %d: %s (`%s`)\n", i, err, scanner.Text())
 					}
-					if e := db.SaveEvent(evt); e != nil {
+					if e := db.SaveEvent(ctx, evt); e != nil {
 						log.Printf("failed to save event at line %d: %s (`%s`)\n", i, e, scanner.Text())
 					}
 					i++
@@ -100,7 +100,7 @@ var app = &cli.Command{
 			return ctx, fmt.Errorf("'%s' store type is not supported by this CLI", typ)
 		}
 
-		if err := db.Init(); err != nil {
+		if err := db.Init(ctx); err != nil {
 			return ctx, err
 		}
 

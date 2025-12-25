@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"context"
 	"fmt"
 	"iter"
 
@@ -9,7 +10,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func (b *BoltBackend) ReplaceEvent(evt nostr.Event) error {
+func (b *BoltBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error {
 	return b.DB.Update(func(txn *bbolt.Tx) error {
 		rawBucket := txn.Bucket(rawEventStore)
 

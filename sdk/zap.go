@@ -70,7 +70,7 @@ func (sys *System) FetchNutZapInfo(ctx context.Context, pubkey nostr.PubKey) Nut
 		return v
 	}
 
-	for evt := range sys.Store.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{10019}, Authors: []nostr.PubKey{pubkey}}, 1) {
+	for evt := range sys.Store.QueryEvents(ctx, nostr.Filter{Kinds: []nostr.Kind{10019}, Authors: []nostr.PubKey{pubkey}}, 1) {
 		// ok, we found something locally
 		nzi, err := ParseNutZapInfo(evt)
 		if err != nil {

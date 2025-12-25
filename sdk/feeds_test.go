@@ -21,7 +21,7 @@ func TestStreamLiveFeed(t *testing.T) {
 
 	for _, r := range []*relay.Relay{relay1, relay2, relay3} {
 		db := &slicestore.SliceStore{}
-		db.Init()
+		db.Init(context.Background())
 		r.UseEventstore(db, 4000)
 		defer db.Close()
 	}

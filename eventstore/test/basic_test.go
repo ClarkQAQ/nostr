@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"slices"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 )
 
 func basicTest(t *testing.T, db eventstore.Store) {
-	err := db.Init()
+	err := db.Init(context.Background())
 	require.NoError(t, err)
 
 	// define public keys for use throughout the test
@@ -76,20 +77,20 @@ func basicTest(t *testing.T, db eventstore.Store) {
 
 		// save all events
 		for _, evt := range events {
-			err = db.SaveEvent(evt)
+			err = db.SaveEvent(context.Background(), evt)
 			require.NoError(t, err)
 		}
 
 		// test 0: query all
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{}, 1000))
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{}, 1000))
 			require.NoError(t, err)
 			require.Len(t, results, 6)
 		}
 
 		// test 1: query by 'e' tag
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Tags: nostr.TagMap{"e": []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
 			}, 1000))
 			require.NoError(t, err)
@@ -99,7 +100,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 
 		// test 2: query by 'q' tag
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Tags: nostr.TagMap{"q": []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
 			}, 1000))
 			require.NoError(t, err)
@@ -109,7 +110,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 
 		// test 3: query by 'p' tag + kind
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Tags:  nostr.TagMap{"p": []string{pk3.Hex()}},
 				Kinds: []nostr.Kind{3},
 			}, 1000))
@@ -120,7 +121,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 
 		// test 4: query by author + kind
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Authors: []nostr.PubKey{pk4},
 				Kinds:   []nostr.Kind{3},
 			}, 1000))
@@ -142,10 +143,10 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Kind: 23122,
 		}
 		_ = evt1.Sign(sk3)
-		require.NoError(t, db.SaveEvent(evt1))
+		require.NoError(t, db.SaveEvent(context.Background(), evt1))
 
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Tags: nostr.TagMap{"e": []string{"f355341a03672c5b136a6002fb4b69ad52111a1646638771c3995fc0a4db2a78"}},
 			}, 1000))
 			require.NoError(t, err)
@@ -156,7 +157,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 				"querying by 'e' tag")
 		}
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Tags: nostr.TagMap{"q": []string{"f355341a03672c5b136a6002fb4b69ad52111a1646638771c3995fc0a4db2a78"}},
 			}, 1000))
 			require.NoError(t, err)
@@ -176,7 +177,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Kind: 23122,
 		}
 		_ = evt2.Sign(sk3)
-		require.NoError(t, db.SaveEvent(evt2))
+		require.NoError(t, db.SaveEvent(context.Background(), evt2))
 
 		evt3 := nostr.Event{
 			CreatedAt: nostr.Now(),
@@ -187,10 +188,10 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Kind: 23122,
 		}
 		_ = evt3.Sign(sk3)
-		require.NoError(t, db.SaveEvent(evt3))
+		require.NoError(t, db.SaveEvent(context.Background(), evt3))
 
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Tags: nostr.TagMap{"e": []string{"f355341a03672c5b136a6002fb4b69ad52111a1646638771c3995fc0a4db2a78"}},
 			}, 1000))
 			require.NoError(t, err)
@@ -201,7 +202,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 				"querying by 'e' tag")
 		}
 		{
-			results := slices.Collect(db.QueryEvents(nostr.Filter{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 				Tags: nostr.TagMap{"q": []string{"f355341a03672c5b136a6002fb4b69ad52111a1646638771c3995fc0a4db2a78"}},
 			}, 1000))
 			require.NoError(t, err)
@@ -223,11 +224,11 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = originalProfile.Sign(sk3)
 
-		err = db.ReplaceEvent(originalProfile)
+		err = db.ReplaceEvent(context.Background(), originalProfile)
 		require.NoError(t, err)
 
 		// verify
-		results := slices.Collect(db.QueryEvents(nostr.Filter{
+		results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{0},
 		}, 1000))
@@ -244,11 +245,11 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		_ = newProfile.Sign(sk3)
 
 		// replace with newer event
-		err = db.ReplaceEvent(newProfile)
+		err = db.ReplaceEvent(context.Background(), newProfile)
 		require.NoError(t, err)
 
 		// verify only the newer event exists
-		results = slices.Collect(db.QueryEvents(nostr.Filter{
+		results = slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{0},
 		}, 1000))
@@ -264,11 +265,11 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = olderProfile.Sign(sk3)
 
-		err = db.ReplaceEvent(olderProfile)
+		err = db.ReplaceEvent(context.Background(), olderProfile)
 		require.NoError(t, err)
 
 		// verify the newer event is still there
-		results = slices.Collect(db.QueryEvents(nostr.Filter{
+		results = slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{0},
 		}, 1000))
@@ -284,11 +285,11 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = articleV1.Sign(sk3)
 
-		err = db.ReplaceEvent(articleV1)
+		err = db.ReplaceEvent(context.Background(), articleV1)
 		require.NoError(t, err)
 
 		// verify article was saved
-		results = slices.Collect(db.QueryEvents(nostr.Filter{
+		results = slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{30023},
 			Tags:    nostr.TagMap{"d": []string{"my-article"}},
@@ -305,11 +306,11 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = articleV2.Sign(sk3)
 
-		err = db.ReplaceEvent(articleV2)
+		err = db.ReplaceEvent(context.Background(), articleV2)
 		require.NoError(t, err)
 
 		// verify only the newer version exists
-		results = slices.Collect(db.QueryEvents(nostr.Filter{
+		results = slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{30023},
 			Tags:    nostr.TagMap{"d": []string{"my-article"}},
@@ -327,11 +328,11 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = differentArticle.Sign(sk3)
 
-		err = db.ReplaceEvent(differentArticle)
+		err = db.ReplaceEvent(context.Background(), differentArticle)
 		require.NoError(t, err)
 
 		// verify both articles exist (different d tags)
-		results = slices.Collect(db.QueryEvents(nostr.Filter{
+		results = slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{30023},
 		}, 1000))
@@ -348,7 +349,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Kind:      1,
 		}
 		_ = otherEvent1.Sign(sk3)
-		err = db.SaveEvent(otherEvent1)
+		err = db.SaveEvent(context.Background(), otherEvent1)
 		require.NoError(t, err)
 
 		otherEvent2 := nostr.Event{
@@ -358,7 +359,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Kind:      2,
 		}
 		_ = otherEvent2.Sign(sk4)
-		err = db.SaveEvent(otherEvent2)
+		err = db.SaveEvent(context.Background(), otherEvent2)
 		require.NoError(t, err)
 
 		// create a test event to delete
@@ -369,29 +370,29 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			Kind:      1,
 		}
 		_ = deleteEvent.Sign(sk3)
-		err = db.SaveEvent(deleteEvent)
+		err = db.SaveEvent(context.Background(), deleteEvent)
 		require.NoError(t, err)
 
 		// verify events exist
-		results := slices.Collect(db.QueryEvents(nostr.Filter{
+		results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{1},
 		}, 1000))
 		require.Contains(t, results, deleteEvent)
 		require.Contains(t, results, otherEvent1)
 
-		results2 := slices.Collect(db.QueryEvents(nostr.Filter{
+		results2 := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk4},
 			Kinds:   []nostr.Kind{2},
 		}, 1000))
 		require.Contains(t, results2, otherEvent2)
 
 		// delete the event
-		err = db.DeleteEvent(deleteEvent.ID)
+		err = db.DeleteEvent(context.Background(), deleteEvent.ID)
 		require.NoError(t, err)
 
 		// verify event is deleted
-		results = slices.Collect(db.QueryEvents(nostr.Filter{
+		results = slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk3},
 			Kinds:   []nostr.Kind{1},
 		}, 1000))
@@ -399,7 +400,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		require.Contains(t, results, otherEvent1)
 
 		// verify other event still exists
-		results2 = slices.Collect(db.QueryEvents(nostr.Filter{
+		results2 = slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
 			Authors: []nostr.PubKey{pk4},
 			Kinds:   []nostr.Kind{2},
 		}, 1000))
@@ -407,7 +408,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 
 		// test deleting non-existent event (should not error)
 		fakeID, _ := nostr.IDFromHex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-		err = db.DeleteEvent(fakeID)
+		err = db.DeleteEvent(context.Background(), fakeID)
 		require.NoError(t, err)
 	}
 }

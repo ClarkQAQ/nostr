@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,7 +16,7 @@ func main() {
 
 	db := &boltdb.BoltBackend{Path: "/tmp/relay-grasp-lmdb-tmp"}
 	_ = os.MkdirAll(db.Path, 0o755)
-	if err := db.Init(); err != nil {
+	if err := db.Init(context.Background()); err != nil {
 		panic(err)
 	}
 

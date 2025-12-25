@@ -1,10 +1,12 @@
 package badgerdb
 
 import (
+	"context"
 	"iter"
 	"log"
 	"math"
 	"slices"
+	"strings"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
@@ -12,7 +14,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-func (b *BadgerBackend) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
+func (b *BadgerBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
 	return func(yield func(nostr.Event) bool) {
 		if filter.IDs != nil {
 			// when there are ids we ignore everything else and just fetch the ids
@@ -21,11 +23,6 @@ func (b *BadgerBackend) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[
 			}); err != nil {
 				log.Printf("badger: unexpected id query error: %s\n", err)
 			}
-			return
-		}
-
-		// ignore search queries
-		if filter.Search != "" {
 			return
 		}
 
@@ -180,6 +177,10 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 
 					// if there is still a tag to be checked, do it now
 					if extraTagValues != nil && !event.Tags.ContainsAny(extraTagKey, extraTagValues) {
+						continue
+					}
+
+					if filter.Search != "" && !strings.Contains(event.Content, filter.Search) {
 						continue
 					}
 

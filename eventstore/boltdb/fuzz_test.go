@@ -2,6 +2,7 @@ package boltdb
 
 import (
 	"cmp"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -34,7 +35,7 @@ func FuzzQuery(f *testing.F) {
 		}
 		db := &BoltBackend{}
 		db.Path = "/tmp/bolttest"
-		if err := db.Init(); err != nil {
+		if err := db.Init(context.Background()); err != nil {
 			t.Fatal(err)
 			return
 		}
@@ -77,7 +78,7 @@ func FuzzQuery(f *testing.F) {
 			err := evt.Sign(sk)
 			require.NoError(t, err)
 
-			err = db.SaveEvent(evt)
+			err = db.SaveEvent(context.Background(), evt)
 			require.NoError(t, err)
 
 			if filter.Matches(evt) {
@@ -92,7 +93,7 @@ func FuzzQuery(f *testing.F) {
 
 		start := time.Now()
 
-		res := slices.Collect(db.QueryEvents(filter, 500))
+		res := slices.Collect(db.QueryEvents(context.Background(), filter, 500))
 		end := time.Now()
 
 		require.Equal(t, len(expected), len(res), "number of results is different than expected")

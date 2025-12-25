@@ -25,7 +25,7 @@ var query = &cli.Command{
 				continue
 			}
 
-			for evt := range db.QueryEvents(filter, 10_000_000) {
+			for evt := range db.QueryEvents(ctx, filter, 10_000_000) {
 				fmt.Println(evt)
 			}
 		}

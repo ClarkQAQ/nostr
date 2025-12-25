@@ -1,6 +1,7 @@
 package badgerdb
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-func (b *BadgerBackend) DeleteEvent(id nostr.ID) error {
+func (b *BadgerBackend) DeleteEvent(ctx context.Context, id nostr.ID) error {
 	return b.DB.Update(func(txn *badger.Txn) error {
 		return b.delete(txn, id)
 	})

@@ -138,19 +138,19 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 			maxLimit = maxQueryLimit * 20
 		}
 
-		return store.QueryEvents(filter, maxLimit)
+		return store.QueryEvents(ctx, filter, maxLimit)
 	}
 	rl.Count = func(ctx context.Context, filter nostr.Filter) (uint32, error) {
-		return store.CountEvents(filter)
+		return store.CountEvents(ctx, filter)
 	}
 	rl.StoreEvent = func(ctx context.Context, event nostr.Event) error {
-		return store.SaveEvent(event)
+		return store.SaveEvent(ctx, event)
 	}
 	rl.ReplaceEvent = func(ctx context.Context, event nostr.Event) error {
-		return store.ReplaceEvent(event)
+		return store.ReplaceEvent(ctx, event)
 	}
 	rl.DeleteEvent = func(ctx context.Context, id nostr.ID) error {
-		return store.DeleteEvent(id)
+		return store.DeleteEvent(ctx, id)
 	}
 
 	// only when using the eventstore we automatically set up the expiration manager

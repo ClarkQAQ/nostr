@@ -2,6 +2,7 @@ package boltdb
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"slices"
 
@@ -13,7 +14,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func (b *BoltBackend) CountEvents(filter nostr.Filter) (uint32, error) {
+func (b *BoltBackend) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {
 	var count uint32 = 0
 
 	queries, extraAuthors, extraKinds, extraTagKey, extraTagValues, since, err := b.prepareQueries(filter)

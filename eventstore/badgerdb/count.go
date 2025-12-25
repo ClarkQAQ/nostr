@@ -2,16 +2,18 @@ package badgerdb
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"slices"
+	"strings"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
 	"github.com/dgraph-io/badger/v4"
 )
 
-func (b *BadgerBackend) CountEvents(filter nostr.Filter) (uint32, error) {
+func (b *BadgerBackend) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {
 	var count int = 0
 
 	queries, extraAuthors, extraKinds, extraTagKey, extraTagValues, since, e := b.prepareQueries(filter)
@@ -52,7 +54,7 @@ func (b *BadgerBackend) CountEvents(filter nostr.Filter) (uint32, error) {
 					break
 				}
 
-				if extraAuthors != nil || extraKinds != nil || extraTagValues != nil {
+				if extraAuthors != nil || extraKinds != nil || extraTagValues != nil || filter.Search != "" {
 					// fetch actual event
 					idPtr := key[keyLen-8:]
 					rawKey := make([]byte, 1+8)
@@ -83,18 +85,22 @@ func (b *BadgerBackend) CountEvents(filter nostr.Filter) (uint32, error) {
 						continue
 					}
 
-					if extraTagValues != nil {
-						evt := &nostr.Event{}
-						if err := betterbinary.Unmarshal(bin, evt); err != nil {
+					evt := &nostr.Event{}
+					if extraTagValues != nil || filter.Search != "" {
+						if e := betterbinary.Unmarshal(bin, evt); e != nil {
 							it.Next()
 							continue
 						}
+					}
 
-						// if there is still a tag to be checked, do it now
-						if !evt.Tags.ContainsAny(extraTagKey, extraTagValues) {
-							it.Next()
-							continue
-						}
+					if extraTagValues != nil && !evt.Tags.ContainsAny(extraTagKey, extraTagValues) {
+						it.Next()
+						continue
+					}
+
+					if filter.Search != "" && !strings.Contains(evt.Content, filter.Search) {
+						it.Next()
+						continue
 					}
 				}
 

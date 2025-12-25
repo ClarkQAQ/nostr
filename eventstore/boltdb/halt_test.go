@@ -20,7 +20,7 @@ func TestHaltingProblem(t *testing.T) {
 			return
 		}
 		db := BoltBackend{Path: "/tmp/bolthalttest"}
-		if err := db.Init(); err != nil {
+		if err := db.Init(context.Background()); err != nil {
 			panic(err)
 		}
 

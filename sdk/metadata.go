@@ -111,7 +111,7 @@ func (sys *System) FetchProfileMetadata(ctx context.Context, pubkey nostr.PubKey
 
 	pm.PubKey = pubkey
 
-	for evt := range sys.Store.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{0}, Authors: []nostr.PubKey{pubkey}}, 1) {
+	for evt := range sys.Store.QueryEvents(ctx, nostr.Filter{Kinds: []nostr.Kind{0}, Authors: []nostr.PubKey{pubkey}}, 1) {
 		// ok, we found something locally
 		pm, _ = ParseMetadata(evt)
 		pm.PubKey = pubkey

@@ -47,7 +47,7 @@ func fetchGenericSets[V comparable, I TagItemWithValue[V]](
 	v := GenericSets[V, I]{PubKey: pubkey}
 
 	events := slices.Collect(
-		sys.Store.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{actualKind}, Authors: []nostr.PubKey{pubkey}}, 100),
+		sys.Store.QueryEvents(ctx, nostr.Filter{Kinds: []nostr.Kind{actualKind}, Authors: []nostr.PubKey{pubkey}}, 100),
 	)
 	if len(events) != 0 {
 		// ok, we found something locally

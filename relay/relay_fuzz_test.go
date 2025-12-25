@@ -23,7 +23,7 @@ func FuzzReplaceableEvents(f *testing.F) {
 
 		relay := NewRelay()
 		store := &boltdb.BoltBackend{Path: "/tmp/fuzz"}
-		store.Init()
+		store.Init(context.Background())
 		relay.UseEventstore(store, 4000)
 
 		defer store.Close()

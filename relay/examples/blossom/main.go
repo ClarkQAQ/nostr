@@ -17,14 +17,14 @@ func main() {
 	r := relay.NewRelay()
 
 	db := &boltdb.BoltBackend{Path: "/tmp/relay-boltdb-tmp"}
-	if err := db.Init(); err != nil {
+	if err := db.Init(context.Background()); err != nil {
 		panic(err)
 	}
 
 	r.UseEventstore(db, 400)
 
 	bdb := &boltdb.BoltBackend{Path: "/tmp/relay-boltdb-blossom-tmp"}
-	if err := bdb.Init(); err != nil {
+	if err := bdb.Init(context.Background()); err != nil {
 		panic(err)
 	}
 	bl := blossom.New()

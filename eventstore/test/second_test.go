@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"slices"
@@ -12,7 +13,7 @@ import (
 )
 
 func runSecondTestOn(t *testing.T, db eventstore.Store) {
-	_ = db.Init()
+	_ = db.Init(context.Background())
 
 	for i := 0; i < 10000; i++ {
 		eTag := make([]byte, 32)
@@ -38,7 +39,7 @@ func runSecondTestOn(t *testing.T, db eventstore.Store) {
 			sk = sk4
 		}
 		_ = evt.Sign(sk)
-		err := db.SaveEvent(evt)
+		err := db.SaveEvent(context.Background(), evt)
 		require.NoError(t, err)
 	}
 
@@ -70,7 +71,7 @@ func runSecondTestOn(t *testing.T, db eventstore.Store) {
 		for q, filter := range filters {
 			label := fmt.Sprintf("filter %d: %s", q, filter)
 			t.Run(fmt.Sprintf("q-%d", q), func(t *testing.T) {
-				results := slices.Collect(db.QueryEvents(filter, 500))
+				results := slices.Collect(db.QueryEvents(context.Background(), filter, 500))
 				require.NotEmpty(t, results, label)
 			})
 		}

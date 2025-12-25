@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"slices"
@@ -13,7 +14,7 @@ import (
 
 // this is testing what happens when most results come from the same abstract query -- but not all
 func unbalancedTest(t *testing.T, db eventstore.Store) {
-	_ = db.Init()
+	_ = db.Init(context.Background())
 
 	const total = 10000
 	const limit = 160
@@ -46,7 +47,7 @@ func unbalancedTest(t *testing.T, db eventstore.Store) {
 		err := evt.Sign([32]byte(sk))
 		require.NoError(t, err)
 
-		err = db.SaveEvent(evt)
+		err = db.SaveEvent(context.Background(), evt)
 		require.NoError(t, err)
 
 		if bigfilter.Matches(evt) {
@@ -60,7 +61,7 @@ func unbalancedTest(t *testing.T, db eventstore.Store) {
 	}
 	require.Len(t, expected, limit)
 
-	res := slices.Collect(db.QueryEvents(bigfilter, 500))
+	res := slices.Collect(db.QueryEvents(context.Background(), bigfilter, 500))
 
 	require.Equal(t, limit, len(res))
 	require.True(t, slices.IsSortedFunc(res, nostr.CompareEventReverse))

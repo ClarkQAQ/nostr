@@ -25,7 +25,7 @@ var count = &cli.Command{
 				continue
 			}
 
-			res, err := db.CountEvents(filter)
+			res, err := db.CountEvents(ctx, filter)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to count '%s': %s\n", filter, err)
 				hasError = true

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"slices"
@@ -13,21 +14,21 @@ import (
 
 func main() {
 	db1 := &slicestore.SliceStore{}
-	if e := db1.Init(); e != nil {
+	if e := db1.Init(context.Background()); e != nil {
 		panic(e)
 	}
 	r1 := relay.NewRelay()
 	r1.UseEventstore(db1, 400)
 
 	db2 := &boltdb.BoltBackend{Path: "/tmp/t"}
-	if e := db2.Init(); e != nil {
+	if e := db2.Init(context.Background()); e != nil {
 		panic(e)
 	}
 	r2 := relay.NewRelay()
 	r2.UseEventstore(db2, 400)
 
 	db3 := &slicestore.SliceStore{}
-	if e := db3.Init(); e != nil {
+	if e := db3.Init(context.Background()); e != nil {
 		panic(e)
 	}
 	r3 := relay.NewRelay()

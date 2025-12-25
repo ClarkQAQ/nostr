@@ -1,13 +1,15 @@
 package badgerdb
 
 import (
+	"context"
+
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
 	"github.com/dgraph-io/badger/v4"
 )
 
-func (b *BadgerBackend) SaveEvent(evt nostr.Event) error {
+func (b *BadgerBackend) SaveEvent(ctx context.Context, evt nostr.Event) error {
 	return b.DB.Update(func(txn *badger.Txn) error {
 		// check if we already have this id
 		rawKey := make([]byte, 1+8)

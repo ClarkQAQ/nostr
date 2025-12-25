@@ -1,6 +1,9 @@
 package wrappers
 
 import (
+	"context"
+	"fmt"
+
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 )
@@ -18,16 +21,18 @@ func (w *UniqueReactionsWrapper) SaveEvent(event nostr.Event) error {
 		ref := event.Tags.Find("e")
 		if ref != nil {
 			// query for existing events of same kind from same author referencing the same event and delete them
-			for old := range w.Store.QueryEvents(nostr.Filter{
+			for old := range w.Store.QueryEvents(context.Background(), nostr.Filter{
 				Authors: []nostr.PubKey{event.PubKey},
 				Kinds:   []nostr.Kind{event.Kind},
 				Tags:    nostr.TagMap{"e": []string{ref[1]}},
 			}, 1_000) {
-				w.Store.DeleteEvent(old.ID)
+				if e := w.Store.DeleteEvent(context.Background(), old.ID); e != nil {
+					return fmt.Errorf("failed to delete old event: %v", e)
+				}
 			}
 		}
 	}
 
 	// Save the new event
-	return w.Store.SaveEvent(event)
+	return w.Store.SaveEvent(context.Background(), event)
 }

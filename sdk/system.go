@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"context"
 	"math/rand/v2"
 
 	"fiatjaf.com/nostr"
@@ -147,7 +148,7 @@ func NewSystem() *System {
 
 	if sys.Store == nil {
 		sys.Store = &nullstore.NullStore{}
-		sys.Store.Init()
+		sys.Store.Init(context.Background())
 	}
 	sys.Publisher = wrappers.StorePublisher{Store: sys.Store, MaxLimit: 1000}
 

@@ -15,7 +15,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 	// setup relay with in-memory store
 	relay := NewRelay()
 	store := &slicestore.SliceStore{}
-	store.Init()
+	store.Init(context.Background())
 
 	relay.UseEventstore(store, 400)
 
@@ -264,7 +264,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 		// create a new relay with shorter expiration check interval
 		relay := NewRelay()
 		store := &slicestore.SliceStore{}
-		store.Init()
+		store.Init(context.Background())
 
 		// this will automatically start the expiration manager
 		relay.UseEventstore(store, 400)

@@ -1,6 +1,7 @@
 package badgerdb
 
 import (
+	"context"
 	"fmt"
 	"iter"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-func (b *BadgerBackend) ReplaceEvent(evt nostr.Event) error {
+func (b *BadgerBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error {
 	return b.DB.Update(func(txn *badger.Txn) error {
 		filter := nostr.Filter{Kinds: []nostr.Kind{evt.Kind}, Authors: []nostr.PubKey{evt.PubKey}}
 		if evt.Kind.IsAddressable() {

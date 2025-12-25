@@ -97,7 +97,7 @@ func (sys *System) FetchSpecificEvent(
 
 	// try to fetch in our internal eventstore first
 	if !params.SkipLocalStore {
-		for evt := range sys.Store.QueryEvents(filter, 1) {
+		for evt := range sys.Store.QueryEvents(ctx, filter, 1) {
 			return &evt, nil, nil
 		}
 	}

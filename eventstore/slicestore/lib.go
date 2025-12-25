@@ -3,6 +3,7 @@ package slicestore
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"fmt"
 	"iter"
 	"slices"
@@ -20,14 +21,14 @@ type SliceStore struct {
 	internal []nostr.Event
 }
 
-func (b *SliceStore) Init() error {
+func (b *SliceStore) Init(ctx context.Context) error {
 	b.internal = make([]nostr.Event, 0, 5000)
 	return nil
 }
 
 func (b *SliceStore) Close() {}
 
-func (b *SliceStore) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
+func (b *SliceStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
 	return func(yield func(nostr.Event) bool) {
 		if tlimit := filter.GetTheoreticalLimit(); tlimit == 0 {
 			return
@@ -66,7 +67,7 @@ func (b *SliceStore) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[nos
 	}
 }
 
-func (b *SliceStore) CountEvents(filter nostr.Filter) (uint32, error) {
+func (b *SliceStore) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {
 	var val uint32
 	for _, event := range b.internal {
 		if filter.Matches(event) {
@@ -76,7 +77,7 @@ func (b *SliceStore) CountEvents(filter nostr.Filter) (uint32, error) {
 	return val, nil
 }
 
-func (b *SliceStore) SaveEvent(evt nostr.Event) error {
+func (b *SliceStore) SaveEvent(ctx context.Context, evt nostr.Event) error {
 	b.Lock()
 	defer b.Unlock()
 
@@ -96,7 +97,7 @@ func (b *SliceStore) save(evt nostr.Event) error {
 	return nil
 }
 
-func (b *SliceStore) DeleteEvent(id nostr.ID) error {
+func (b *SliceStore) DeleteEvent(ctx context.Context, id nostr.ID) error {
 	b.Lock()
 	defer b.Unlock()
 
@@ -123,7 +124,7 @@ func (b *SliceStore) delete(id nostr.ID) error {
 	return nil
 }
 
-func (b *SliceStore) ReplaceEvent(evt nostr.Event) error {
+func (b *SliceStore) ReplaceEvent(ctx context.Context, evt nostr.Event) error {
 	b.Lock()
 	defer b.Unlock()
 
@@ -133,7 +134,7 @@ func (b *SliceStore) ReplaceEvent(evt nostr.Event) error {
 	}
 
 	shouldStore := true
-	for previous := range b.QueryEvents(filter, 1) {
+	for previous := range b.QueryEvents(ctx, filter, 1) {
 		if internal.IsOlder(previous, evt) {
 			if err := b.delete(previous.ID); err != nil {
 				return fmt.Errorf("failed to delete event for replacing: %w", err)

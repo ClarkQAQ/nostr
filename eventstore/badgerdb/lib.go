@@ -1,9 +1,9 @@
 package badgerdb
 
 import (
+	"context"
 	"time"
 
-	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 	"github.com/dgraph-io/badger/v4"
 )
@@ -25,8 +25,6 @@ var _ eventstore.Store = (*BadgerBackend)(nil)
 type BadgerBackend struct {
 	Path string
 	DB   *badger.DB
-
-	EnableHLLCacheFor func(kind nostr.Kind) (useCache bool, skipSavingActualEvent bool)
 }
 
 // NewBadgerBackend creates a new BadgerBackend with the given path.
@@ -35,7 +33,7 @@ func NewBadgerBackend(path string) (*BadgerBackend, error) {
 	return &BadgerBackend{Path: path}, nil
 }
 
-func (b *BadgerBackend) Init() error {
+func (b *BadgerBackend) Init(ctx context.Context) error {
 	opts := badger.DefaultOptions(b.Path)
 
 	// Performance optimizations

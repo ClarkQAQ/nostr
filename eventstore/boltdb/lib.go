@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"context"
 	"time"
 
 	"fiatjaf.com/nostr"
@@ -31,7 +32,7 @@ type BoltBackend struct {
 	EnableHLLCacheFor func(kind nostr.Kind) (useCache bool, skipSavingActualEvent bool)
 }
 
-func (b *BoltBackend) Init() error {
+func (b *BoltBackend) Init(ctx context.Context) error {
 	db, err := bbolt.Open(b.Path, 0600, &bbolt.Options{
 		Timeout:         2 * time.Second,
 		PreLoadFreelist: true,

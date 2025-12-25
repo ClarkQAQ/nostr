@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"slices"
@@ -12,7 +13,7 @@ import (
 )
 
 func manyAuthorsTest(t *testing.T, db eventstore.Store) {
-	_ = db.Init()
+	_ = db.Init(context.Background())
 
 	const total = 10000
 	const limit = 500
@@ -45,7 +46,7 @@ func manyAuthorsTest(t *testing.T, db eventstore.Store) {
 		err := evt.Sign([32]byte(sk))
 		require.NoError(t, err)
 
-		err = db.SaveEvent(evt)
+		err = db.SaveEvent(context.Background(), evt)
 		require.NoError(t, err)
 
 		if bigfilter.Matches(evt) {
@@ -53,7 +54,7 @@ func manyAuthorsTest(t *testing.T, db eventstore.Store) {
 		}
 	}
 
-	res := slices.Collect(db.QueryEvents(bigfilter, 500))
+	res := slices.Collect(db.QueryEvents(context.Background(), bigfilter, 500))
 	require.Len(t, res, limit)
 	require.True(t, slices.IsSortedFunc(res, nostr.CompareEventReverse))
 	slices.SortFunc(ordered, nostr.CompareEventReverse)

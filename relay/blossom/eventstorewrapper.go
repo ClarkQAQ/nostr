@@ -17,7 +17,7 @@ type EventStoreBlobIndexWrapper struct {
 
 func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescriptor, pubkey nostr.PubKey) error {
 	next, stop := iter.Pull(
-		es.Store.QueryEvents(nostr.Filter{Authors: []nostr.PubKey{pubkey}, Kinds: []nostr.Kind{24242}, Tags: nostr.TagMap{"x": []string{blob.SHA256}}}, 1),
+		es.Store.QueryEvents(ctx, nostr.Filter{Authors: []nostr.PubKey{pubkey}, Kinds: []nostr.Kind{24242}, Tags: nostr.TagMap{"x": []string{blob.SHA256}}}, 1),
 	)
 	defer stop()
 
@@ -34,7 +34,7 @@ func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescript
 			CreatedAt: blob.Uploaded,
 		}
 		evt.ID = evt.GetID()
-		if e := es.Store.SaveEvent(evt); e != nil {
+		if e := es.Store.SaveEvent(ctx, evt); e != nil {
 			return fmt.Errorf("save event: %w", e)
 		}
 	}
@@ -44,7 +44,7 @@ func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescript
 
 func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey, publicURL string) iter.Seq[BlobDescriptor] {
 	return func(yield func(BlobDescriptor) bool) {
-		for evt := range es.Store.QueryEvents(nostr.Filter{
+		for evt := range es.Store.QueryEvents(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
 			Kinds:   []nostr.Kind{24242},
 		}, 1000) {
@@ -55,7 +55,7 @@ func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubK
 
 func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL string) (*BlobDescriptor, error) {
 	next, stop := iter.Pull(
-		es.Store.QueryEvents(nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
+		es.Store.QueryEvents(ctx, nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
 	)
 
 	defer stop()
@@ -70,7 +70,7 @@ func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, pub
 
 func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error {
 	next, stop := iter.Pull(
-		es.Store.QueryEvents(nostr.Filter{
+		es.Store.QueryEvents(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
 			Tags:    nostr.TagMap{"x": []string{sha256}},
 			Kinds:   []nostr.Kind{24242},
@@ -81,7 +81,7 @@ func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, 
 	defer stop()
 
 	if evt, found := next(); found {
-		return es.Store.DeleteEvent(evt.ID)
+		return es.Store.DeleteEvent(ctx, evt.ID)
 	}
 
 	return nil

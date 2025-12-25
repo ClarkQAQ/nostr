@@ -38,7 +38,7 @@ var save = &cli.Command{
 				continue
 			}
 
-			if err := db.SaveEvent(event); err != nil {
+			if err := db.SaveEvent(ctx, event); err != nil {
 				fmt.Fprintf(os.Stderr, "failed to save event '%s': %s\n", line, err)
 				hasError = true
 				continue

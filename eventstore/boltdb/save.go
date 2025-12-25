@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"context"
 	"fmt"
 
 	"fiatjaf.com/nostr"
@@ -9,7 +10,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func (b *BoltBackend) SaveEvent(evt nostr.Event) error {
+func (b *BoltBackend) SaveEvent(ctx context.Context, evt nostr.Event) error {
 	return b.DB.Update(func(txn *bbolt.Tx) error {
 		if b.EnableHLLCacheFor != nil {
 			// modify hyperloglog caches relative to this

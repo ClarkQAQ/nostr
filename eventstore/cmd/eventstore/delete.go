@@ -23,7 +23,7 @@ var delete_ = &cli.Command{
 				hasError = true
 			}
 
-			if err := db.DeleteEvent(id); err != nil {
+			if err := db.DeleteEvent(ctx, id); err != nil {
 				fmt.Fprintf(os.Stderr, "error deleting '%s': %s\n", id.Hex(), err)
 				hasError = true
 			}

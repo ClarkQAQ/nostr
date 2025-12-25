@@ -19,7 +19,7 @@ func main() {
 	if e := os.MkdirAll(db.Path, 0o755); e != nil {
 		panic(e)
 	}
-	if err := db.Init(); err != nil {
+	if err := db.Init(context.Background()); err != nil {
 		panic(err)
 	}
 

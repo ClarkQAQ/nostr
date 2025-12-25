@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -16,7 +17,7 @@ import (
 
 func BenchmarkSliceStore(b *testing.B) {
 	s := &slicestore.SliceStore{}
-	if e := s.Init(); e != nil {
+	if e := s.Init(context.Background()); e != nil {
 		b.Fatal(e)
 	}
 	runBenchmarkOn(b, s)
@@ -25,7 +26,7 @@ func BenchmarkSliceStore(b *testing.B) {
 func BenchmarkBoltDB(b *testing.B) {
 	os.RemoveAll(dbpath + "boltdb")
 	l := &boltdb.BoltBackend{Path: dbpath + "boltdb"}
-	if e := l.Init(); e != nil {
+	if e := l.Init(context.Background()); e != nil {
 		b.Fatal(e)
 	}
 
@@ -38,7 +39,7 @@ func BenchmarkBadgerDB(b *testing.B) {
 	if e != nil {
 		b.Fatal(e)
 	}
-	if e := l.Init(); e != nil {
+	if e := l.Init(context.Background()); e != nil {
 		b.Fatal(e)
 	}
 
@@ -72,7 +73,7 @@ func runBenchmarkOn(b *testing.B, db eventstore.Store) {
 		if e := evt.Sign(sk); e != nil {
 			b.Fatal(e)
 		}
-		if e := db.SaveEvent(evt); e != nil {
+		if e := db.SaveEvent(context.Background(), evt); e != nil {
 			b.Fatal(e)
 		}
 	}
@@ -103,7 +104,7 @@ func runBenchmarkOn(b *testing.B, db eventstore.Store) {
 		for q, filter := range filters {
 			b.Run(fmt.Sprintf("q-%d", q), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					_ = db.QueryEvents(filter, 500)
+					_ = db.QueryEvents(context.Background(), filter, 500)
 				}
 			})
 		}
@@ -115,7 +116,7 @@ func runBenchmarkOn(b *testing.B, db eventstore.Store) {
 			b.Fatal(e)
 		}
 		for i := 0; i < b.N; i++ {
-			if e := db.SaveEvent(evt); e != nil && !errors.Is(e, eventstore.ErrDupEvent) {
+			if e := db.SaveEvent(context.Background(), evt); e != nil && !errors.Is(e, eventstore.ErrDupEvent) {
 				b.Fatal(e)
 			}
 		}

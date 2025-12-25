@@ -1,6 +1,7 @@
 package boltdb
 
 import (
+	"context"
 	"iter"
 	"log"
 	"math"
@@ -12,7 +13,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func (b *BoltBackend) QueryEvents(filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
+func (b *BoltBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
 	return func(yield func(nostr.Event) bool) {
 		if filter.IDs != nil {
 			// when there are ids we ignore everything else and just fetch the ids
