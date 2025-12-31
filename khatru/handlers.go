@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -41,15 +42,30 @@ func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		MaxAge:         86400,
 	})
 
-	if r.Header.Get("Upgrade") == "websocket" {
-		rl.HandleWebsocket(w, r)
-	} else if r.Header.Get("Accept") == "application/nostr+json" {
-		corsMiddleware.Handler(http.HandlerFunc(rl.HandleNIP11)).ServeHTTP(w, r)
-	} else if r.Header.Get("Content-Type") == "application/nostr+json+rpc" {
-		corsMiddleware.Handler(http.HandlerFunc(rl.HandleNIP86)).ServeHTTP(w, r)
-	} else {
-		corsMiddleware.Handler(rl.serveMux).ServeHTTP(w, r)
+	relayPathMatches := true
+	if rl.ServiceURL != "" {
+		p, err := url.Parse(rl.ServiceURL)
+		if err == nil {
+			relayPathMatches = strings.TrimSuffix(r.URL.Path, "/") == strings.TrimSuffix(p.Path, "/")
+		}
 	}
+
+	if relayPathMatches {
+		if r.Header.Get("Upgrade") == "websocket" {
+			rl.HandleWebsocket(w, r)
+			return
+		}
+		if r.Header.Get("Accept") == "application/nostr+json" {
+			corsMiddleware.Handler(http.HandlerFunc(rl.HandleNIP11)).ServeHTTP(w, r)
+			return
+		}
+		if r.Header.Get("Content-Type") == "application/nostr+json+rpc" {
+			corsMiddleware.Handler(http.HandlerFunc(rl.HandleNIP86)).ServeHTTP(w, r)
+			return
+		}
+	}
+
+	corsMiddleware.Handler(rl.serveMux).ServeHTTP(w, r)
 }
 
 func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
