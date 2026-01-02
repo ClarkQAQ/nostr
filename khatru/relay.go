@@ -181,5 +181,6 @@ func (rl *Relay) getBaseURL(r *http.Request) string {
 			proto = "https"
 		}
 	}
-	return proto + "://" + host
+
+	return proto + "://" + host + r.URL.Path
 }
