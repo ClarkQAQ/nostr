@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	MaxKind         = math.MaxUint16
-	MaxCreatedAt    = math.MaxUint32
+	MaxKind         = math.MaxUint64
+	MaxCreatedAt    = math.MaxUint64
 	MaxContentSize  = math.MaxUint16
 	MaxTagCount     = math.MaxUint16
 	MaxTagItemCount = math.MaxUint8
@@ -18,7 +18,7 @@ const (
 )
 
 func Measure(evt nostr.Event) int {
-	n := 135 // static base
+	n := 145 // static base (1 + 8 + 8 + 32 + 32 + 64)
 
 	n += 2 + // tag section length
 		2 + // number of tags
@@ -39,28 +39,22 @@ func Measure(evt nostr.Event) int {
 func Marshal(evt nostr.Event, buf []byte) error {
 	buf[0] = 0
 
-	if evt.Kind > MaxKind {
-		return fmt.Errorf("kind is too big: %d, max is %d", evt.Kind, MaxKind)
-	}
-	binary.LittleEndian.PutUint16(buf[1:3], uint16(evt.Kind))
+	binary.LittleEndian.PutUint64(buf[1:9], uint64(evt.Kind))
 
-	if evt.CreatedAt > MaxCreatedAt {
-		return fmt.Errorf("created_at is too big: %d, max is %d", evt.CreatedAt, MaxCreatedAt)
-	}
-	binary.LittleEndian.PutUint32(buf[3:7], uint32(evt.CreatedAt))
+	binary.LittleEndian.PutUint64(buf[9:17], uint64(evt.CreatedAt))
 
-	copy(buf[7:39], evt.ID[:])
-	copy(buf[39:71], evt.PubKey[:])
-	copy(buf[71:135], evt.Sig[:])
+	copy(buf[17:49], evt.ID[:])
+	copy(buf[49:81], evt.PubKey[:])
+	copy(buf[81:145], evt.Sig[:])
 
-	tagBase := 135
-	// buf[135:137] (tagsSectionLength) will be set later when we know the absolute size of the tags section
+	tagBase := 145
+	// buf[145:147] (tagsSectionLength) will be set later when we know the absolute size of the tags section
 
 	ntags := len(evt.Tags)
 	if ntags > MaxTagCount {
 		return fmt.Errorf("can't encode too many tags: %d, max is %d", ntags, MaxTagCount)
 	}
-	binary.LittleEndian.PutUint16(buf[137:139], uint16(ntags))
+	binary.LittleEndian.PutUint16(buf[147:149], uint16(ntags))
 
 	tagOffset := 2 + 2 + ntags*2
 	for t, tag := range evt.Tags {
@@ -107,13 +101,13 @@ func Unmarshal(data []byte, evt *nostr.Event) (err error) {
 		}
 	}()
 
-	evt.Kind = nostr.Kind(binary.LittleEndian.Uint16(data[1:3]))
-	evt.CreatedAt = nostr.Timestamp(binary.LittleEndian.Uint32(data[3:7]))
-	evt.ID = nostr.ID(data[7:39])
-	evt.PubKey = nostr.PubKey(data[39:71])
-	evt.Sig = [64]byte(data[71:135])
+	evt.Kind = nostr.Kind(binary.LittleEndian.Uint64(data[1:9]))
+	evt.CreatedAt = nostr.Timestamp(binary.LittleEndian.Uint64(data[9:17]))
+	evt.ID = nostr.ID(data[17:49])
+	evt.PubKey = nostr.PubKey(data[49:81])
+	evt.Sig = [64]byte(data[81:145])
 
-	const tagbase = 135
+	const tagbase = 145
 	tagsSectionLength := int(binary.LittleEndian.Uint16(data[tagbase:]))
 	ntags := binary.LittleEndian.Uint16(data[tagbase+2:])
 	evt.Tags = make(nostr.Tags, ntags)

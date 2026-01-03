@@ -44,9 +44,9 @@ func (b *BadgerBackend) QueryEvents(ctx context.Context, filter nostr.Filter, ma
 
 func (b *BadgerBackend) queryByIds(txn *badger.Txn, ids []nostr.ID, yield func(nostr.Event) bool) error {
 	for _, id := range ids {
-		rawKey := make([]byte, 1+8)
+		rawKey := make([]byte, 1+32)
 		rawKey[0] = prefixRaw[0]
-		copy(rawKey[1:], id[16:24])
+		copy(rawKey[1:], id[:])
 
 		item, err := txn.Get(rawKey)
 		if err != nil {
@@ -134,17 +134,17 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 		for i := range its {
 			for t := 0; t < len(its[i].timestamps); t++ {
 				if its[i].timestamps[t] >= threshold {
-					idPtr := its[i].idPtrs[t]
+					id := its[i].ids[t]
 
 					// discard this regardless of what happens
 					its[i].timestamps = internal.SwapDelete(its[i].timestamps, t)
-					its[i].idPtrs = internal.SwapDelete(its[i].idPtrs, t)
+					its[i].ids = internal.SwapDelete(its[i].ids, t)
 					t--
 
 					// fetch actual event
-					rawKey := make([]byte, 1+8)
+					rawKey := make([]byte, 1+32)
 					rawKey[0] = prefixRaw[0]
-					copy(rawKey[1:], idPtr)
+					copy(rawKey[1:], id)
 
 					item, err := txn.Get(rawKey)
 					if err != nil {
@@ -153,7 +153,7 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 
 					bin, err := item.ValueCopy(nil)
 					if err != nil {
-						log.Printf("badger: failed to get value for %x: %s\n", idPtr, err)
+						log.Printf("badger: failed to get value for %x: %s\n", id, err)
 						continue
 					}
 
@@ -205,7 +205,7 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 		// now pull more events
 		for i := 0; i < min(len(its), numberOfIteratorsToPullOnEachRound); i++ {
 			if its[i].exhausted {
-				if len(its[i].idPtrs) == 0 {
+				if len(its[i].ids) == 0 {
 					// close the iterator before removing
 					if its[i].it != nil {
 						its[i].it.Close()

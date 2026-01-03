@@ -18,9 +18,9 @@ func TestBaseCase(t *testing.T) {
 		{
 			`{"id":"a9663055164ab8b30d9524656370c4bf93393bb051b7edf4556f40c5298dc0c7","pubkey":"ee11a5dff40c19a555f41fe42b48f00e618c91225622ae37b6c2bb67b76c4e49","created_at":1681778790,"kind":1,"sig":"4dfea1a6f73141d5691e43afc3234dbe73016db0fb207cf247e0127cc2591ee6b4be5b462272030a9bde75882aae810f359682b1b6ce6cbb97201141c576db42","content":"He got snowed in"}`,
 			[]byte{
-				0,    // versioning byte
-				1, 0, // kind 1
-				102, 232, 61, 100, // created at 1681778790
+				0,                      // versioning byte
+				1, 0, 0, 0, 0, 0, 0, 0, // kind 1 (uint64)
+				102, 232, 61, 100, 0, 0, 0, 0, // created at 1681778790
 				169, 102, 48, 85, 22, 74, 184, 179, 13, 149, 36, 101, 99, 112, 196, 191, 147, 57,
 				59, 176, 81, 183, 237, 244, 85, 111, 64, 197, 41, 141, 192, 199, // id
 				238, 17, 165, 223, 244, 12, 25, 165, 85, 244, 31, 228, 43, 72, 240, 14, 97, 140,
@@ -29,22 +29,22 @@ func TestBaseCase(t *testing.T) {
 				109, 176, 251, 32, 124, 242, 71, 224, 18, 124, 194, 89, 30, 230, 180, 190, 91, 70,
 				34, 114, 3, 10, 155, 222, 117, 136, 42, 174, 129, 15, 53, 150, 130, 177, 182, 206,
 				108, 187, 151, 32, 17, 65, 197, 118, 219, 66, // sig
-				// 135:
+				// 145:
 				4, 0, // tags section is 4 bytes long
 				0, 0, // there are zero tags
-				// 139: (135+4)
+				// 149: (145+4)
 				16, 0, // the content is 16 bytes long
 				72, 101, 32, 103, 111, 116, 32, 115, 110, 111, 119, 101, 100, 32, 105,
 				110, // "He got snowed in"
-				// 157:
+				// 167:
 			},
 		},
 		{
 			`{"id":"a9663055164ab8b30d9524656370c4bf93393bb051b7edf4556f40c5298dc0c7","pubkey":"ee11a5dff40c19a555f41fe42b48f00e618c91225622ae37b6c2bb67b76c4e49","created_at":1681778790,"kind":1,"sig":"4dfea1a6f73141d5691e43afc3234dbe73016db0fb207cf247e0127cc2591ee6b4be5b462272030a9bde75882aae810f359682b1b6ce6cbb97201141c576db42","content":"He got snowed in","tags":[["client","gossip"],["p","e2ccf7cf20403f3f2a4a55b328f0de3be38558a7d5f33632fdaaefc726c1c8eb"],["e","2c86abcc98f7fd8a6750aab8df6c1863903f107206cc2d72e8afeb6c38357aed","wss://nostr-pub.wellorder.net/","root"]]}`,
 			[]byte{
-				0,    // versioning byte
-				1, 0, // kind 1
-				102, 232, 61, 100, // created at 1681778790
+				0,                      // versioning byte
+				1, 0, 0, 0, 0, 0, 0, 0, // kind 1 (uint64)
+				102, 232, 61, 100, 0, 0, 0, 0, // created at 1681778790
 				169, 102, 48, 85, 22, 74, 184, 179, 13, 149, 36, 101, 99, 112, 196, 191, 147, 57,
 				59, 176, 81, 183, 237, 244, 85, 111, 64, 197, 41, 141, 192, 199, // id
 				238, 17, 165, 223, 244, 12, 25, 165, 85, 244, 31, 228, 43, 72, 240, 14, 97, 140,
@@ -53,19 +53,19 @@ func TestBaseCase(t *testing.T) {
 				109, 176, 251, 32, 124, 242, 71, 224, 18, 124, 194, 89, 30, 230, 180, 190, 91, 70,
 				34, 114, 3, 10, 155, 222, 117, 136, 42, 174, 129, 15, 53, 150, 130, 177, 182, 206,
 				108, 187, 151, 32, 17, 65, 197, 118, 219, 66, // sig
-				// 135:
+				// 145:
 				205, 0, // tags section is 205 bytes long
 				3, 0, // there are three tags
 				10, 0, // first tag is at offset 10
 				27, 0, // second tag is at offset 27
 				97, 0, // third tag is at offset 97
-				// 145: (135+10)
+				// 155: (145+10)
 				2,    // the first tag has 2 strings
 				6, 0, // the first string is 6 bytes long
 				99, 108, 105, 101, 110, 116, // "client"
 				6, 0, // the second string is 6 bytes long
 				103, 111, 115, 115, 105, 112, // "gossip"
-				// 162: (135+27)
+				// 172: (145+27)
 				2,    // the second tag has two strings
 				1, 0, // the first string is 1 char long
 				112,   // "p"
@@ -75,7 +75,7 @@ func TestBaseCase(t *testing.T) {
 				55, 100, 53, 102, 51, 51, 54, 51, 50, 102, 100, 97, 97, 101, 102, 99, 55, 50, 54,
 				99, 49, 99, 56, 101,
 				98, // "e2ccf7cf20403f3f2a4a55b328f0de3be38558a7d5f33632fdaaefc726c1c8eb"
-				// 232: (135+97)
+				// 242: (145+97)
 				4,    // the third tag has 4 strings
 				1, 0, // the first string is 1 char long
 				101,   // "e"
@@ -91,11 +91,11 @@ func TestBaseCase(t *testing.T) {
 				47,   //  "wss://nostr-pub.wellorder.net/"
 				4, 0, // the fourth string is 4 bytes long
 				114, 111, 111, 116, // "root"
-				// 340: (135+205)
+				// 350: (145+205)
 				16, 0, // the content is 16 bytes long
 				72, 101, 32, 103, 111, 116, 32, 115, 110, 111, 119, 101, 100, 32, 105,
 				110, // "He got snowed in"
-				// 358:
+				// 368:
 			},
 		},
 	} {

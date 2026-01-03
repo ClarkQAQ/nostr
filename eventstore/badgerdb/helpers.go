@@ -18,31 +18,31 @@ type iterator struct {
 	query query
 
 	// iteration stuff
-	it        *badger.Iterator
-	key       []byte
-	currIdPtr []byte
+	it     *badger.Iterator
+	key    []byte
+	currId []byte
 
 	// this keeps track of last timestamp value pulled from this
-	last uint32
+	last uint64
 
 	// if we shouldn't fetch more from this
 	exhausted bool
 
 	// results not yet emitted
-	idPtrs     [][]byte
-	timestamps []uint32
+	ids        [][]byte
+	timestamps []uint64
 }
 
 func newIterator(query query, it *badger.Iterator) *iterator {
 	return &iterator{
-		query:     query,
-		it:        it,
-		key:       make([]byte, 0, 64),
-		currIdPtr: make([]byte, 8),
+		query:  query,
+		it:     it,
+		key:    make([]byte, 0, 64),
+		currId: make([]byte, 32),
 	}
 }
 
-func (it *iterator) pull(n int, since uint32) {
+func (it *iterator) pull(n int, since uint64) {
 	query := it.query
 
 	for range n {
@@ -60,23 +60,23 @@ func (it *iterator) pull(n int, since uint32) {
 			return
 		}
 
-		// extract createdAt (4 bytes before the last 8 bytes idPtr)
+		// extract createdAt (8 bytes before the last 32 bytes id)
 		keyLen := len(key)
-		if keyLen < 12 {
+		if keyLen < 8+32 {
 			it.it.Next()
 			continue
 		}
 
-		createdAt := binary.BigEndian.Uint32(key[keyLen-12 : keyLen-8])
+		createdAt := binary.BigEndian.Uint64(key[keyLen-8-32 : keyLen-32])
 		if createdAt < since {
 			it.exhausted = true
 			return
 		}
 
 		// got a key
-		idPtr := make([]byte, 8)
-		copy(idPtr, key[keyLen-8:])
-		it.idPtrs = append(it.idPtrs, idPtr)
+		id := make([]byte, 32)
+		copy(id, key[keyLen-32:])
+		it.ids = append(it.ids, id)
 		it.timestamps = append(it.timestamps, createdAt)
 		it.last = createdAt
 
@@ -111,10 +111,10 @@ func (it *iterator) seek(startingPoint []byte) {
 	item = it.it.Item()
 	key = item.Key()
 	keyLen := len(key)
-	if keyLen >= 8 {
-		it.key = make([]byte, keyLen-8)
-		copy(it.key, key[:keyLen-8])
-		copy(it.currIdPtr, key[keyLen-8:])
+	if keyLen >= 32 {
+		it.key = make([]byte, keyLen-32)
+		copy(it.key, key[:keyLen-32])
+		copy(it.currId, key[keyLen-32:])
 	}
 }
 
@@ -186,7 +186,7 @@ func (its iterators) quickselect(k int) {
 }
 
 // return the highest 'last' value among the first k items in its
-func (its iterators) threshold(k int) uint32 {
+func (its iterators) threshold(k int) uint64 {
 	highest := its[0].last
 	for i := 1; i < k; i++ {
 		if its[i].last > highest {
@@ -203,18 +203,18 @@ type key struct {
 
 func (b *BadgerBackend) getIndexKeysForEvent(evt nostr.Event) iter.Seq[key] {
 	return func(yield func(key) bool) {
-		idPtr := evt.ID[16:24]
-		ts := make([]byte, 4)
-		binary.BigEndian.PutUint32(ts, uint32(evt.CreatedAt))
+		id := evt.ID[:]
+		ts := make([]byte, 8)
+		binary.BigEndian.PutUint64(ts, uint64(evt.CreatedAt))
 
 		{
 			// ~ by pubkey+date
-			// p:<pk8>:<ts4>:<idPtr8>
-			k := make([]byte, 1+8+4+8)
+			// p:<pk32>:<ts8>:<id32>
+			k := make([]byte, 1+32+8+32)
 			k[0] = prefixPubkey[0]
-			copy(k[1:1+8], evt.PubKey[0:8])
-			copy(k[1+8:1+8+4], ts)
-			copy(k[1+8+4:1+8+4+8], idPtr)
+			copy(k[1:1+32], evt.PubKey[:])
+			copy(k[1+32:1+32+8], ts)
+			copy(k[1+32+8:1+32+8+32], id)
 			if !yield(key{prefix: prefixPubkey, fullkey: k}) {
 				return
 			}
@@ -222,12 +222,12 @@ func (b *BadgerBackend) getIndexKeysForEvent(evt nostr.Event) iter.Seq[key] {
 
 		{
 			// ~ by kind+date
-			// k:<kind2>:<ts4>:<idPtr8>
-			k := make([]byte, 1+2+4+8)
+			// k:<kind8>:<ts8>:<id32>
+			k := make([]byte, 1+8+8+32)
 			k[0] = prefixKind[0]
-			binary.BigEndian.PutUint16(k[1:1+2], uint16(evt.Kind))
-			copy(k[1+2:1+2+4], ts)
-			copy(k[1+2+4:1+2+4+8], idPtr)
+			binary.BigEndian.PutUint64(k[1:1+8], uint64(evt.Kind))
+			copy(k[1+8:1+8+8], ts)
+			copy(k[1+8+8:1+8+8+32], id)
 			if !yield(key{prefix: prefixKind, fullkey: k}) {
 				return
 			}
@@ -235,13 +235,13 @@ func (b *BadgerBackend) getIndexKeysForEvent(evt nostr.Event) iter.Seq[key] {
 
 		{
 			// ~ by pubkey+kind+date
-			// x:<pk8>:<kind2>:<ts4>:<idPtr8>
-			k := make([]byte, 1+8+2+4+8)
+			// x:<pk32>:<kind8>:<ts8>:<id32>
+			k := make([]byte, 1+32+8+8+32)
 			k[0] = prefixPubkeyKind[0]
-			copy(k[1:1+8], evt.PubKey[0:8])
-			binary.BigEndian.PutUint16(k[1+8:1+8+2], uint16(evt.Kind))
-			copy(k[1+8+2:1+8+2+4], ts)
-			copy(k[1+8+2+4:1+8+2+4+8], idPtr)
+			copy(k[1:1+32], evt.PubKey[:])
+			binary.BigEndian.PutUint64(k[1+32:1+32+8], uint64(evt.Kind))
+			copy(k[1+32+8:1+32+8+8], ts)
+			copy(k[1+32+8+8:1+32+8+8+32], id)
 			if !yield(key{prefix: prefixPubkeyKind, fullkey: k}) {
 				return
 			}
@@ -263,10 +263,10 @@ func (b *BadgerBackend) getIndexKeysForEvent(evt nostr.Event) iter.Seq[key] {
 
 			// get key prefix (with full length) and offset where to write the created_at
 			prefix, k := b.getTagIndexPrefix(tag[0], tag[1])
-			// keys always end with 4 bytes of created_at + 8 bytes of the id ptr
+			// keys always end with 8 bytes of created_at + 32 bytes of the id
 
-			binary.BigEndian.PutUint32(k[len(k)-8-4:], uint32(evt.CreatedAt))
-			copy(k[len(k)-8:], idPtr)
+			binary.BigEndian.PutUint64(k[len(k)-8-32:], uint64(evt.CreatedAt))
+			copy(k[len(k)-32:], id)
 			if !yield(key{prefix: prefix, fullkey: k}) {
 				return
 			}
@@ -274,11 +274,11 @@ func (b *BadgerBackend) getIndexKeysForEvent(evt nostr.Event) iter.Seq[key] {
 
 		{
 			// ~ by date only
-			// c:<ts4>:<idPtr8>
-			k := make([]byte, 1+4+8)
+			// c:<ts8>:<id32>
+			k := make([]byte, 1+8+32)
 			k[0] = prefixCreatedAt[0]
-			copy(k[1:1+4], ts)
-			copy(k[1+4:1+4+8], idPtr)
+			copy(k[1:1+8], ts)
+			copy(k[1+8:1+8+32], id)
 			if !yield(key{prefix: prefixCreatedAt, fullkey: k}) {
 				return
 			}
@@ -291,10 +291,9 @@ func (b *BadgerBackend) getTagIndexPrefix(tagName string, tagValue string) (pref
 
 	// if it's 32 bytes as hex, save it as bytes
 	if len(tagValue) == 64 {
-		// but we actually only use the first 8 bytes, with letter (tag name) prefix
-		// t:<letter1>:<tagVal8>:<ts4>:<idPtr8>
-		k = make([]byte, 1+1+8+4+8)
-		if err := xhex.Decode(k[2:2+8], []byte(tagValue[0:8*2])); err == nil {
+		// t:<letter1>:<tagVal32>:<ts8>:<id32>
+		k = make([]byte, 1+1+32+8+32)
+		if err := xhex.Decode(k[2:2+32], []byte(tagValue[0:64])); err == nil {
 			k[0] = prefixTag32[0]
 			k[1] = letterPrefix
 			return prefixTag32, k
@@ -302,27 +301,27 @@ func (b *BadgerBackend) getTagIndexPrefix(tagName string, tagValue string) (pref
 	}
 
 	// if it looks like an "a" tag, index it in this special format, with letter (tag name) prefix
-	// a:<letter1>:<kind2>:<pk8>:<d30>:<ts4>:<idPtr8>
+	// a:<letter1>:<kind8>:<pk32>:<d30>:<ts8>:<id32>
 	spl := strings.Split(tagValue, ":")
 	if len(spl) == 3 && len(spl[1]) == 64 {
-		k = make([]byte, 1+1+2+8+30+4+8)
-		if err := xhex.Decode(k[1+1+2:1+1+2+8], []byte(spl[1][0:8*2])); err == nil {
-			if kind, err := strconv.ParseUint(spl[0], 10, 16); err == nil {
+		k = make([]byte, 1+1+8+32+30+8+32)
+		if err := xhex.Decode(k[1+1+8:1+1+8+32], []byte(spl[1][0:64])); err == nil {
+			if kind, err := strconv.ParseUint(spl[0], 10, 64); err == nil {
 				k[0] = prefixTagAddr[0]
 				k[1] = letterPrefix
-				binary.BigEndian.PutUint16(k[1+1:1+1+2], uint16(kind))
+				binary.BigEndian.PutUint64(k[1+1:1+1+8], uint64(kind))
 				// limit "d" identifier to 30 bytes (so we don't have to grow our byte slice)
-				copy(k[1+1+2+8:1+1+2+8+30], spl[2])
+				copy(k[1+1+8+32:1+1+8+32+30], spl[2])
 				return prefixTagAddr, k
 			}
 		}
 	}
 
 	// index whatever else as a md5 hash of the contents, with letter (tag name) prefix
-	// m:<letter1>:<md516>:<ts4>:<idPtr8>
+	// m:<letter1>:<md516>:<ts8>:<id32>
 	h := md5.New()
 	h.Write([]byte(tagValue))
-	k = make([]byte, 1+1+16+4+8)
+	k = make([]byte, 1+1+16+8+32)
 	k[0] = prefixTag[0]
 	k[1] = letterPrefix
 	copy(k[2:2+16], h.Sum(nil))

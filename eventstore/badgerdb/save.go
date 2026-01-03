@@ -12,9 +12,9 @@ import (
 func (b *BadgerBackend) SaveEvent(ctx context.Context, evt nostr.Event) error {
 	return b.DB.Update(func(txn *badger.Txn) error {
 		// check if we already have this id
-		rawKey := make([]byte, 1+8)
+		rawKey := make([]byte, 1+32)
 		rawKey[0] = prefixRaw[0]
-		copy(rawKey[1:], evt.ID[16:24])
+		copy(rawKey[1:], evt.ID[:])
 
 		_, err := txn.Get(rawKey)
 		if err == nil {
@@ -37,9 +37,9 @@ func (b *BadgerBackend) save(txn *badger.Txn, evt nostr.Event) error {
 	}
 
 	// raw event store
-	rawKey := make([]byte, 1+8)
+	rawKey := make([]byte, 1+32)
 	rawKey[0] = prefixRaw[0]
-	copy(rawKey[1:], evt.ID[16:24])
+	copy(rawKey[1:], evt.ID[:])
 
 	if err := txn.Set(rawKey, bin); err != nil {
 		return err

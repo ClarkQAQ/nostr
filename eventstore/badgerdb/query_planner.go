@@ -19,7 +19,7 @@ func (b *BadgerBackend) prepareQueries(filter nostr.Filter) (
 	extraKinds []nostr.Kind,
 	extraTagKey string,
 	extraTagValues []string,
-	since uint32,
+	since uint64,
 	err error,
 ) {
 	// we will apply this to every query we return
@@ -28,18 +28,18 @@ func (b *BadgerBackend) prepareQueries(filter nostr.Filter) (
 			return
 		}
 
-		var until uint32 = 4294967295
+		var until uint64 = 18446744073709551615
 		if filter.Until != 0 {
-			if fu := uint32(filter.Until); fu < until {
+			if fu := uint64(filter.Until); fu < until {
 				until = fu
 			}
 		}
 		for i, q := range queries {
-			sp := make([]byte, len(q.prefix)+4+8) // prefix + ts + idPtr
+			sp := make([]byte, len(q.prefix)+8+32) // prefix + ts + id
 			copy(sp, q.prefix)
-			binary.BigEndian.PutUint32(sp[len(q.prefix):len(q.prefix)+4], until)
-			// fill idPtr with 0xFF to get the largest possible key for reverse iteration
-			for j := len(q.prefix) + 4; j < len(sp); j++ {
+			binary.BigEndian.PutUint64(sp[len(q.prefix):len(q.prefix)+8], until)
+			// fill id with 0xFF to get the largest possible key for reverse iteration
+			for j := len(q.prefix) + 8; j < len(sp); j++ {
 				sp[j] = 0xFF
 			}
 			queries[i].startingPoint = sp
@@ -48,7 +48,7 @@ func (b *BadgerBackend) prepareQueries(filter nostr.Filter) (
 
 	// this is where we'll end the iteration
 	if filter.Since != 0 {
-		if fs := uint32(filter.Since); fs > since {
+		if fs := uint64(filter.Since); fs > since {
 			since = fs
 		}
 	}
@@ -67,8 +67,8 @@ func (b *BadgerBackend) prepareQueries(filter nostr.Filter) (
 		for i, value := range tagValues {
 			// get key prefix (with full length) and offset where to write the created_at
 			_, k := b.getTagIndexPrefix(tagKey, value)
-			// remove the last parts to get just the prefix we want here (remove ts4 and idPtr8)
-			queryPrefix := k[0 : len(k)-8-4]
+			// remove the last parts to get just the prefix we want here (remove ts8 and id32)
+			queryPrefix := k[0 : len(k)-8-32]
 			queries[i] = query{i: i, prefix: queryPrefix}
 		}
 
@@ -97,25 +97,25 @@ pubkeyMatching:
 	if len(filter.Authors) > 0 {
 		if len(filter.Kinds) == 0 {
 			// will use pubkey index
-			// p:<pk8>
+			// p:<pk32>
 			queries = make([]query, len(filter.Authors))
 			for i, pk := range filter.Authors {
-				prefix := make([]byte, 1+8)
+				prefix := make([]byte, 1+32)
 				prefix[0] = prefixPubkey[0]
-				copy(prefix[1:1+8], pk[0:8])
+				copy(prefix[1:1+32], pk[:])
 				queries[i] = query{i: i, prefix: prefix}
 			}
 		} else {
 			// will use pubkeyKind index
-			// x:<pk8>:<kind2>
+			// x:<pk32>:<kind8>
 			queries = make([]query, len(filter.Authors)*len(filter.Kinds))
 			i := 0
 			for _, pk := range filter.Authors {
 				for _, kind := range filter.Kinds {
-					prefix := make([]byte, 1+8+2)
+					prefix := make([]byte, 1+32+8)
 					prefix[0] = prefixPubkeyKind[0]
-					copy(prefix[1:1+8], pk[0:8])
-					binary.BigEndian.PutUint16(prefix[1+8:1+8+2], uint16(kind))
+					copy(prefix[1:1+32], pk[:])
+					binary.BigEndian.PutUint64(prefix[1+32:1+32+8], uint64(kind))
 					queries[i] = query{i: i, prefix: prefix}
 					i++
 				}
@@ -129,12 +129,12 @@ pubkeyMatching:
 
 	if len(filter.Kinds) > 0 {
 		// will use a kind index
-		// k:<kind2>
+		// k:<kind8>
 		queries = make([]query, len(filter.Kinds))
 		for i, kind := range filter.Kinds {
-			prefix := make([]byte, 1+2)
+			prefix := make([]byte, 1+8)
 			prefix[0] = prefixKind[0]
-			binary.BigEndian.PutUint16(prefix[1:1+2], uint16(kind))
+			binary.BigEndian.PutUint64(prefix[1:1+8], uint64(kind))
 			queries[i] = query{i: i, prefix: prefix}
 		}
 

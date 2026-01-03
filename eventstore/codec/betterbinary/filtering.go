@@ -12,14 +12,14 @@ func TagMatches(evtb []byte, key string, vals []string) bool {
 		matches = append(matches, match)
 	}
 
-	ntags := binary.LittleEndian.Uint16(evtb[137:])
+	ntags := binary.LittleEndian.Uint16(evtb[147:])
 	var t uint16
 	for t = 0; t < ntags; t++ {
-		offset := int(binary.LittleEndian.Uint16(evtb[139+t*2:]))
-		nitems := evtb[135+offset]
+		offset := int(binary.LittleEndian.Uint16(evtb[149+t*2:]))
+		nitems := evtb[145+offset]
 		if nitems >= 2 {
 			for _, match := range matches {
-				if slices.Equal(evtb[135+offset+1:135+offset+1+len(match)], match) {
+				if slices.Equal(evtb[145+offset+1:145+offset+1+len(match)], match) {
 					return true
 				}
 			}

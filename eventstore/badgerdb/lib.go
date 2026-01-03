@@ -10,14 +10,14 @@ import (
 
 // Key prefixes for different index types
 var (
-	prefixRaw        = []byte{'r'} // raw event storage: r:<idPtr8>
-	prefixCreatedAt  = []byte{'c'} // by created_at: c:<ts4>:<idPtr8>
-	prefixKind       = []byte{'k'} // by kind: k:<kind2>:<ts4>:<idPtr8>
-	prefixPubkey     = []byte{'p'} // by pubkey: p:<pk8>:<ts4>:<idPtr8>
-	prefixPubkeyKind = []byte{'x'} // by pubkey+kind: x:<pk8>:<kind2>:<ts4>:<idPtr8>
-	prefixTag32      = []byte{'t'} // 32-byte hex tags: t:<letter1>:<tagVal8>:<ts4>:<idPtr8>
-	prefixTagAddr    = []byte{'a'} // addressable refs: a:<letter1>:<kind2>:<pk8>:<d30>:<ts4>:<idPtr8>
-	prefixTag        = []byte{'m'} // md5 hashed tags: m:<letter1>:<md516>:<ts4>:<idPtr8>
+	prefixRaw        = []byte{'r'} // raw event storage: r:<id32>
+	prefixCreatedAt  = []byte{'c'} // by created_at: c:<ts8>:<id32>
+	prefixKind       = []byte{'k'} // by kind: k:<kind8>:<ts8>:<id32>
+	prefixPubkey     = []byte{'p'} // by pubkey: p:<pk32>:<ts8>:<id32>
+	prefixPubkeyKind = []byte{'x'} // by pubkey+kind: x:<pk32>:<kind8>:<ts8>:<id32>
+	prefixTag32      = []byte{'t'} // 32-byte hex tags: t:<letter1>:<tagVal32>:<ts8>:<id32>
+	prefixTagAddr    = []byte{'a'} // addressable refs: a:<letter1>:<kind8>:<pk32>:<d30>:<ts8>:<id32>
+	prefixTag        = []byte{'m'} // md5 hashed tags: m:<letter1>:<md516>:<ts8>:<id32>
 )
 
 var _ eventstore.Store = (*BadgerBackend)(nil)

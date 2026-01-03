@@ -44,22 +44,22 @@ func (b *BadgerBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 				}
 
 				keyLen := len(key)
-				if keyLen < 12 {
+				if keyLen < 8+32 {
 					it.Next()
 					continue
 				}
 
-				createdAt := binary.BigEndian.Uint32(key[keyLen-12 : keyLen-8])
+				createdAt := binary.BigEndian.Uint64(key[keyLen-8-32 : keyLen-32])
 				if createdAt < since {
 					break
 				}
 
 				if extraAuthors != nil || extraKinds != nil || extraTagValues != nil || filter.Search != "" {
 					// fetch actual event
-					idPtr := key[keyLen-8:]
-					rawKey := make([]byte, 1+8)
+					id := key[keyLen-32:]
+					rawKey := make([]byte, 1+32)
 					rawKey[0] = prefixRaw[0]
-					copy(rawKey[1:], idPtr)
+					copy(rawKey[1:], id)
 
 					rawItem, err := txn.Get(rawKey)
 					if err != nil {

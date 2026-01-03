@@ -18,9 +18,9 @@ func (b *BadgerBackend) DeleteEvent(ctx context.Context, id nostr.ID) error {
 
 func (b *BadgerBackend) delete(txn *badger.Txn, id nostr.ID) error {
 	// check if we have this actually
-	rawKey := make([]byte, 1+8)
+	rawKey := make([]byte, 1+32)
 	rawKey[0] = prefixRaw[0]
-	copy(rawKey[1:], id[16:24])
+	copy(rawKey[1:], id[:])
 
 	item, e := txn.Get(rawKey)
 	if e != nil {
@@ -28,29 +28,29 @@ func (b *BadgerBackend) delete(txn *badger.Txn, id nostr.ID) error {
 			return nil
 		}
 
-		return fmt.Errorf("failed to get raw event %x to delete: %w", id, e)
+		return fmt.Errorf("failed to get raw event %s to delete: %w", id, e)
 	}
 
 	bin, e := item.ValueCopy(nil)
 	if e != nil {
-		return fmt.Errorf("failed to get raw event %x to delete: %w", id, e)
+		return fmt.Errorf("failed to get raw event %s to delete: %w", id, e)
 	}
 
 	var evt nostr.Event
 	if e := betterbinary.Unmarshal(bin, &evt); e != nil {
-		return fmt.Errorf("failed to unmarshal raw event %x to delete: %w", id, e)
+		return fmt.Errorf("failed to unmarshal raw event %s to delete: %w", id, e)
 	}
 
 	// calculate all index keys we have for this event and delete them
 	for k := range b.getIndexKeysForEvent(evt) {
 		if e := txn.Delete(k.fullkey); e != nil {
-			return fmt.Errorf("failed to delete index entry for %x: %w", evt.ID[0:8], e)
+			return fmt.Errorf("failed to delete index entry for %s: %w", evt.ID, e)
 		}
 	}
 
 	// delete the raw event
 	if e := txn.Delete(rawKey); e != nil {
-		return fmt.Errorf("failed to delete raw event %x: %w", evt.ID[16:24], e)
+		return fmt.Errorf("failed to delete raw event %s: %w", evt.ID, e)
 	}
 
 	return nil

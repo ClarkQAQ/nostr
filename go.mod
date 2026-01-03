@@ -6,7 +6,6 @@ require (
 	github.com/FastFilter/xorfilter v0.2.1
 	github.com/ImVexed/fasturl v0.0.0-20230304231329-4e41488060f3
 	github.com/bep/debounce v1.2.1
-	github.com/blevesearch/bleve/v2 v2.4.4
 	github.com/bluekeyes/go-gitdiff v0.7.1
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/btcsuite/btcd/btcutil v1.1.5
@@ -52,27 +51,8 @@ require (
 	github.com/ClickHouse/ch-go v0.69.0 // indirect
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
-	github.com/RoaringBitmap/roaring v1.9.4 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
-	github.com/bits-and-blooms/bitset v1.17.0 // indirect
-	github.com/blevesearch/bleve_index_api v1.1.12 // indirect
-	github.com/blevesearch/geo v0.1.20 // indirect
-	github.com/blevesearch/go-faiss v1.0.24 // indirect
-	github.com/blevesearch/go-porterstemmer v1.0.3 // indirect
-	github.com/blevesearch/gtreap v0.1.1 // indirect
-	github.com/blevesearch/mmap-go v1.0.4 // indirect
-	github.com/blevesearch/scorch_segment_api/v2 v2.2.16 // indirect
-	github.com/blevesearch/segment v0.9.1 // indirect
-	github.com/blevesearch/snowballstem v0.9.0 // indirect
-	github.com/blevesearch/upsidedown_store_api v1.0.2 // indirect
-	github.com/blevesearch/vellum v1.0.11 // indirect
-	github.com/blevesearch/zapx/v11 v11.3.10 // indirect
-	github.com/blevesearch/zapx/v12 v12.3.10 // indirect
-	github.com/blevesearch/zapx/v13 v13.3.10 // indirect
-	github.com/blevesearch/zapx/v14 v14.3.10 // indirect
-	github.com/blevesearch/zapx/v15 v15.3.16 // indirect
-	github.com/blevesearch/zapx/v16 v16.1.9-0.20241217210638-a0519e7caf3b // indirect
 	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -84,9 +64,6 @@ require (
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/golang/geo v0.0.0-20210211234256-740aa86cb551 // indirect
-	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
@@ -95,7 +72,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/paulmach/orb v0.12.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
