@@ -1,8 +1,8 @@
 package nip86
 
 import (
+	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 
 	"fiatjaf.com/nostr"
@@ -16,19 +16,19 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		pkh, ok := req.Params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
-		}
-		pk, err := nostr.PubKeyFromHex(pkh)
-		if err != nil {
+
+		var pk nostr.PubKey
+		if e := json.Unmarshal(req.Params[0], &pk); e != nil {
 			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
 		}
 
 		var reason string
 		if len(req.Params) >= 2 {
-			reason, _ = req.Params[1].(string)
+			if e := json.Unmarshal(req.Params[1], &reason); e != nil {
+				return nil, fmt.Errorf("invalid reason param for '%s'", req.Method)
+			}
 		}
+
 		return BanPubKey{pk, reason}, nil
 	case "listbannedpubkeys":
 		return ListBannedPubKeys{}, nil
@@ -36,19 +36,19 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		pkh, ok := req.Params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
-		}
-		pk, err := nostr.PubKeyFromHex(pkh)
-		if err != nil {
+
+		var pk nostr.PubKey
+		if e := json.Unmarshal(req.Params[0], &pk); e != nil {
 			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
 		}
 
 		var reason string
 		if len(req.Params) >= 2 {
-			reason, _ = req.Params[1].(string)
+			if e := json.Unmarshal(req.Params[1], &reason); e != nil {
+				return nil, fmt.Errorf("invalid reason param for '%s'", req.Method)
+			}
 		}
+
 		return AllowPubKey{pk, reason}, nil
 	case "listallowedpubkeys":
 		return ListAllowedPubKeys{}, nil
@@ -58,37 +58,37 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		idh, ok := req.Params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("missing id param for '%s'", req.Method)
-		}
-		id, err := nostr.IDFromHex(idh)
-		if err != nil {
+
+		var id nostr.ID
+		if e := json.Unmarshal(req.Params[0], &id); e != nil {
 			return nil, fmt.Errorf("invalid id param for '%s'", req.Method)
 		}
 
 		var reason string
 		if len(req.Params) >= 2 {
-			reason, _ = req.Params[1].(string)
+			if e := json.Unmarshal(req.Params[1], &reason); e != nil {
+				return nil, fmt.Errorf("invalid reason param for '%s'", req.Method)
+			}
 		}
+
 		return AllowEvent{id, reason}, nil
 	case "banevent":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		idh, ok := req.Params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("missing id param for '%s'", req.Method)
-		}
-		id, err := nostr.IDFromHex(idh)
-		if err != nil {
+
+		var id nostr.ID
+		if e := json.Unmarshal(req.Params[0], &id); e != nil {
 			return nil, fmt.Errorf("invalid id param for '%s'", req.Method)
 		}
 
 		var reason string
 		if len(req.Params) >= 2 {
-			reason, _ = req.Params[1].(string)
+			if e := json.Unmarshal(req.Params[1], &reason); e != nil {
+				return nil, fmt.Errorf("invalid reason param for '%s'", req.Method)
+			}
 		}
+
 		return BanEvent{id, reason}, nil
 	case "listbannedevents":
 		return ListBannedEvents{}, nil
@@ -100,67 +100,104 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		name, _ := req.Params[0].(string)
+
+		var name string
+		if e := json.Unmarshal(req.Params[0], &name); e != nil {
+			return nil, fmt.Errorf("invalid name param for '%s'", req.Method)
+		}
+
 		return ChangeRelayName{name}, nil
 	case "changerelaydescription":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		desc, _ := req.Params[0].(string)
+
+		var desc string
+		if e := json.Unmarshal(req.Params[0], &desc); e != nil {
+			return nil, fmt.Errorf("invalid description param for '%s'", req.Method)
+		}
+
 		return ChangeRelayDescription{desc}, nil
 	case "changerelayicon":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		url, _ := req.Params[0].(string)
+
+		var url string
+		if e := json.Unmarshal(req.Params[0], &url); e != nil {
+			return nil, fmt.Errorf("invalid icon url param for '%s'", req.Method)
+		}
+
 		return ChangeRelayIcon{url}, nil
 	case "allowkind":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		kind, ok := req.Params[0].(float64)
-		if !ok || math.Trunc(kind) != kind {
-			return nil, fmt.Errorf("invalid kind '%v' for '%s'", req.Params[0], req.Method)
+
+		var kind int
+		if e := json.Unmarshal(req.Params[0], &kind); e != nil {
+			return nil, fmt.Errorf("invalid kind param for '%s'", req.Method)
 		}
-		return AllowKind{int(kind)}, nil
+
+		return AllowKind{kind}, nil
 	case "disallowkind":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		kind, ok := req.Params[0].(float64)
-		if !ok || math.Trunc(kind) != kind {
-			return nil, fmt.Errorf("invalid kind '%v' for '%s'", req.Params[0], req.Method)
+
+		var kind int
+		if e := json.Unmarshal(req.Params[0], &kind); e != nil {
+			return nil, fmt.Errorf("invalid kind param for '%s'", req.Method)
 		}
-		return DisallowKind{int(kind)}, nil
+
+		return DisallowKind{kind}, nil
 	case "listallowedkinds":
 		return ListAllowedKinds{}, nil
 	case "blockip":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		ipstr, _ := req.Params[0].(string)
+
+		var ipstr string
+		if e := json.Unmarshal(req.Params[0], &ipstr); e != nil {
+			return nil, fmt.Errorf("invalid ip param for '%s'", req.Method)
+		}
+
 		ip := net.ParseIP(ipstr)
 		if ip == nil {
 			return nil, fmt.Errorf("invalid ip param for '%s'", req.Method)
 		}
+
 		var reason string
 		if len(req.Params) >= 2 {
-			reason, _ = req.Params[1].(string)
+			if e := json.Unmarshal(req.Params[1], &reason); e != nil {
+				return nil, fmt.Errorf("invalid reason param for '%s'", req.Method)
+			}
 		}
+
 		return BlockIP{ip, reason}, nil
 	case "unblockip":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
-		ipstr, _ := req.Params[0].(string)
+
+		var ipstr string
+		if e := json.Unmarshal(req.Params[0], &ipstr); e != nil {
+			return nil, fmt.Errorf("invalid ip param for '%s'", req.Method)
+		}
+
 		ip := net.ParseIP(ipstr)
 		if ip == nil {
 			return nil, fmt.Errorf("invalid ip param for '%s'", req.Method)
 		}
+
 		var reason string
 		if len(req.Params) >= 2 {
-			reason, _ = req.Params[1].(string)
+			if e := json.Unmarshal(req.Params[1], &reason); e != nil {
+				return nil, fmt.Errorf("invalid reason param for '%s'", req.Method)
+			}
 		}
+
 		return UnblockIP{ip, reason}, nil
 	case "listblockedips":
 		return ListBlockedIPs{}, nil
@@ -169,16 +206,15 @@ func DecodeRequest(req Request) (MethodParams, error) {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
 
-		pkh, ok := req.Params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
-		}
-		pk, err := nostr.PubKeyFromHex(pkh)
-		if err != nil {
+		var pk nostr.PubKey
+		if e := json.Unmarshal(req.Params[0], &pk); e != nil {
 			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
 		}
 
-		allowedMethods := req.Params[1].([]string)
+		var allowedMethods []string
+		if e := json.Unmarshal(req.Params[1], &allowedMethods); e != nil {
+			return nil, fmt.Errorf("invalid allowed methods param for '%s'", req.Method)
+		}
 
 		return GrantAdmin{
 			Pubkey:       pk,
@@ -189,16 +225,15 @@ func DecodeRequest(req Request) (MethodParams, error) {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
 		}
 
-		pkh, ok := req.Params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
-		}
-		pk, err := nostr.PubKeyFromHex(pkh)
-		if err != nil {
+		var pk nostr.PubKey
+		if e := json.Unmarshal(req.Params[0], &pk); e != nil {
 			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
 		}
 
-		disallowedMethods := req.Params[1].([]string)
+		var disallowedMethods []string
+		if e := json.Unmarshal(req.Params[1], &disallowedMethods); e != nil {
+			return nil, fmt.Errorf("invalid disallowed methods param for '%s'", req.Method)
+		}
 
 		return RevokeAdmin{
 			Pubkey:          pk,
@@ -207,7 +242,7 @@ func DecodeRequest(req Request) (MethodParams, error) {
 	case "stats":
 		return Stats{}, nil
 	default:
-		return nil, fmt.Errorf("unknown method '%s'", req.Method)
+		return req, nil
 	}
 }
 
