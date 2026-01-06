@@ -109,7 +109,17 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 		return nil
 	}
 
-	batchSizePerQuery := internal.BatchSizePerNumberOfQueries(limit, len(queries))
+	// when limit is 0 (unlimited), use a reasonable default batch size
+	effectiveLimit := limit
+	if effectiveLimit == 0 {
+		effectiveLimit = 1024 // default batch size for unlimited queries
+	}
+
+	batchSizePerQuery := internal.BatchSizePerNumberOfQueries(effectiveLimit, len(queries))
+	// ensure batch size is at least 1 to avoid zero-capacity slices
+	if batchSizePerQuery < 1 {
+		batchSizePerQuery = 1
+	}
 
 	// initial pull from all queries
 	for i := range its {
@@ -197,7 +207,8 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 			}
 
 			totalEventsEmitted++
-			if totalEventsEmitted == limit {
+			// only check limit if it was non-zero (unlimited otherwise)
+			if limit != 0 && totalEventsEmitted == limit {
 				return nil
 			}
 		}
