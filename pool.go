@@ -24,8 +24,8 @@ type Pool struct {
 	Relays  *xsync.MapOf[string, *Relay]
 	Context context.Context
 
-	authHandler func(context.Context, *Event) error
-	cancel      context.CancelCauseFunc
+	authRequiredHandler func(context.Context, *Event) error
+	cancel              context.CancelCauseFunc
 
 	eventMiddleware     func(RelayEvent)
 	duplicateMiddleware func(relay string, id ID)
@@ -59,7 +59,7 @@ func NewPool(opts PoolOptions) *Pool {
 		Context: ctx,
 		cancel:  cancel,
 
-		authHandler:         opts.AuthHandler,
+		authRequiredHandler: opts.AuthRequiredHandler,
 		eventMiddleware:     opts.EventMiddleware,
 		duplicateMiddleware: opts.DuplicateMiddleware,
 		queryMiddleware:     opts.AuthorKindQueryMiddleware,
@@ -74,10 +74,10 @@ func NewPool(opts PoolOptions) *Pool {
 }
 
 type PoolOptions struct {
-	// AuthHandler, if given, must be a function that signs the auth event when called.
-	// it will be called whenever any relay in the pool returns a `CLOSED` message
+	// AuthRequiredHandler, if given, must be a function that signs the auth event when called.
+	// it will be called whenever any relay in the pool returns a `CLOSED` or `OK` message
 	// with the "auth-required:" prefix, only once for each relay
-	AuthHandler func(context.Context, *Event) error
+	AuthRequiredHandler func(context.Context, *Event) error
 
 	// PenaltyBox just sets the penalty box mechanism so relays that fail to connect
 	// or that disconnect will be ignored for a while and we won't attempt to connect again.
@@ -202,9 +202,9 @@ func (pool *Pool) PublishMany(ctx context.Context, urls []string, evt Event) cha
 				if err := relay.Publish(ctx, evt); err == nil {
 					// success with no auth required
 					ch <- PublishResult{nil, url, relay}
-				} else if strings.HasPrefix(err.Error(), "msg: auth-required:") && pool.authHandler != nil {
+				} else if strings.HasPrefix(err.Error(), "msg: auth-required:") && pool.authRequiredHandler != nil {
 					// try to authenticate if we can
-					if authErr := relay.Auth(ctx, pool.authHandler); authErr == nil {
+					if authErr := relay.Auth(ctx, pool.authRequiredHandler); authErr == nil {
 						if err := relay.Publish(ctx, evt); err == nil {
 							// success after auth
 							ch <- PublishResult{nil, url, relay}
@@ -389,9 +389,9 @@ func (pool *Pool) FetchManyReplaceable(
 				case <-sub.EndOfStoredEvents:
 					return
 				case reason := <-sub.ClosedReason:
-					if strings.HasPrefix(reason, "auth-required:") && pool.authHandler != nil && !hasAuthed {
+					if strings.HasPrefix(reason, "auth-required:") && pool.authRequiredHandler != nil && !hasAuthed {
 						// relay is requesting auth. if we can we will perform auth and try again
-						err := relay.Auth(ctx, pool.authHandler)
+						err := relay.Auth(ctx, pool.authRequiredHandler)
 						if err == nil {
 							hasAuthed = true // so we don't keep doing AUTH again and again
 							goto subscribe
@@ -561,9 +561,9 @@ func (pool *Pool) subMany(
 							}
 						}
 					case reason := <-sub.ClosedReason:
-						if strings.HasPrefix(reason, "auth-required:") && pool.authHandler != nil && !hasAuthed {
+						if strings.HasPrefix(reason, "auth-required:") && pool.authRequiredHandler != nil && !hasAuthed {
 							// relay is requesting auth. if we can we will perform auth and try again
-							err := relay.Auth(ctx, pool.authHandler)
+							err := relay.Auth(ctx, pool.authRequiredHandler)
 							if err == nil {
 								hasAuthed = true // so we don't keep doing AUTH again and again
 								if closedChan != nil {
@@ -659,9 +659,9 @@ func (pool *Pool) subManyEose(
 				case <-sub.EndOfStoredEvents:
 					return
 				case reason := <-sub.ClosedReason:
-					if strings.HasPrefix(reason, "auth-required:") && pool.authHandler != nil && !hasAuthed {
+					if strings.HasPrefix(reason, "auth-required:") && pool.authRequiredHandler != nil && !hasAuthed {
 						// relay is requesting auth. if we can we will perform auth and try again
-						err := relay.Auth(ctx, pool.authHandler)
+						err := relay.Auth(ctx, pool.authRequiredHandler)
 						if err == nil {
 							hasAuthed = true // so we don't keep doing AUTH again and again
 							if closedChan != nil {
