@@ -59,7 +59,8 @@ type Relay struct {
 	ctx    context.Context
 	cancel context.CancelCauseFunc
 
-	// setting this variable overwrites the hackish workaround we do to try to figure out our own base URL
+	// setting this variable overwrites the hackish workaround we do to try to figure out our own base URL.
+	// it also ensures the relay stuff is served only from that path and not from any path possible.
 	ServiceURL string
 
 	// hooks that will be called at various times
@@ -180,5 +181,6 @@ func (rl *Relay) getBaseURL(r *http.Request) string {
 			proto = "https"
 		}
 	}
-	return proto + "://" + host
+
+	return proto + "://" + host + r.URL.Path
 }

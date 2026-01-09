@@ -72,6 +72,7 @@ func (gs *GraspServer) handleGitReceivePack(
 			{"receive.denyCurrentBranch", "updateInstead"},
 			{"uploadpack.allowReachableSHA1InWant", "true"},
 			{"uploadpack.allowTipSHA1InWant", "true"},
+			{"uploadpack.allowFilter", "true"},
 		} {
 			cmd = exec.Command("git", "config", config.key, config.value)
 			cmd.Dir = repoPath

@@ -124,6 +124,8 @@ func (sys *System) FetchProfileMetadata(ctx context.Context, pubkey nostr.PubKey
 			newM := sys.tryFetchMetadataFromNetwork(ctx, pubkey)
 			if newM != nil && newM.Event.CreatedAt > pm.Event.CreatedAt {
 				pm = *newM
+
+				sys.Store.ReplaceEvent(ctx, *pm.Event)
 			}
 
 			// even if we didn't find anything register this because we tried
@@ -139,6 +141,8 @@ func (sys *System) FetchProfileMetadata(ctx context.Context, pubkey nostr.PubKey
 
 	if newM := sys.tryFetchMetadataFromNetwork(ctx, pubkey); newM != nil {
 		pm = *newM
+
+		sys.Store.SaveEvent(ctx, *pm.Event)
 
 		// we'll only save this if we got something which means we found at least one event
 		lastFetchKey := makeLastFetchKey(0, pubkey)

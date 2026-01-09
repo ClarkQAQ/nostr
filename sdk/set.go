@@ -63,6 +63,9 @@ func fetchGenericSets[V comparable, I TagItemWithValue[V]](
 
 			// unlike for lists, when fetching sets we will blindly trust whatever we get from the network
 			v = *newV
+			for _, evt := range newV.Events {
+				sys.Store.ReplaceEvent(ctx, evt)
+			}
 
 			// even if we didn't find anything register this because we tried
 			// (and we still have the previous event in our local store)
@@ -78,6 +81,10 @@ func fetchGenericSets[V comparable, I TagItemWithValue[V]](
 
 	if newV := tryFetchSetsFromNetwork(ctx, sys, pubkey, addressableIndex, parseTag); newV != nil {
 		v = *newV
+
+		for _, evt := range newV.Events {
+			sys.Store.ReplaceEvent(ctx, evt)
+		}
 
 		// we'll only save this if we got something which means we found at least one event
 		lastFetchKey := makeLastFetchKey(actualKind, pubkey)

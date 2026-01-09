@@ -50,5 +50,5 @@ func (bs BunkerSigner) Encrypt(ctx context.Context, plaintext string, recipient 
 
 // Decrypt decrypts a base64-encoded ciphertext from a sender using the remote bunker.
 func (bs BunkerSigner) Decrypt(ctx context.Context, base64ciphertext string, sender nostr.PubKey) (plaintext string, err error) {
-	return bs.bunker.NIP44Encrypt(ctx, sender, base64ciphertext)
+	return bs.bunker.NIP44Decrypt(ctx, sender, base64ciphertext)
 }

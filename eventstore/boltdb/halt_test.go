@@ -28,7 +28,7 @@ func TestHaltingProblem(t *testing.T) {
 		relay.UseEventstore(&db, 500)
 
 		server := &http.Server{Addr: ":54898", Handler: relay}
-		server.ListenAndServe()
+		_ = server.ListenAndServe()
 	}()
 
 	time.Sleep(time.Millisecond * 200)
@@ -43,7 +43,7 @@ func TestHaltingProblem(t *testing.T) {
 			Content:   "",
 			Kind:      nostr.Kind(1),
 		}
-		evt.Sign(sk)
+		_ = evt.Sign(sk)
 		err := client.Publish(context.Background(), evt)
 		require.NoError(t, err)
 		id = evt.ID
@@ -58,7 +58,7 @@ func TestHaltingProblem(t *testing.T) {
 			},
 			Kind: nostr.Kind(5),
 		}
-		evt.Sign(sk)
+		_ = evt.Sign(sk)
 
 		err := client.Publish(context.Background(), evt)
 		require.NoError(t, err)

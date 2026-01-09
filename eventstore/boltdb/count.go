@@ -175,11 +175,11 @@ func (b *BoltBackend) countEventsHLLCached(filter nostr.Filter) (uint32, *hyperl
 	binary.BigEndian.PutUint16(cacheKey[0:2], uint16(filter.Kinds[0]))
 	switch filter.Kinds[0] {
 	case 3:
-		xhex.Decode(cacheKey[2:2+8], []byte(filter.Tags["p"][0][0:8*2]))
+		_ = xhex.Decode(cacheKey[2:2+8], []byte(filter.Tags["p"][0][0:8*2]))
 	case 7:
-		xhex.Decode(cacheKey[2:2+8], []byte(filter.Tags["e"][0][0:8*2]))
+		_ = xhex.Decode(cacheKey[2:2+8], []byte(filter.Tags["e"][0][0:8*2]))
 	case 1111:
-		xhex.Decode(cacheKey[2:2+8], []byte(filter.Tags["E"][0][0:8*2]))
+		_ = xhex.Decode(cacheKey[2:2+8], []byte(filter.Tags["E"][0][0:8*2]))
 	}
 
 	var count uint32
@@ -205,7 +205,7 @@ func (b *BoltBackend) updateHyperLogLogCachedValues(txn *bbolt.Tx, evt nostr.Eve
 
 	for ref, offset := range nip45.HyperLogLogEventPubkeyOffsetsAndReferencesForEvent(evt) {
 		// setup cache key (reusing buffer)
-		xhex.Decode(cacheKey[2:2+8], []byte(ref[0:8*2]))
+		_ = xhex.Decode(cacheKey[2:2+8], []byte(ref[0:8*2]))
 
 		// fetch hll value from cache db
 		hll := hyperloglog.New(offset)

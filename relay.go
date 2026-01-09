@@ -39,7 +39,8 @@ type Relay struct {
 	connectionContext       context.Context // will be canceled when the connection closes
 	connectionContextCancel context.CancelCauseFunc
 
-	challenge                     string       // NIP-42 challenge, we only keep the last
+	challenge                     string // NIP-42 challenge, we only keep the last
+	authHandler                   func(context.Context, *Event) error
 	noticeHandler                 func(string) // NIP-01 NOTICEs
 	customHandler                 func(string) // nonstandard unparseable messages
 	okCallbacks                   map[ID]okcallback
@@ -64,6 +65,7 @@ func NewRelay(ctx context.Context, url string, opts RelayOptions) *Relay {
 		requestHeader:                 opts.RequestHeader,
 		customHandler:                 opts.CustomHandler,
 		noticeHandler:                 opts.NoticeHandler,
+		authHandler:                   opts.AuthHandler,
 	}
 
 	return r
@@ -82,6 +84,9 @@ func RelayConnect(ctx context.Context, url string, opts RelayOptions) (*Relay, e
 }
 
 type RelayOptions struct {
+	// AuthHandler is fired when an AUTH message is received. It is given the AUTH event, unsigned, and expects you to sign it.
+	AuthHandler func(context.Context, *Event) error
+
 	// NoticeHandler just takes notices and is expected to do something with them.
 	// When not given defaults to logging the notices.
 	NoticeHandler func(notice string)
@@ -184,6 +189,9 @@ func (r *Relay) handleMessage(message string) {
 			return
 		}
 		r.challenge = *env.Challenge
+		if r.authHandler != nil {
+			r.Auth(r.Context(), r.authHandler)
+		}
 	case *EventEnvelope:
 		// we already have the subscription from the pre-check above, so we can just reuse it
 		if sub == nil {

@@ -33,7 +33,7 @@ type BoltBackend struct {
 }
 
 func (b *BoltBackend) Init(ctx context.Context) error {
-	db, err := bbolt.Open(b.Path, 0600, &bbolt.Options{
+	db, err := bbolt.Open(b.Path, 0o600, &bbolt.Options{
 		Timeout:         2 * time.Second,
 		PreLoadFreelist: true,
 		FreelistType:    bbolt.FreelistMapType,
@@ -47,7 +47,7 @@ func (b *BoltBackend) Init(ctx context.Context) error {
 
 	b.DB = db
 
-	db.Update(func(txn *bbolt.Tx) error {
+	_ = db.Update(func(txn *bbolt.Tx) error {
 		if _, err := txn.CreateBucketIfNotExists(settingsStore); err != nil {
 			return err
 		}

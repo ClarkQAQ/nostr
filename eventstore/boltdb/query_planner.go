@@ -72,17 +72,13 @@ func (b *BoltBackend) prepareQueries(filter nostr.Filter) (
 		// add an extra kind filter if available (only do this on plain tag index, not on ptag-kind index)
 		if filter.Kinds != nil {
 			extraKinds = make([]nostr.Kind, len(filter.Kinds))
-			for i, kind := range filter.Kinds {
-				extraKinds[i] = kind
-			}
+			copy(extraKinds, filter.Kinds)
 		}
 
 		// add an extra author search if possible
 		if filter.Authors != nil {
 			extraAuthors = make([]nostr.PubKey, len(filter.Authors))
-			for i, pk := range filter.Authors {
-				extraAuthors[i] = pk
-			}
+			copy(extraAuthors, filter.Authors)
 		}
 
 		// add an extra useless tag if available

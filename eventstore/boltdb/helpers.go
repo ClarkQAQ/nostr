@@ -72,8 +72,6 @@ func (it *iterator) pull(n int, since uint32) {
 			return
 		}
 	}
-
-	return
 }
 
 func (it *iterator) seek(key []byte) {

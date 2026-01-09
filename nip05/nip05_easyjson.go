@@ -58,7 +58,9 @@ func easyjsonDecode(in *jlexer.Lexer, out *WellKnownResponse) {
 						}
 						in.AddError(err)
 					}
-					out.Names[key] = pk
+					if pk != nostr.ZeroPK {
+						out.Names[key] = pk
+					}
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -107,7 +109,9 @@ func easyjsonDecode(in *jlexer.Lexer, out *WellKnownResponse) {
 						}
 						in.Delim(']')
 					}
-					out.Relays[key] = relays
+					if key != nostr.ZeroPK {
+						out.Relays[key] = relays
+					}
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -158,7 +162,9 @@ func easyjsonDecode(in *jlexer.Lexer, out *WellKnownResponse) {
 						}
 						in.Delim(']')
 					}
-					out.NIP46[key] = bunkers
+					if key != nostr.ZeroPK {
+						out.NIP46[key] = bunkers
+					}
 					in.WantComma()
 				}
 				in.Delim('}')

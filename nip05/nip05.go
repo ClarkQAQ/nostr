@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"fiatjaf.com/nostr"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/mailru/easyjson"
 )
 
 var NIP05_REGEX = regexp.MustCompile(`^(?:([\w.+-]+)@)?([\w_-]+(\.[\w_-]+)+)$`)
@@ -77,7 +77,7 @@ func Fetch(ctx context.Context, fullname string) (resp WellKnownResponse, name s
 	defer res.Body.Close()
 
 	var result WellKnownResponse
-	if err := jsoniter.NewDecoder(res.Body).Decode(&result); err != nil {
+	if err := easyjson.UnmarshalFromReader(res.Body, &result); err != nil {
 		return resp, name, fmt.Errorf("failed to decode json response: %w", err)
 	}
 

@@ -94,7 +94,7 @@ func (rs *RelayStream) Next() string {
 func NewSystem() *System {
 	sys := &System{
 		KVStore:          kvstore_memory.NewStore(),
-		RelayListRelays:  NewRelayStream("wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
+		RelayListRelays:  NewRelayStream("wss://indexer.coracle.social", "wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
 		FollowListRelays: NewRelayStream("wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
 		MetadataRelays:   NewRelayStream("wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
 		FallbackRelays: NewRelayStream(
