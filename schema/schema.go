@@ -57,10 +57,11 @@ type KindSchema struct {
 	InUse       bool      `yaml:"in_use"`
 	Content     nextSpec  `yaml:"content"`
 	Required    []string  `yaml:"required"`
-	Tags        []tagSpec `yaml:"tags"`
+	Multiple    []string  `yaml:"multiple"`
+	Tags        []TagSpec `yaml:"tags"`
 }
 
-type tagSpec struct {
+type TagSpec struct {
 	Name   string    `yaml:"name"`
 	Prefix string    `yaml:"prefix"`
 	Next   *nextSpec `yaml:"next"`
