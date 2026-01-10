@@ -122,10 +122,9 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 			if err != nil {
 				return nil, fmt.Errorf("invalid event id hex")
 			}
-
 			targets = append(targets, id)
+			missing = false
 		}
-
 		if missing {
 			return nil, fmt.Errorf("missing 'e' tag")
 		}
