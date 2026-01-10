@@ -20,7 +20,6 @@ require (
 	github.com/mailru/easyjson v0.9.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/puzpuzpuz/xsync/v3 v3.5.1
-	github.com/redis/rueidis v1.0.68
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
