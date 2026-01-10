@@ -57,7 +57,10 @@ func Encrypt(secretKey [32]byte, password string, logn uint8, ksb KeySecurityByt
 
 func Decrypt(bech32string string, password string) (secretKey nostr.SecretKey, err error) {
 	secb, err := DecryptToBytes(bech32string, password)
-	return nostr.SecretKey(secb), err
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return nostr.SecretKey(secb), nil
 }
 
 func DecryptToBytes(bech32string string, password string) (secretKey []byte, err error) {
