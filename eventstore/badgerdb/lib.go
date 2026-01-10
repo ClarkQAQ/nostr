@@ -24,9 +24,9 @@ var (
 var _ eventstore.Store = (*BadgerBackend)(nil)
 
 type BadgerBackend struct {
-	Path        string
-	DB          *badger.DB
-	WithOptions []func(badger.Options) badger.Options
+	Path    string
+	DB      *badger.DB
+	Options []func(badger.Options) badger.Options
 }
 
 // NewBadgerBackend creates a new BadgerBackend with the given path.
@@ -35,8 +35,8 @@ func NewBadgerBackend(path string) (*BadgerBackend, error) {
 	return &BadgerBackend{Path: path}, nil
 }
 
-func (b *BadgerBackend) WithOption(fn func(badger.Options) badger.Options) {
-	b.WithOptions = append(b.WithOptions, fn)
+func (b *BadgerBackend) WithOptions(fn func(badger.Options) badger.Options) {
+	b.Options = append(b.Options, fn)
 }
 
 func (b *BadgerBackend) Init(ctx context.Context) error {
@@ -57,7 +57,7 @@ func (b *BadgerBackend) Init(ctx context.Context) error {
 	opts.IndexCacheSize = 128 << 20   // 128MB index cache
 	opts.DetectConflicts = false      // disable conflict detection for speed
 
-	for _, fn := range b.WithOptions {
+	for _, fn := range b.Options {
 		opts = fn(opts)
 	}
 
