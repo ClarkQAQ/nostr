@@ -23,14 +23,19 @@ var (
 var _ eventstore.Store = (*BadgerBackend)(nil)
 
 type BadgerBackend struct {
-	Path string
-	DB   *badger.DB
+	Path        string
+	DB          *badger.DB
+	WithOptions []func(badger.Options) badger.Options
 }
 
 // NewBadgerBackend creates a new BadgerBackend with the given path.
 // Call Init() to open the database.
 func NewBadgerBackend(path string) (*BadgerBackend, error) {
 	return &BadgerBackend{Path: path}, nil
+}
+
+func (b *BadgerBackend) WithOption(fn func(badger.Options) badger.Options) {
+	b.WithOptions = append(b.WithOptions, fn)
 }
 
 func (b *BadgerBackend) Init(ctx context.Context) error {
@@ -46,9 +51,13 @@ func (b *BadgerBackend) Init(ctx context.Context) error {
 	opts.ValueLogFileSize = 256 << 20 // 256MB value log files
 	opts.NumMemtables = 5             // number of memtables
 	opts.MemTableSize = 64 << 20      // 64MB memtable size
-	opts.BlockCacheSize = 256 << 20   // 256MB block cache
+	opts.BlockCacheSize = 0           // disable block cache
 	opts.IndexCacheSize = 128 << 20   // 128MB index cache
 	opts.DetectConflicts = false      // disable conflict detection for speed
+
+	for _, fn := range b.WithOptions {
+		opts = fn(opts)
+	}
 
 	db, err := badger.Open(opts)
 	if err != nil {
