@@ -6,6 +6,7 @@ import (
 
 	"fiatjaf.com/nostr/eventstore"
 	"github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/badger/v4/options"
 )
 
 // Key prefixes for different index types
@@ -52,6 +53,7 @@ func (b *BadgerBackend) Init(ctx context.Context) error {
 	opts.NumMemtables = 5             // number of memtables
 	opts.MemTableSize = 64 << 20      // 64MB memtable size
 	opts.BlockCacheSize = 0           // disable block cache
+	opts.Compression = options.None   // disable compression
 	opts.IndexCacheSize = 128 << 20   // 128MB index cache
 	opts.DetectConflicts = false      // disable conflict detection for speed
 
