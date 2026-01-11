@@ -6,11 +6,11 @@ import (
 	"log"
 	"math"
 	"slices"
-	"strings"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
 	"fiatjaf.com/nostr/eventstore/internal"
+	"fiatjaf.com/nostr/eventstore/searcher"
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -130,6 +130,11 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 	totalEventsEmitted := 0
 	tempResults := make([]nostr.Event, 0, batchSizePerQuery*2)
 
+	var searchSearcher *searcher.Searcher
+	if filter.Search != "" {
+		searchSearcher = searcher.NewSearcher(filter.Search)
+	}
+
 	for len(its) > 0 {
 		// reset stuff
 		tempResults = tempResults[:0]
@@ -190,7 +195,7 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 						continue
 					}
 
-					if filter.Search != "" && !strings.Contains(event.Content, filter.Search) {
+					if searchSearcher != nil && !searchSearcher.Contains(event.Content) {
 						continue
 					}
 

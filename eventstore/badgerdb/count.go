@@ -6,10 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"slices"
-	"strings"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
+	"fiatjaf.com/nostr/eventstore/searcher"
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -19,6 +19,11 @@ func (b *BadgerBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 	queries, extraAuthors, extraKinds, extraTagKey, extraTagValues, since, e := b.prepareQueries(filter)
 	if e != nil {
 		return 0, fmt.Errorf("failed to prepare queries: %w", e)
+	}
+
+	var searchSearcher *searcher.Searcher
+	if filter.Search != "" {
+		searchSearcher = searcher.NewSearcher(filter.Search)
 	}
 
 	if e := b.DB.View(func(txn *badger.Txn) error {
@@ -98,7 +103,7 @@ func (b *BadgerBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 						continue
 					}
 
-					if filter.Search != "" && !strings.Contains(evt.Content, filter.Search) {
+					if searchSearcher != nil && !searchSearcher.Contains(evt.Content) {
 						it.Next()
 						continue
 					}
