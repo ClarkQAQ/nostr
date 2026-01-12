@@ -7,6 +7,7 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
+	"fiatjaf.com/nostr/nipb0/blossom"
 )
 
 // EventStoreBlobIndexWrapper uses fake events to keep track of what blobs we have stored and who owns them
@@ -89,7 +90,7 @@ func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, 
 func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event) BlobDescriptor {
 	hhash := evt.Tags[0][1]
 	mimetype := evt.Tags[1][1]
-	ext := getExtension(mimetype)
+	ext := blossom.GetExtension(mimetype)
 	size, _ := strconv.Atoi(evt.Tags[2][1])
 
 	return BlobDescriptor{

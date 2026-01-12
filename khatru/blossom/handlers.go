@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nipb0/blossom"
 	"github.com/liamg/magic"
 )
 
@@ -87,11 +88,11 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// if we can't find, use the filetype given by the upload header
 		mimetype := r.Header.Get("Content-Type")
-		ext = getExtension(mimetype)
+		ext = blossom.GetExtension(mimetype)
 	}
 
 	// special case of android apk -- if we see a .zip but they say it's .apk we trust them
-	if ext == ".zip" && getExtension(r.Header.Get("Content-Type")) == ".apk" {
+	if ext == ".zip" && blossom.GetExtension(r.Header.Get("Content-Type")) == ".apk" {
 		ext = ".apk"
 	}
 
@@ -197,7 +198,7 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 			ext = spl[1]
 		}
 	} else if bd != nil {
-		ext = getExtension(bd.Type)
+		ext = blossom.GetExtension(bd.Type)
 	}
 
 	if nil != bs.RejectGet {
@@ -345,7 +346,7 @@ func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 			ext = spl[1]
 		}
 	} else if bd != nil {
-		ext = getExtension(bd.Type)
+		ext = blossom.GetExtension(bd.Type)
 	}
 
 	// should we accept this delete?
@@ -454,7 +455,7 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 	var ext string
 	contentType := resp.Header.Get("Content-Type")
 	if contentType != "" {
-		ext = getExtension(contentType)
+		ext = blossom.GetExtension(contentType)
 	} else if ft, _ := magic.Lookup(body); ft != nil {
 		ext = "." + ft.Extension
 	} else if idx := strings.LastIndex(req.URL, "."); idx != -1 {
