@@ -139,7 +139,7 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 		Uploaded: nostr.Now(),
 	}
 	if err := bs.Store.Keep(r.Context(), bd, auth.PubKey); err != nil {
-		blossomError(w, "failed to save event: "+err.Error(), 400)
+		blossomError(w, "failed to save blob descriptor: "+err.Error(), 400)
 		return
 	}
 
