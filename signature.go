@@ -7,6 +7,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // Verify checks if the event signature is valid for the given event.
@@ -14,16 +15,23 @@ import (
 // Returns true if the signature is valid, false otherwise.
 func (evt Event) VerifySignature() bool {
 	// read and check pubkey
-	pubkey, err := schnorr.ParsePubKey(evt.PubKey[:])
-	if err != nil {
+	var x, y secp256k1.FieldVal
+	if overflow := x.SetByteSlice(evt.PubKey[0:32]); overflow {
 		return false
 	}
+	if !secp256k1.DecompressY(&x, false, &y) {
+		return false
+	}
+	pubkey := secp256k1.NewPublicKey(&x, &y)
 
 	// read signature
-	sig, err := schnorr.ParseSignature(evt.Sig[:])
-	if err != nil {
+	var r btcec.FieldVal
+	if overflow := r.SetByteSlice(evt.Sig[0:32]); overflow {
 		return false
 	}
+	var s btcec.ModNScalar
+	s.SetByteSlice(evt.Sig[32:64])
+	sig := schnorr.NewSignature(&r, &s)
 
 	// check signature
 	hash := sha256.Sum256(evt.Serialize())
