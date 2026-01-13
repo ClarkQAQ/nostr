@@ -7,11 +7,12 @@ import (
 	"slices"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nipb0/blossom"
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
 type ownedBlob struct {
-	blob   BlobDescriptor
+	blob   blossom.BlobDescriptor
 	owners []nostr.PubKey
 }
 
@@ -25,7 +26,7 @@ func NewMemoryBlobIndex() MemoryBlobIndex {
 	}
 }
 
-func (x MemoryBlobIndex) Keep(ctx context.Context, blob BlobDescriptor, pubkey nostr.PubKey) error {
+func (x MemoryBlobIndex) Keep(ctx context.Context, blob blossom.BlobDescriptor, pubkey nostr.PubKey) error {
 	x.m.Compute(blob.SHA256, func(oldValue ownedBlob, loaded bool) (newValue ownedBlob, delete bool) {
 		if loaded {
 			newValue = oldValue
@@ -45,10 +46,10 @@ func (x MemoryBlobIndex) Keep(ctx context.Context, blob BlobDescriptor, pubkey n
 	return nil
 }
 
-func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey) iter.Seq[BlobDescriptor] {
-	return func(yield func(BlobDescriptor) bool) {
+func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey) iter.Seq[blossom.BlobDescriptor] {
+	return func(yield func(blossom.BlobDescriptor) bool) {
 		x.m.Range(func(key string, value ownedBlob) bool {
-			if value.blob.Owner == value.owners[0] {
+			if slices.Contains(value.owners, pubkey) {
 				if !yield(value.blob) {
 					return false
 				}
@@ -58,9 +59,8 @@ func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey) iter.Seq
 	}
 }
 
-func (x MemoryBlobIndex) Get(ctx context.Context, sha256 string) (*BlobDescriptor, error) {
+func (x MemoryBlobIndex) Get(ctx context.Context, sha256 string) (*blossom.BlobDescriptor, error) {
 	if val, ok := x.m.Load(sha256); ok {
-		val.blob.Owner = val.owners[0]
 		return &val.blob, nil
 	}
 	return nil, errors.New("not found")

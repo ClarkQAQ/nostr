@@ -5,22 +5,13 @@ import (
 	"iter"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nipb0/blossom"
 )
 
-type BlobDescriptor struct {
-	URL      string          `json:"url"`
-	SHA256   string          `json:"sha256"`
-	Size     int             `json:"size"`
-	Type     string          `json:"type"`
-	Uploaded nostr.Timestamp `json:"uploaded"`
-
-	Owner nostr.PubKey `json:"-"`
-}
-
 type BlobIndex interface {
-	Keep(ctx context.Context, blob BlobDescriptor, pubkey nostr.PubKey) error
-	List(ctx context.Context, pubkey nostr.PubKey) iter.Seq[BlobDescriptor]
-	Get(ctx context.Context, sha256 string) (*BlobDescriptor, error)
+	Keep(ctx context.Context, blob blossom.BlobDescriptor, pubkey nostr.PubKey) error
+	List(ctx context.Context, pubkey nostr.PubKey) iter.Seq[blossom.BlobDescriptor]
+	Get(ctx context.Context, sha256 string) (*blossom.BlobDescriptor, error)
 	Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error
 }
 

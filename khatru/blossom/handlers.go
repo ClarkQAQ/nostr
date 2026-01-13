@@ -36,11 +36,7 @@ func (bs BlossomServer) handleUploadCheck(w http.ResponseWriter, r *http.Request
 	}
 
 	mimetype := r.Header.Get("X-Content-Type")
-	exts, _ := mime.ExtensionsByType(mimetype)
-	var ext string
-	if len(exts) > 0 {
-		ext = exts[0]
-	}
+	ext := blossom.GetExtension(mimetype)
 
 	// get the file size from the incoming header
 	size, _ := strconv.Atoi(r.Header.Get("X-Content-Length"))
@@ -135,7 +131,7 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// keep track of the blob descriptor
-	bd := BlobDescriptor{
+	bd := blossom.BlobDescriptor{
 		URL:      bs.ServiceURL + "/" + hhash + ext,
 		SHA256:   hhash,
 		Size:     len(b),
@@ -472,7 +468,7 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// keep track of the blob descriptor
-	bd := BlobDescriptor{
+	bd := blossom.BlobDescriptor{
 		URL:      bs.ServiceURL + "/" + hhash + ext,
 		SHA256:   hhash,
 		Size:     len(body),
