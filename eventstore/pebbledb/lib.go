@@ -50,11 +50,11 @@ type PebbleBackend struct {
 	// MaxOpenFiles limits file descriptors. 0 = default (1000).
 	MaxOpenFiles int
 
-	// CacheSize in bytes for block cache. 0 = default (64MB).
+	// CacheSize in bytes for block cache. 0 = default (128MB).
 	CacheSize int64
 
-	// MemTableSize in bytes. 0 = default (64MB).
-	MemTableSize int
+	// MemTableSize in bytes. 0 = default (4MB).
+	MemTableSize uint64
 
 	// DisableWAL disables write-ahead log for maximum write performance.
 	// WARNING: Data may be lost on crash.
@@ -75,7 +75,7 @@ func NewPebbleBackend(path string) (*PebbleBackend, error) {
 }
 
 func (b *PebbleBackend) Init(ctx context.Context) error {
-	cache := pebble.NewCache(1 << 30) // 1GB default
+	cache := pebble.NewCache(128 << 20) // 128MB default
 	if b.CacheSize > 0 {
 		cache = pebble.NewCache(b.CacheSize)
 	}
@@ -89,7 +89,7 @@ func (b *PebbleBackend) Init(ctx context.Context) error {
 		LoggerAndTracer: &NoopLoggerAndTracer{},
 
 		// Memory table configuration
-		MemTableSize:                64 << 20, // 64MB default
+		MemTableSize:                4 << 20, // 4MB default
 		MemTableStopWritesThreshold: 16,
 
 		// L0 compaction thresholds - balanced for mixed workload
@@ -107,7 +107,7 @@ func (b *PebbleBackend) Init(ctx context.Context) error {
 	}
 
 	if b.MemTableSize > 0 {
-		opts.MemTableSize = uint64(b.MemTableSize)
+		opts.MemTableSize = b.MemTableSize
 	}
 
 	if b.MaxOpenFiles > 0 {

@@ -22,11 +22,11 @@ func (b *PebbleBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 
 	// Iterate over all plans
 	for _, plan := range plans {
-		iter, err := snap.NewIter(&pebble.IterOptions{
+		iter, e := snap.NewIter(&pebble.IterOptions{
 			LowerBound: plan.lowerBound,
 			UpperBound: plan.upperBound,
 		})
-		if err != nil {
+		if e != nil {
 			continue
 		}
 
@@ -46,8 +46,8 @@ func (b *PebbleBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 			// If we need extra filtering, fetch the event
 			if extraAuthors != nil || extraKinds != nil || extraTagValues != nil || extraSearch != nil {
 				rawKey := makeRawKey(id)
-				bin, closer, err := snap.Get(rawKey)
-				if err != nil {
+				bin, closer, e := snap.Get(rawKey)
+				if e != nil {
 					continue
 				}
 
@@ -73,7 +73,7 @@ func (b *PebbleBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 				// Need full unmarshal for tag/search checks
 				if extraTagValues != nil || extraSearch != nil {
 					var evt nostr.Event
-					if err := betterbinary.Unmarshal(binCopy, &evt); err != nil {
+					if e := betterbinary.Unmarshal(binCopy, &evt); e != nil {
 						continue
 					}
 
