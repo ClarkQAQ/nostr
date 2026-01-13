@@ -108,7 +108,7 @@ func main() {
 
 ### But I don't want to write my own database!
 
-Fear no more. Using the https://fiatjaf.com/nostr/eventstore module you get a bunch of compatible databases out of the box and you can just plug them into your relay. For example, [lmdb](https://pkg.go.dev/fiatjaf.com/nostr/eventstore/lmdb):
+Fear no more. Using the [`fiatjaf.com/nostr/eventstore`](../eventstore) module you get a bunch of compatible databases out of the box and you can just plug them into your relay. For example, [`lmdb`](../eventstore/lmdb):
 
 ```go
 	db := lmdb.LMDBackend{Path: "/tmp/khatru-lmdb-tmp"}
@@ -121,7 +121,7 @@ Fear no more. Using the https://fiatjaf.com/nostr/eventstore module you get a bu
 
 ### But I don't want to write a bunch of custom policies!
 
-Fear no more. We have a bunch of common policies written in the `fiatjaf.com/nostr/khatru/policies` package and also a handpicked selection of base sane defaults, which you can apply with:
+Fear no more. We have a bunch of common policies written in the [`fiatjaf.com/nostr/khatru/policies`](policies) package and also a handpicked selection of base sane defaults, which you can apply with:
 
 ```go
 	policies.ApplySaneDefaults(relay)
