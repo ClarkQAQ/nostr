@@ -17,7 +17,7 @@ go mod tidy
 
 ## Components
 
-- **eventstore**: Pluggable storage backends (BadgerDB, BoltDB, in-memory)
+- **eventstore**: Pluggable storage backends (PebbleDB, BadgerDB, BoltDB, in-memory)
 - **relay**: Flexible framework for building Nostr relays
 - **relay/blossom**: Plugin for a relay server that adds flexible Blossom server support
 - **relay/grasp**: Plugin for a relay server that adds Grasp server support

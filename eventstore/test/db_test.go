@@ -8,6 +8,7 @@ import (
 	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/eventstore/badgerdb"
 	"fiatjaf.com/nostr/eventstore/boltdb"
+	"fiatjaf.com/nostr/eventstore/pebbledb"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 )
 
@@ -50,5 +51,20 @@ func TestBadgerDB(t *testing.T) {
 		}
 
 		t.Run(test.name, func(t *testing.T) { test.run(t, db) })
+	}
+}
+
+func TestPebbleDB(t *testing.T) {
+	for _, test := range tests {
+		os.RemoveAll(dbpath + "pebble")
+		db, e := pebbledb.NewPebbleBackend(dbpath + "pebble")
+		if e != nil {
+			t.Fatal(e)
+		}
+
+		t.Run(test.name, func(t *testing.T) {
+			test.run(t, db)
+			db.Close()
+		})
 	}
 }
