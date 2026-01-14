@@ -31,10 +31,10 @@ type RelayManagementAPI struct {
 	ChangeRelayName             func(ctx context.Context, name string) error
 	ChangeRelayDescription      func(ctx context.Context, desc string) error
 	ChangeRelayIcon             func(ctx context.Context, icon string) error
-	AllowKind                   func(ctx context.Context, kind int) error
-	DisallowKind                func(ctx context.Context, kind int) error
-	ListAllowedKinds            func(ctx context.Context) ([]int, error)
-	ListDisallowedKinds         func(ctx context.Context) ([]int, error)
+	AllowKind                   func(ctx context.Context, kind nostr.Kind) error
+	DisallowKind                func(ctx context.Context, kind nostr.Kind) error
+	ListAllowedKinds            func(ctx context.Context) ([]nostr.Kind, error)
+	ListDisallowedKinds         func(ctx context.Context) ([]nostr.Kind, error)
 	BlockIP                     func(ctx context.Context, ip net.IP, reason string) error
 	UnblockIP                   func(ctx context.Context, ip net.IP, reason string) error
 	ListBlockedIPs              func(ctx context.Context) ([]nip86.IPReason, error)
