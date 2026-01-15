@@ -80,6 +80,8 @@ func (il *IndexingLayer) CountEvents(filter nostr.Filter) (uint32, error) {
 
 					count++
 				}
+
+				it.next()
 			}
 		}
 
