@@ -3,6 +3,7 @@ package blossom
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -67,13 +68,13 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// get the file size from the incoming header
 	size, _ := strconv.Atoi(r.Header.Get("Content-Length"))
-	if size == 0 {
+	if size <= 0 {
 		blossomError(w, "missing \"Content-Length\" header", 400)
 		return
 	}
 
 	// read first bytes of upload so we can find out the filetype
-	b := make([]byte, min(50, size), size)
+	b := make([]byte, min(50, size), size+1 /* the extra 1 is for checking the validity of the Content-Length */)
 	if n, err := r.Body.Read(b); err != nil && n != size {
 		blossomError(w, "failed to read initial bytes of upload body: "+err.Error(), 400)
 		return
@@ -102,25 +103,28 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// if it passes then we have to read the entire thing into memory so we can compute the sha256
-	for {
-		var n int
-		n, err = r.Body.Read(b[len(b):cap(b)])
-		b = b[:len(b)+n]
-		if err != nil {
+	// we will only read as much as specified in the Content-Length header
+	if size > len(b) {
+		alreadyRead := len(b)
+		for {
+			n, err := r.Body.Read(b[alreadyRead : size+1])
+			alreadyRead += n
 			if err == io.EOF {
-				err = nil
+				break
+			} else if err != nil && err != io.EOF {
+				blossomError(w, "failed to read upload body: "+err.Error(), 400)
+				return
 			}
-			break
+			if alreadyRead > size {
+				blossomError(w, "file is bigger than was specified in Content-Length", 400)
+				return
+			}
 		}
-		if len(b) == cap(b) {
-			// add more capacity (let append pick how much)
-			// if Content-Length was correct we shouldn't reach this
-			b = append(b, 0)[:len(b)]
+		if alreadyRead != size {
+			blossomError(w, fmt.Sprintf("got a %d bytes but Content-Length said %d", alreadyRead, size), 400)
+			return
 		}
-	}
-	if err != nil {
-		blossomError(w, "failed to read upload body: "+err.Error(), 400)
-		return
+		b = b[0:size]
 	}
 
 	hash := sha256.Sum256(b)
