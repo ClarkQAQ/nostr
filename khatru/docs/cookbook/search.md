@@ -6,9 +6,7 @@ outline: deep
 
 The [`nostr.Filter` type](https://pkg.go.dev/fiatjaf.com/nostr#Filter) has a `Search` field, so you basically just has to handle that if it's present.
 
-It can be tricky to implement fulltext search properly though, so some [eventstores](../core/eventstore) implement it natively, such as [Bleve](https://pkg.go.dev/fiatjaf.com/nostr/eventstore/bleve), [OpenSearch](https://pkg.go.dev/fiatjaf.com/nostr/eventstore/opensearch) and [ElasticSearch](https://pkg.go.dev/fiatjaf.com/nostr/eventstore/elasticsearch) (although for the last two you'll need an instance of these database servers running, while with Bleve it's embedded).
-
-If you have any of these you can just use them just like any other eventstore:
+It can be tricky to implement fulltext search properly though, so the [bleve](https://pkg.go.dev/fiatjaf.com/nostr/eventstore/bleve) evenstore implements it natively and you can use it on top of another main eventstore:
 
 ```go
 func main () {
