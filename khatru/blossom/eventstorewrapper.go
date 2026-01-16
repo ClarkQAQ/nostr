@@ -52,7 +52,9 @@ func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubK
 			Authors: []nostr.PubKey{pubkey},
 			Kinds:   []nostr.Kind{24242},
 		}, 1000) {
-			yield(es.parseEvent(evt))
+			if !yield(es.parseEvent(evt)) {
+				return
+			}
 		}
 	}
 }
