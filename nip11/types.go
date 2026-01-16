@@ -14,7 +14,7 @@ type RelayInformationDocument struct {
 	PubKey        *nostr.PubKey `json:"pubkey,omitempty"`
 	Self          *nostr.PubKey `json:"self,omitempty"`
 	Contact       string        `json:"contact,omitempty"`
-	SupportedNIPs []any         `json:"supported_nips,omitempty"`
+	SupportedNIPs []int         `json:"supported_nips,omitempty"`
 	Software      string        `json:"software,omitempty"`
 	Version       string        `json:"version,omitempty"`
 
@@ -34,7 +34,7 @@ type RelayInformationDocument struct {
 }
 
 func (info *RelayInformationDocument) AddSupportedNIP(number int) {
-	idx := slices.IndexFunc(info.SupportedNIPs, func(n any) bool { return n == number })
+	idx := slices.IndexFunc(info.SupportedNIPs, func(n int) bool { return n == number })
 	if idx != -1 {
 		return
 	}

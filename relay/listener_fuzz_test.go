@@ -38,7 +38,7 @@ func FuzzRandomListenerClientRemoving(f *testing.F) {
 
 				if s%addListenerFreq == 0 {
 					l++
-					rl.addListener(ws, w+":"+idFromSeqLower(j), rl, f, cancel)
+					_ = rl.addListener(ws, w+":"+idFromSeqLower(j), rl, f, cancel)
 				}
 
 				s++
@@ -97,11 +97,11 @@ func FuzzRandomListenerIdRemoving(f *testing.F) {
 
 				if s%addListenerFreq == 0 {
 					id := w + ":" + idFromSeqLower(j)
-					rl.addListener(ws, id, rl, f, cancel)
+					_ = rl.addListener(ws, id, rl, f, cancel)
 					subs = append(subs, wsid{ws, id})
 
 					if s%addExtraListenerFreq == 0 {
-						rl.addListener(ws, id, rl, f, cancel)
+						_ = rl.addListener(ws, id, rl, f, cancel)
 						extra++
 					}
 				}
@@ -166,7 +166,7 @@ func FuzzRouterListenersPabloCrash(f *testing.F) {
 				id := w + ":" + idFromSeqLower(j)
 				for _, rlt := range relays {
 					if s%int(subFreq) == 0 {
-						rl.addListener(conn, id, rlt, f, cancel)
+						_ = rl.addListener(conn, id, rlt, f, cancel)
 						subs = append(subs, wsid{conn, id})
 					}
 					s++

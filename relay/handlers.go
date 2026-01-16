@@ -303,7 +303,11 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 							cancelReqCtx(errors.New("filter rejected"))
 							return
 						} else {
-							rl.addListener(ws, env.SubscriptionID, srl, filter, cancelReqCtx)
+							if e := rl.addListener(ws, env.SubscriptionID, srl, filter, cancelReqCtx); e != nil {
+								_ = ws.WriteJSON(nostr.ClosedEnvelope{SubscriptionID: env.SubscriptionID, Reason: e.Error()})
+								cancelReqCtx(e)
+								return
+							}
 						}
 					}
 

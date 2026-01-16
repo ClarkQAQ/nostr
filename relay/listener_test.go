@@ -39,10 +39,10 @@ func TestListenerSetupAndRemoveOnce(t *testing.T) {
 	var cancel func(cause error) = nil
 
 	t.Run("adding listeners", func(t *testing.T) {
-		rl.addListener(ws1, "1a", rl, f1, cancel)
-		rl.addListener(ws1, "1b", rl, f2, cancel)
-		rl.addListener(ws2, "2a", rl, f3, cancel)
-		rl.addListener(ws1, "1c", rl, f3, cancel)
+		_ = rl.addListener(ws1, "1a", rl, f1, cancel)
+		_ = rl.addListener(ws1, "1b", rl, f2, cancel)
+		_ = rl.addListener(ws2, "2a", rl, f3, cancel)
+		_ = rl.addListener(ws1, "1c", rl, f3, cancel)
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
@@ -98,11 +98,11 @@ func TestListenerMoreConvolutedCase(t *testing.T) {
 	var cancel func(cause error) = nil
 
 	t.Run("adding listeners", func(t *testing.T) {
-		rl.addListener(ws1, "c", rl, f1, cancel)
-		rl.addListener(ws2, "b", rl, f2, cancel)
-		rl.addListener(ws3, "a", rl, f3, cancel)
-		rl.addListener(ws4, "d", rl, f3, cancel)
-		rl.addListener(ws2, "b", rl, f1, cancel)
+		_ = rl.addListener(ws1, "c", rl, f1, cancel)
+		_ = rl.addListener(ws2, "b", rl, f2, cancel)
+		_ = rl.addListener(ws3, "a", rl, f3, cancel)
+		_ = rl.addListener(ws4, "d", rl, f3, cancel)
+		_ = rl.addListener(ws2, "b", rl, f1, cancel)
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
@@ -221,16 +221,16 @@ func TestListenerMoreStuffWithMultipleRelays(t *testing.T) {
 	var cancel func(cause error) = nil
 
 	t.Run("adding listeners", func(t *testing.T) {
-		rl.addListener(ws1, "c", rlx, f1, cancel)
-		rl.addListener(ws2, "b", rly, f2, cancel)
-		rl.addListener(ws3, "a", rlz, f3, cancel)
-		rl.addListener(ws4, "d", rlx, f3, cancel)
-		rl.addListener(ws4, "e", rlx, f3, cancel)
-		rl.addListener(ws3, "a", rlx, f3, cancel)
-		rl.addListener(ws4, "e", rly, f3, cancel)
-		rl.addListener(ws3, "f", rly, f3, cancel)
-		rl.addListener(ws1, "g", rlz, f1, cancel)
-		rl.addListener(ws2, "g", rlz, f2, cancel)
+		_ = rl.addListener(ws1, "c", rlx, f1, cancel)
+		_ = rl.addListener(ws2, "b", rly, f2, cancel)
+		_ = rl.addListener(ws3, "a", rlz, f3, cancel)
+		_ = rl.addListener(ws4, "d", rlx, f3, cancel)
+		_ = rl.addListener(ws4, "e", rlx, f3, cancel)
+		_ = rl.addListener(ws3, "a", rlx, f3, cancel)
+		_ = rl.addListener(ws4, "e", rly, f3, cancel)
+		_ = rl.addListener(ws3, "f", rly, f3, cancel)
+		_ = rl.addListener(ws1, "g", rlz, f1, cancel)
+		_ = rl.addListener(ws2, "g", rlz, f2, cancel)
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
@@ -444,7 +444,7 @@ func TestRandomListenerClientRemoving(t *testing.T) {
 
 			if rand.Intn(2) < 1 {
 				l++
-				rl.addListener(ws, w+":"+idFromSeqLower(j), rl, f, cancel)
+				_ = rl.addListener(ws, w+":"+idFromSeqLower(j), rl, f, cancel)
 			}
 		}
 	}
@@ -489,11 +489,11 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 
 			if rand.Intn(2) < 1 {
 				id := w + ":" + idFromSeqLower(j)
-				rl.addListener(ws, id, rl, f, cancel)
+				_ = rl.addListener(ws, id, rl, f, cancel)
 				subs = append(subs, wsid{ws, id})
 
 				if rand.Intn(5) < 1 {
-					rl.addListener(ws, id, rl, f, cancel)
+					_ = rl.addListener(ws, id, rl, f, cancel)
 					extra++
 				}
 			}
@@ -534,11 +534,11 @@ func TestRouterListenersPabloCrash(t *testing.T) {
 	f := nostr.Filter{Kinds: []nostr.Kind{1}}
 	cancel := func(cause error) {}
 
-	rl.addListener(ws1, ":1", rla, f, cancel)
-	rl.addListener(ws2, ":1", rlb, f, cancel)
-	rl.addListener(ws3, "a", rlb, f, cancel)
-	rl.addListener(ws3, "b", rla, f, cancel)
-	rl.addListener(ws3, "c", rlb, f, cancel)
+	_ = rl.addListener(ws1, ":1", rla, f, cancel)
+	_ = rl.addListener(ws2, ":1", rlb, f, cancel)
+	_ = rl.addListener(ws3, "a", rlb, f, cancel)
+	_ = rl.addListener(ws3, "b", rla, f, cancel)
+	_ = rl.addListener(ws3, "c", rlb, f, cancel)
 
 	rl.removeClientAndListeners(ws1)
 	rl.removeClientAndListeners(ws3)

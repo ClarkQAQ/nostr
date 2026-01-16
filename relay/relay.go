@@ -30,7 +30,7 @@ func NewRelay() *Relay {
 		Info: &nip11.RelayInformationDocument{
 			Software:      "https://pkg.go.dev/fiatjaf.com/nostr/relay",
 			Version:       "n/a",
-			SupportedNIPs: []any{1, 11, 42, 70, 86},
+			SupportedNIPs: []int{1, 11, 42, 70, 86},
 		},
 
 		upgrader: websocket.Upgrader{
@@ -117,11 +117,13 @@ type Relay struct {
 	httpServer *http.Server
 
 	// websocket options
-	WriteWait               time.Duration // Time allowed to write a message to the peer.
-	PongWait                time.Duration // Time allowed to read the next pong message from the peer.
-	PingPeriod              time.Duration // Send pings to peer with this period. Must be less than pongWait.
-	MaxMessageSize          int64         // Maximum message size allowed from peer.
-	MaxAuthenticatedClients int
+	WriteWait                 time.Duration // Time allowed to write a message to the peer.
+	PongWait                  time.Duration // Time allowed to read the next pong message from the peer.
+	PingPeriod                time.Duration // Send pings to peer with this period. Must be less than pongWait.
+	MaxMessageSize            int64         // Maximum message size allowed from peer.
+	MaxSubscriptionsPerClient int           // Maximum number of subscriptions per client
+	MaxSubidLength            int           // Maximum size of a subscription id
+	MaxAuthenticatedClients   int
 
 	// NIP-40 expiration manager
 	expirationManager *expirationManager

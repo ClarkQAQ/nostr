@@ -4,11 +4,16 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"unicode/utf8"
 
 	"fiatjaf.com/nostr"
 )
 
-var ErrSubscriptionClosedByClient = errors.New("subscription closed by client")
+var (
+	ErrSubscriptionClosedByClient = errors.New("subscription closed by client")
+	ErrTooManySubscriptions       = errors.New("too many subscriptions")
+	ErrSubscriptionIdTooLong      = errors.New("subscription id too long")
+)
 
 type listenerSpec struct {
 	id       string // kept here so we can easily match against it removeListenerId
@@ -39,12 +44,21 @@ func (rl *Relay) addListener(
 	subrelay *Relay,
 	filter nostr.Filter,
 	cancel context.CancelCauseFunc,
-) {
+) error {
+	if rl.MaxSubidLength > 0 && utf8.RuneCountInString(id) > rl.MaxSubidLength {
+		return ErrSubscriptionIdTooLong
+	}
+
 	rl.clientsMutex.Lock()
 	defer rl.clientsMutex.Unlock()
 
 	if specs, ok := rl.clients[ws]; ok /* this will always be true unless client has disconnected very rapidly */ {
 		idx := len(subrelay.listeners)
+
+		if rl.MaxSubscriptionsPerClient > 0 && len(specs) >= rl.MaxSubscriptionsPerClient {
+			return ErrTooManySubscriptions
+		}
+
 		rl.clients[ws] = append(specs, listenerSpec{
 			id:       id,
 			cancel:   cancel,
@@ -57,6 +71,8 @@ func (rl *Relay) addListener(
 			filter: filter,
 		})
 	}
+
+	return nil
 }
 
 // remove a specific subscription id from listeners for a given ws client
