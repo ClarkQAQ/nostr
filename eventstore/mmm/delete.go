@@ -11,6 +11,10 @@ import (
 )
 
 func (il *IndexingLayer) DeleteEvent(id nostr.ID) error {
+	if il.mmmm.ReadOnly {
+		return ReadOnly
+	}
+
 	il.mmmm.writeMutex.Lock()
 	defer il.mmmm.writeMutex.Unlock()
 

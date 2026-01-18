@@ -86,7 +86,8 @@ var app = &cli.Command{
 			end = db.Close
 		case "mmm":
 			var err error
-			if db, err, end = doMmmInit(path); err != nil {
+			readonly := c.Args().First() == "query" || c.Args().First() == "count"
+			if db, err, end = doMmmInit(path, readonly); err != nil {
 				if end != nil {
 					end()
 				}

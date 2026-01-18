@@ -11,13 +11,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func doMmmInit(path string) (eventstore.Store, error, func()) {
+func doMmmInit(path string, readonly bool) (eventstore.Store, error, func()) {
 	logger := zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
 		w.Out = os.Stderr
 	}))
 	mmmm := mmm.MultiMmapManager{
-		Dir:    filepath.Dir(path),
-		Logger: &logger,
+		Dir:      filepath.Dir(path),
+		Logger:   &logger,
+		ReadOnly: readonly,
 	}
 	if err := mmmm.Init(); err != nil {
 		return nil, err, nil
