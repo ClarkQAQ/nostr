@@ -33,7 +33,7 @@ func (b *BoltBackend) CountEvents(filter nostr.Filter) (uint32, error) {
 
 			for {
 				// we already have a k and a v and an err from the cursor setup, so check and use these
-				if !bytes.HasPrefix(it.key, q.prefix) {
+				if !bytes.HasPrefix(it.key, q.prefix) || it.exhausted {
 					// either iteration has errored or we reached the end of this prefix
 					break // stop this cursor and move to the next one
 				}
@@ -54,31 +54,35 @@ func (b *BoltBackend) CountEvents(filter nostr.Filter) (uint32, error) {
 					}
 
 					// check it against pubkeys without decoding the entire thing
-					if !slices.Contains(extraAuthors, betterbinary.GetPubKey(bin)) {
+					if extraAuthors != nil && !slices.Contains(extraAuthors, betterbinary.GetPubKey(bin)) {
 						it.next()
 						continue
 					}
 
 					// check it against kinds without decoding the entire thing
-					if !slices.Contains(extraKinds, betterbinary.GetKind(bin)) {
+					if extraKinds != nil && !slices.Contains(extraKinds, betterbinary.GetKind(bin)) {
 						it.next()
 						continue
 					}
 
-					evt := &nostr.Event{}
-					if err := betterbinary.Unmarshal(bin, evt); err != nil {
-						it.next()
-						continue
-					}
+					if extraTagKey != "" {
+						evt := &nostr.Event{}
+						if err := betterbinary.Unmarshal(bin, evt); err != nil {
+							it.next()
+							continue
+						}
 
-					// if there is still a tag to be checked, do it now
-					if !evt.Tags.ContainsAny(extraTagKey, extraTagValues) {
-						it.next()
-						continue
+						// if there is still a tag to be checked, do it now
+						if !evt.Tags.ContainsAny(extraTagKey, extraTagValues) {
+							it.next()
+							continue
+						}
 					}
 
 					count++
 				}
+
+				it.next()
 			}
 		}
 

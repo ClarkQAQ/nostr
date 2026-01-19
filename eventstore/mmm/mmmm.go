@@ -176,6 +176,21 @@ func (b *MultiMmapManager) EnsureLayer(name string) (*IndexingLayer, error) {
 			txn.RawRead = true
 
 			nameb := []byte(name)
+			if idv, err := txn.Get(b.knownLayers, nameb); err == nil {
+				if err := il.Init(); err != nil {
+					return fmt.Errorf("failed to init read-only layer %s: %w", name, err)
+				}
+				il.id = binary.BigEndian.Uint16(idv)
+				return nil
+			} else {
+				return err
+			}
+		})
+	} else {
+		err = b.lmdbEnv.Update(func(txn *lmdb.Txn) error {
+			txn.RawRead = true
+
+			nameb := []byte(name)
 			if idv, err := txn.Get(b.knownLayers, nameb); lmdb.IsNotFound(err) {
 				if id, err := b.getNextAvailableLayerId(txn); err != nil {
 					return fmt.Errorf("failed to reserve a layer id for %s: %w", name, err)
@@ -195,21 +210,6 @@ func (b *MultiMmapManager) EnsureLayer(name string) (*IndexingLayer, error) {
 					return fmt.Errorf("failed to init old layer %s: %w", name, err)
 				}
 
-				return nil
-			} else {
-				return err
-			}
-		})
-	} else {
-		err = b.lmdbEnv.Update(func(txn *lmdb.Txn) error {
-			txn.RawRead = true
-
-			nameb := []byte(name)
-			if idv, err := txn.Get(b.knownLayers, nameb); err == nil {
-				if err := il.Init(); err != nil {
-					return fmt.Errorf("failed to init read-only layer %s: %w", name, err)
-				}
-				il.id = binary.BigEndian.Uint16(idv)
 				return nil
 			} else {
 				return err

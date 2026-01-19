@@ -31,7 +31,8 @@ func (il *IndexingLayer) CountEvents(filter nostr.Filter) (uint32, error) {
 
 			for {
 				// we already have a k and a v and an err from the cursor setup, so check and use these
-				if it.err != nil ||
+				if it.exhausted ||
+					it.err != nil ||
 					len(it.key) != q.keySize ||
 					!bytes.HasPrefix(it.key, q.prefix) {
 					// either iteration has errored or we reached the end of this prefix
@@ -66,16 +67,18 @@ func (il *IndexingLayer) CountEvents(filter nostr.Filter) (uint32, error) {
 					}
 
 					// decode the entire thing (TODO: do a conditional decode while also checking the extra tag)
-					event := &nostr.Event{}
-					if err := betterbinary.Unmarshal(bin, event); err != nil {
-						it.next()
-						continue
-					}
+					if extraTagKey != "" {
+						event := &nostr.Event{}
+						if err := betterbinary.Unmarshal(bin, event); err != nil {
+							it.next()
+							continue
+						}
 
-					// if there is still a tag to be checked, do it now
-					if !event.Tags.ContainsAny(extraTagKey, extraTagValues) {
-						it.next()
-						continue
+						// if there is still a tag to be checked, do it now
+						if !event.Tags.ContainsAny(extraTagKey, extraTagValues) {
+							it.next()
+							continue
+						}
 					}
 
 					count++
