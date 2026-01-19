@@ -49,11 +49,11 @@ type Group struct {
 	// indicates that only members can write messages to the group
 	Restricted bool
 
-	// indicates that relays should hide group metadata from non-members
-	Hidden bool
-
 	// indicates that join requests are ignored unless they include an invite code
 	Closed bool
+
+	// indicates that relays should hide group metadata from non-members
+	Hidden bool
 
 	Roles       []*Role
 	InviteCodes []string
