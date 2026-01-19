@@ -223,7 +223,7 @@ func (group Group) ToMembersEvent() nostr.Event {
 func (group Group) ToRolesEvent() nostr.Event {
 	evt := nostr.Event{
 		Kind:      nostr.KindSimpleGroupRoles,
-		CreatedAt: group.LastMembersUpdate,
+		CreatedAt: group.LastRolesUpdate,
 		Tags:      make(nostr.Tags, 1, 1+len(group.Members)),
 	}
 	evt.Tags[0] = nostr.Tag{"d", group.Address.ID}
