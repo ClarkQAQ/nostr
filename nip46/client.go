@@ -16,11 +16,12 @@ import (
 )
 
 type BunkerClient struct {
+	Relays []string
+
 	serial          atomic.Uint64
 	clientSecretKey [32]byte
 	pool            *nostr.Pool
 	target          nostr.PubKey
-	relays          []string
 	conversationKey [32]byte // nip44
 	listeners       *xsync.MapOf[string, chan Response]
 	idPrefix        string
@@ -116,23 +117,27 @@ func NewBunker(
 
 	clientPublicKey := nostr.GetPublicKey(clientSecretKey)
 	conversationKey, _ := nip44.GenerateConversationKey(targetPublicKey, clientSecretKey)
+	now := nostr.Now()
 
 	bunker := &BunkerClient{
 		pool:            pool,
 		clientSecretKey: clientSecretKey,
 		target:          targetPublicKey,
-		relays:          relays,
+		Relays:          relays,
 		conversationKey: conversationKey,
 		listeners:       xsync.NewMapOf[string, chan Response](),
 		onAuth:          onAuth,
 		idPrefix:        "nl-" + strconv.Itoa(rand.Intn(65536)),
 	}
 
+	cancellableCtx, cancel := context.WithCancel(ctx)
+	_ = cancel
+
 	go func() {
-		events := pool.SubscribeMany(ctx, relays, nostr.Filter{
+		events := pool.SubscribeMany(cancellableCtx, relays, nostr.Filter{
 			Tags:      nostr.TagMap{"p": []string{clientPublicKey.Hex()}},
 			Kinds:     []nostr.Kind{nostr.KindNostrConnect},
-			Since:     nostr.Now(),
+			Since:     now,
 			LimitZero: true,
 		}, nostr.SubscriptionOptions{
 			Label: "bunker46client",
@@ -167,6 +172,14 @@ func NewBunker(
 		}
 	}()
 
+	// attempt switch_relays once every 10 times
+	if now%10 == 0 {
+		if newRelays, _ := bunker.SwitchRelays(ctx); newRelays != nil {
+			cancel()
+			bunker = NewBunker(ctx, clientSecretKey, targetPublicKey, newRelays, pool, func(string) {})
+		}
+	}
+
 	return bunker
 }
 
@@ -176,6 +189,15 @@ func (bunker *BunkerClient) Ping(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (bunker *BunkerClient) SwitchRelays(ctx context.Context) ([]string, error) {
+	var res []string
+	_, err := bunker.RPC(ctx, "switch_relays", res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (bunker *BunkerClient) GetPublicKey(ctx context.Context) (nostr.PubKey, error) {
@@ -283,7 +305,7 @@ func (bunker *BunkerClient) RPC(ctx context.Context, method string, params []str
 	relayConnectionWorked := make(chan struct{})
 	bunkerConnectionWorked := make(chan struct{})
 
-	for _, url := range bunker.relays {
+	for _, url := range bunker.Relays {
 		go func(url string) {
 			relay, err := bunker.pool.EnsureRelay(url)
 			if err == nil {

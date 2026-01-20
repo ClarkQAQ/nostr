@@ -5,14 +5,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	mrand "math/rand"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/nip44"
-	"github.com/puzpuzpuz/xsync/v3"
 )
 
 var NoConnectionReceived = errors.New("relay connections ended without a bunker connection established")
@@ -112,16 +109,17 @@ func NewBunkerFromNostrConnect(
 		if req.Result != "" {
 			if req.Result == secret {
 				// secret validation passed - connection established
-				return &BunkerClient{
-					pool:            pool,
-					clientSecretKey: clientSecretKey,
-					target:          targetPublicKey,
-					relays:          relayURLs,
-					conversationKey: conversationKey,
-					listeners:       xsync.NewMapOf[string, chan Response](),
-					onAuth:          func(string) {},
-					idPrefix:        "nl-" + strconv.Itoa(mrand.Intn(65536)),
-				}, nil
+				cancellableCtx, cancel := context.WithCancel(ctx)
+				_ = cancel
+				bunker := NewBunker(cancellableCtx, clientSecretKey, targetPublicKey, relayURLs, pool, func(string) {})
+
+				// attempt switch_relays
+				if newRelays, _ := bunker.SwitchRelays(ctx); newRelays != nil {
+					cancel()
+					bunker = NewBunker(ctx, clientSecretKey, targetPublicKey, newRelays, pool, func(string) {})
+				}
+
+				return bunker, nil
 			}
 		}
 	}
