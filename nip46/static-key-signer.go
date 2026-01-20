@@ -20,6 +20,9 @@ type StaticKeySigner struct {
 	sync.Mutex
 
 	AuthorizeRequest func(harmless bool, from nostr.PubKey, secret string) bool
+
+	// used for switch_relays call
+	DefaultRelays []string
 }
 
 func NewStaticKeySigner(secretKey [32]byte) StaticKeySigner {
@@ -204,6 +207,9 @@ func (p *StaticKeySigner) HandleRequest(_ context.Context, event nostr.Event) (
 	case "ping":
 		result = "pong"
 		harmless = true
+	case "switch_relays":
+		j, _ := json.Marshal(p.DefaultRelays)
+		result = string(j)
 	default:
 		return req, resp, eventResponse,
 			fmt.Errorf("unknown method '%s'", req.Method)

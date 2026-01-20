@@ -16,6 +16,9 @@ type DynamicSigner struct {
 	// { [handlePubkey]: {[clientKey]: Session} }
 	sessions map[nostr.PubKey]map[nostr.PubKey]Session
 
+	// used for switch_relays call
+	DefaultRelays []string
+
 	sync.Mutex
 
 	// the handler is the keypair we use to communicate with the NIP-46 client, decrypt requests, encrypt responses etc
@@ -203,6 +206,9 @@ func (p *DynamicSigner) HandleRequest(ctx context.Context, event nostr.Event) (
 		result = plaintext
 	case "ping":
 		result = "pong"
+	case "switch_relays":
+		j, _ := json.Marshal(p.DefaultRelays)
+		result = string(j)
 	default:
 		return req, resp, eventResponse,
 			fmt.Errorf("unknown method '%s'", req.Method)
