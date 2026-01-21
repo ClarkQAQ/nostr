@@ -3,6 +3,7 @@ package nip46
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"sync"
 
 	"fiatjaf.com/nostr"
@@ -58,6 +59,43 @@ func (p *StaticKeySigner) getOrCreateSession(clientPubkey nostr.PubKey) (Session
 	return session, nil
 }
 
+// HandleNostrConnectURI works like HandleRequest, but takes a nostrconnect:// URI as input, as scanned/pasted
+// by the user, produced by the client.
+func (p *StaticKeySigner) HandleNostrConnectURI(ctx context.Context, uri *url.URL) (
+	resp Response,
+	eventResponse nostr.Event,
+	err error,
+) {
+	clientPublicKey, err := nostr.PubKeyFromHex(uri.Host)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+
+	secret := uri.Query().Get("secret")
+
+	// pretend they started with a request
+	conversationKey, err := nip44.GenerateConversationKey(clientPublicKey, p.secretKey)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+	reqj, _ := json.Marshal(Request{
+		ID:     "nostrconnect",
+		Method: "imagined-nostrconnect",
+		Params: []string{clientPublicKey.Hex(), secret},
+	})
+	ciphertext, err := nip44.Encrypt(string(reqj), conversationKey)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+
+	_, resp, eventResponse, err = p.HandleRequest(ctx, nostr.Event{
+		PubKey:  clientPublicKey,
+		Kind:    nostr.KindNostrConnect,
+		Content: ciphertext,
+	})
+	return resp, eventResponse, err
+}
+
 func (p *StaticKeySigner) HandleRequest(_ context.Context, event nostr.Event) (
 	req Request,
 	resp Response,
@@ -85,6 +123,14 @@ func (p *StaticKeySigner) HandleRequest(_ context.Context, event nostr.Event) (
 	var resultErr error
 
 	switch req.Method {
+	case "imagined-nostrconnect":
+		// this is a fake request we pretend has existed, but was actually just we reading the nostrconnect:// uri
+		if len(req.Params) < 2 || req.Params[1] == "" {
+			resultErr = fmt.Errorf("needs a second argument 'secret'")
+			break
+		}
+		result = req.Params[1]
+		harmless = true
 	case "connect":
 		if len(req.Params) >= 2 {
 			secret = req.Params[1]
