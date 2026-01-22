@@ -14,7 +14,7 @@ var _ Signer = (*DynamicSigner)(nil)
 
 type DynamicSigner struct {
 	// { [handlePubkey]: {[clientKey]: Session} }
-	sessions map[nostr.PubKey]map[nostr.PubKey]Session
+	sessions map[nostr.PubKey]map[nostr.PubKey]*Session
 
 	// used for switch_relays call
 	DefaultRelays []string
@@ -47,7 +47,7 @@ type DynamicSigner struct {
 }
 
 func (p *DynamicSigner) Init() {
-	p.sessions = make(map[nostr.PubKey]map[nostr.PubKey]Session)
+	p.sessions = make(map[nostr.PubKey]map[nostr.PubKey]*Session)
 }
 
 func (p *DynamicSigner) HandleRequest(ctx context.Context, event nostr.Event) (
@@ -85,14 +85,14 @@ func (p *DynamicSigner) HandleRequest(ctx context.Context, event nostr.Event) (
 
 	handlerSessions, exists := p.sessions[handlerPubkey]
 	if !exists {
-		handlerSessions = make(map[nostr.PubKey]Session)
+		handlerSessions = make(map[nostr.PubKey]*Session)
 		p.sessions[handlerPubkey] = handlerSessions
 	}
 
 	session, exists := handlerSessions[event.PubKey]
 	if !exists {
 		// create session if it doesn't exist
-		session = Session{}
+		session = &Session{}
 
 		session.ConversationKey, err = nip44.GenerateConversationKey(event.PubKey, handlerSecret)
 		if err != nil {

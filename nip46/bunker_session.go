@@ -1,7 +1,9 @@
 package nip46
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/nip44"
@@ -10,6 +12,9 @@ import (
 type Session struct {
 	PublicKey       nostr.PubKey
 	ConversationKey [32]byte
+
+	duplicatesBuf [6]string
+	serial        int
 }
 
 type RelayReadWrite struct {
@@ -17,7 +22,9 @@ type RelayReadWrite struct {
 	Write bool `json:"write"`
 }
 
-func (s Session) ParseRequest(event nostr.Event) (Request, error) {
+var AlreadyHandled = errors.New("already handled this request")
+
+func (s *Session) ParseRequest(event nostr.Event) (Request, error) {
 	var req Request
 
 	plain, err := nip44.Decrypt(event.Content, s.ConversationKey)
@@ -26,6 +33,15 @@ func (s Session) ParseRequest(event nostr.Event) (Request, error) {
 	}
 
 	err = json.Unmarshal([]byte(plain), &req)
+
+	// discard duplicates
+	if slices.Contains(s.duplicatesBuf[:], req.ID) {
+		return req, AlreadyHandled
+	}
+
+	s.duplicatesBuf[s.serial%len(s.duplicatesBuf)] = req.ID
+	s.serial++
+
 	return req, err
 }
 

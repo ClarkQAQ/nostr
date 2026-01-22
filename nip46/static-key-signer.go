@@ -15,8 +15,8 @@ import (
 var _ Signer = (*StaticKeySigner)(nil)
 
 type StaticKeySigner struct {
-	secretKey [32]byte
-	sessions  map[nostr.PubKey]Session
+	secretKey nostr.SecretKey
+	sessions  map[nostr.PubKey]*Session
 
 	sync.Mutex
 
@@ -29,11 +29,11 @@ type StaticKeySigner struct {
 func NewStaticKeySigner(secretKey [32]byte) StaticKeySigner {
 	return StaticKeySigner{
 		secretKey: secretKey,
-		sessions:  make(map[nostr.PubKey]Session),
+		sessions:  make(map[nostr.PubKey]*Session),
 	}
 }
 
-func (p *StaticKeySigner) getOrCreateSession(clientPubkey nostr.PubKey) (Session, error) {
+func (p *StaticKeySigner) getOrCreateSession(clientPubkey nostr.PubKey) (*Session, error) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -44,17 +44,16 @@ func (p *StaticKeySigner) getOrCreateSession(clientPubkey nostr.PubKey) (Session
 
 	ck, err := nip44.GenerateConversationKey(clientPubkey, p.secretKey)
 	if err != nil {
-		return Session{}, fmt.Errorf("failed to compute shared secret: %w", err)
+		return nil, fmt.Errorf("failed to compute shared secret: %w", err)
 	}
 
-	pubkey := nostr.GetPublicKey(p.secretKey)
-	session = Session{
-		PublicKey:       pubkey,
+	session = &Session{
+		PublicKey:       p.secretKey.Public(),
 		ConversationKey: ck,
 	}
 
 	// add to pool
-	p.sessions[pubkey] = session
+	p.sessions[clientPubkey] = session
 
 	return session, nil
 }
