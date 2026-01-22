@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 	"sync"
 
 	"fiatjaf.com/nostr"
@@ -78,7 +79,7 @@ func (p *StaticKeySigner) HandleNostrConnectURI(ctx context.Context, uri *url.UR
 		return resp, eventResponse, err
 	}
 	reqj, _ := json.Marshal(Request{
-		ID:     "nostrconnect",
+		ID:     "nostrconnect-" + strconv.FormatInt(int64(nostr.Now()), 10),
 		Method: "imagined-nostrconnect",
 		Params: []string{clientPublicKey.Hex(), secret},
 	})
