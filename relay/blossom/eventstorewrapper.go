@@ -48,8 +48,8 @@ func (es EventStoreBlobIndexWrapper) Keep(
 	return nil
 }
 
-func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey, publicURL *url.URL) iter.Seq[BlobDescriptor] {
-	return func(yield func(BlobDescriptor) bool) {
+func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey, publicURL *url.URL) iter.Seq[blossom.BlobDescriptor] {
+	return func(yield func(blossom.BlobDescriptor) bool) {
 		for evt := range es.Store.QueryEvents(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
 			Kinds:   []nostr.Kind{24242},
@@ -59,7 +59,7 @@ func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubK
 	}
 }
 
-func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL *url.URL) (*BlobDescriptor, error) {
+func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL *url.URL) (*blossom.BlobDescriptor, error) {
 	next, stop := iter.Pull(
 		es.Store.QueryEvents(ctx, nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
 	)
@@ -93,10 +93,10 @@ func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, 
 	return nil
 }
 
-func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event, publicURL *url.URL) BlobDescriptor {
+func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event, publicURL *url.URL) blossom.BlobDescriptor {
 	hhash := evt.Tags[0][1]
 	mimetype := evt.Tags[1][1]
-	ext := ExtensionByMimeType(mimetype)
+	ext := blossom.ExtensionByMimeType(mimetype)
 	size, _ := strconv.ParseInt(evt.Tags[2][1], 10, 64)
 
 	return blossom.BlobDescriptor{

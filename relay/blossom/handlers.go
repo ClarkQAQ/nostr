@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nipb0/blossom"
 	"github.com/gabriel-vasile/mimetype"
 )
 
@@ -41,28 +41,6 @@ func (bs *BlossomServer) checkAuth(w http.ResponseWriter, r *http.Request, actio
 	}
 
 	return auth, true
-}
-
-// helper to parse hash and extension from URL path
-func parsePath(path string) (hash string, mimeType string, e error) {
-	parts := strings.SplitN(path, ".", 2)
-	hash = parts[0]
-	if len(hash) != 65 && strings.HasPrefix(hash, "/") {
-		hash = hash[1:] // trim leading slash if present and length matches
-	} else if len(hash) != 64 {
-		// Handle case where path might be just "/<hash>"
-		if len(hash) == 65 && hash[0] == '/' {
-			hash = hash[1:]
-		} else {
-			return "", "", errors.New("invalid hash length")
-		}
-	}
-
-	if len(parts) == 2 {
-		mimeType = mime.TypeByExtension("." + parts[1])
-	}
-
-	return hash, mimeType, nil
 }
 
 // handleUploadCheck verifies if an upload would be accepted without receiving the body.
@@ -249,8 +227,8 @@ func (bs *BlossomServer) handleStoreBlob(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	bd := BlobDescriptor{
-		URL:      bs.getBaseURL(r, hash+ExtensionByMimeType(mimeType)).String(),
+	bd := blossom.BlobDescriptor{
+		URL:      bs.getBaseURL(r, hash+blossom.ExtensionByMimeType(mimeType)).String(),
 		SHA256:   hash,
 		Size:     size,
 		Type:     mimeType,
@@ -271,8 +249,8 @@ func (bs *BlossomServer) handleStoreBlob(w http.ResponseWriter, r *http.Request,
 
 // handleGetBlob retrieves a blob.
 func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
-	hash, mimeType, e := parsePath(r.URL.Path)
-	if e != nil {
+	hash, mimeType, ok := parseHashPath(r.URL.Path)
+	if !ok {
 		blossomError(w, "invalid /<sha256>[.ext] path", http.StatusBadRequest)
 		return
 	}
@@ -323,7 +301,7 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 
 		if reader != nil {
 			defer reader.Close()
-			http.ServeContent(w, r, hash+ExtensionByMimeType(mimeType), modtime, reader)
+			http.ServeContent(w, r, hash+blossom.ExtensionByMimeType(mimeType), modtime, reader)
 			return
 		}
 
@@ -343,8 +321,8 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 
 // handleHasBlob checks if a blob exists (HEAD request).
 func (bs BlossomServer) handleHasBlob(w http.ResponseWriter, r *http.Request) {
-	hash, _, e := parsePath(r.URL.Path)
-	if e != nil {
+	hash, _, ok := parseHashPath(r.URL.Path)
+	if !ok {
 		blossomError(w, "invalid /<sha256>[.ext] path", http.StatusBadRequest)
 		return
 	}
@@ -432,8 +410,8 @@ func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hash, mimeType, e := parsePath(r.URL.Path)
-	if e != nil {
+	hash, mimeType, ok := parseHashPath(r.URL.Path)
+	if !ok {
 		blossomError(w, "invalid /<sha256>[.ext] path", http.StatusBadRequest)
 		return
 	}

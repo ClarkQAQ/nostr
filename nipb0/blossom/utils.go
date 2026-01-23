@@ -1,36 +1,34 @@
 package blossom
 
 import (
+	"io"
 	"mime"
+
+	"github.com/gabriel-vasile/mimetype"
 )
 
-func GetExtension(mimetype string) string {
-	if mimetype == "" {
+func ExtensionByMimeType(mt string) string {
+	if mt == "" {
 		return ""
 	}
 
-	switch mimetype {
-	case "image/jpeg":
-		return ".jpg"
-	case "image/gif":
-		return ".gif"
-	case "image/png":
-		return ".png"
-	case "image/webp":
-		return ".webp"
-	case "video/mp4":
-		return ".mp4"
-	case "application/vnd.android.package-archive":
-		return ".apk"
+	if m := mimetype.Lookup(mt); m != nil {
+		return m.Extension()
 	}
 
-	exts, _ := mime.ExtensionsByType(mimetype)
-	if len(exts) > 0 {
-		if exts[0] == ".moov" {
-			return ".mov"
-		}
+	if exts, _ := mime.ExtensionsByType(mt); len(exts) > 0 {
 		return exts[0]
 	}
 
 	return ""
 }
+
+func NopSeekCloser(r io.ReadSeeker) io.ReadSeekCloser {
+	return nopSeekCloser{r}
+}
+
+type nopSeekCloser struct {
+	io.ReadSeeker
+}
+
+func (nopSeekCloser) Close() error { return nil }

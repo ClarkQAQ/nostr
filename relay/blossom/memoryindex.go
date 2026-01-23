@@ -2,7 +2,6 @@ package blossom
 
 import (
 	"context"
-	"errors"
 	"iter"
 	"net/url"
 	"slices"
@@ -47,8 +46,8 @@ func (x MemoryBlobIndex) Keep(ctx context.Context, blob blossom.BlobDescriptor, 
 	return nil
 }
 
-func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey, _ *url.URL) iter.Seq[BlobDescriptor] {
-	return func(yield func(BlobDescriptor) bool) {
+func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey, _ *url.URL) iter.Seq[blossom.BlobDescriptor] {
+	return func(yield func(blossom.BlobDescriptor) bool) {
 		x.m.Range(func(key string, value ownedBlob) bool {
 			if slices.Contains(value.owners, pubkey) {
 				if !yield(value.blob) {
@@ -60,11 +59,11 @@ func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey, _ *url.U
 	}
 }
 
-func (x MemoryBlobIndex) Get(ctx context.Context, sha256 string, _ *url.URL) (*BlobDescriptor, error) {
+func (x MemoryBlobIndex) Get(ctx context.Context, sha256 string, _ *url.URL) (*blossom.BlobDescriptor, error) {
 	if val, ok := x.m.Load(sha256); ok {
 		return &val.blob, nil
 	}
-	return nil, errors.New("not found")
+	return nil, nil
 }
 
 func (x MemoryBlobIndex) Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error {

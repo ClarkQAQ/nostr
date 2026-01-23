@@ -50,8 +50,7 @@ func (bs *BlossomServer) HandleMatcher(w http.ResponseWriter, r *http.Request) (
 		return bs.handleMirror, true
 	case strings.HasPrefix(r.URL.Path, "/list/") && r.Method == "GET":
 		return bs.handleList, true
-	case (len(r.URL.Path) == 65 || strings.Index(r.URL.Path, ".") == 65) &&
-		!strings.HasPrefix(r.URL.Path[1:], "/"):
+	case isHashPath(r.URL.Path):
 		switch r.Method {
 		case "HEAD":
 			return bs.handleHasBlob, true

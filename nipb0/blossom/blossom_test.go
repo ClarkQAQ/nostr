@@ -3,7 +3,6 @@ package blossom_test
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http/httptest"
 	"net/url"
@@ -13,9 +12,8 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/keyer"
-	"fiatjaf.com/nostr/khatru"
-	khatru_blossom "fiatjaf.com/nostr/khatru/blossom"
 	blossomclient "fiatjaf.com/nostr/nipb0/blossom"
+	relay_blossom "fiatjaf.com/nostr/relay/blossom"
 )
 
 func TestBlossomBasicOperations(t *testing.T) {
@@ -51,8 +49,8 @@ func TestBlossomBasicOperations(t *testing.T) {
 			t.Fatalf("Failed to upload blob: %v", err)
 		}
 
-		if bd.Size != len(testContent) {
-			t.Errorf("Expected size %d, got %d", len(testContent), bd.Size)
+		if contentSize := int64(len(testContent)); bd.Size != contentSize {
+			t.Errorf("Expected size %d, got %d", contentSize, bd.Size)
 		}
 
 		// content type may include charset, just check that it starts with our expected type
@@ -290,28 +288,25 @@ func TestBlossomBasicOperations(t *testing.T) {
 }
 
 func setupTestServer(t *testing.T, addr string) *httptest.Server {
-	relay := khatru.NewRelay()
-
 	// use memory-based blob index for testing
-	memoryIndex := khatru_blossom.NewMemoryBlobIndex()
+	memoryIndex := relay_blossom.NewMemoryBlobIndex()
 
 	// setup blob storage in memory
 	blobStorage := make(map[string][]byte)
 
-	bl := khatru_blossom.New(relay, "http://localhost"+addr)
+	bl := relay_blossom.New()
 	bl.Store = memoryIndex
 
-	bl.StoreBlob = func(ctx context.Context, sha256 string, ext string, body []byte) error {
-		blobStorage[sha256] = make([]byte, len(body))
-		copy(blobStorage[sha256], body)
+	bl.StoreBlob = func(ctx context.Context, sha256 string, mimeType string, size int64, reader io.Reader) error {
+		blobStorage[sha256], _ = io.ReadAll(reader)
 		return nil
 	}
 
-	bl.LoadBlob = func(ctx context.Context, sha256 string, ext string) (io.ReadSeeker, *url.URL, error) {
+	bl.LoadBlob = func(ctx context.Context, sha256 string, mimeType string) (io.ReadSeekCloser, *url.URL, error) {
 		if data, ok := blobStorage[sha256]; ok {
-			return bytes.NewReader(data), nil, nil
+			return blossomclient.NopSeekCloser(bytes.NewReader(data)), nil, nil
 		}
-		return nil, nil, fmt.Errorf("blob not found")
+		return nil, nil, nil
 	}
 
 	bl.DeleteBlob = func(ctx context.Context, sha256 string, ext string) error {
@@ -319,7 +314,7 @@ func setupTestServer(t *testing.T, addr string) *httptest.Server {
 		return nil
 	}
 
-	server := httptest.NewUnstartedServer(relay)
+	server := httptest.NewUnstartedServer(bl)
 	server.Start()
 
 	// wait a moment for server to be ready
