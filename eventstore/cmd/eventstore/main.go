@@ -16,7 +16,10 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-var db eventstore.Store
+var (
+	db  eventstore.Store
+	end func()
+)
 
 var app = &cli.Command{
 	Name:      "eventstore",
@@ -72,28 +75,34 @@ var app = &cli.Command{
 			db = &boltdb.BoltBackend{Path: path}
 		case "file":
 			db = &slicestore.SliceStore{}
+			if err := db.Init(ctx); err != nil {
+				return ctx, err
+			}
 
-			// run this after we've called db.Init()
-			defer func() {
-				f, err := os.Open(path)
-				if err != nil {
-					log.Printf("failed to file at '%s': %s\n", path, err)
-					os.Exit(3)
+			// fill in the slicestore with the data from the file
+			f, err := os.Open(path)
+			if err != nil {
+				log.Printf("failed to file at '%s': %s\n", path, err)
+				os.Exit(3)
+			}
+			scanner := bufio.NewScanner(f)
+			scanner.Buffer(make([]byte, 16*1024*1024), 256*1024*1024)
+			i := 0
+			for scanner.Scan() {
+				var evt nostr.Event
+				if err := json.Unmarshal(scanner.Bytes(), &evt); err != nil {
+					log.Printf("invalid event read at line %d: %s (`%s`)\n", i, err, scanner.Text())
 				}
-				scanner := bufio.NewScanner(f)
-				scanner.Buffer(make([]byte, 16*1024*1024), 256*1024*1024)
-				i := 0
-				for scanner.Scan() {
-					var evt nostr.Event
-					if err := json.Unmarshal(scanner.Bytes(), &evt); err != nil {
-						log.Printf("invalid event read at line %d: %s (`%s`)\n", i, err, scanner.Text())
-					}
-					if e := db.SaveEvent(ctx, evt); e != nil {
-						log.Printf("failed to save event at line %d: %s (`%s`)\n", i, e, scanner.Text())
-					}
-					i++
+				if e := db.SaveEvent(ctx, evt); e != nil {
+					log.Printf("failed to save event: %s\n", e)
 				}
-			}()
+				i++
+			}
+
+			end = func() {
+				db.Close()
+				f.Close()
+			}
 		case "":
 			return ctx, fmt.Errorf("couldn't determine store type, you can use --type to specify it manually")
 		default:
@@ -118,6 +127,7 @@ var app = &cli.Command{
 }
 
 func main() {
+	defer func() { end() }()
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

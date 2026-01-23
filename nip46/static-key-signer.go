@@ -3,6 +3,8 @@ package nip46
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strconv"
 	"sync"
 
 	"fiatjaf.com/nostr"
@@ -14,22 +16,25 @@ import (
 var _ Signer = (*StaticKeySigner)(nil)
 
 type StaticKeySigner struct {
-	secretKey [32]byte
-	sessions  map[nostr.PubKey]Session
+	secretKey nostr.SecretKey
+	sessions  map[nostr.PubKey]*Session
 
 	sync.Mutex
 
 	AuthorizeRequest func(harmless bool, from nostr.PubKey, secret string) bool
+
+	// used for switch_relays call
+	DefaultRelays []string
 }
 
 func NewStaticKeySigner(secretKey [32]byte) StaticKeySigner {
 	return StaticKeySigner{
 		secretKey: secretKey,
-		sessions:  make(map[nostr.PubKey]Session),
+		sessions:  make(map[nostr.PubKey]*Session),
 	}
 }
 
-func (p *StaticKeySigner) getOrCreateSession(clientPubkey nostr.PubKey) (Session, error) {
+func (p *StaticKeySigner) getOrCreateSession(clientPubkey nostr.PubKey) (*Session, error) {
 	p.Lock()
 	defer p.Unlock()
 
@@ -40,19 +45,55 @@ func (p *StaticKeySigner) getOrCreateSession(clientPubkey nostr.PubKey) (Session
 
 	ck, err := nip44.GenerateConversationKey(clientPubkey, p.secretKey)
 	if err != nil {
-		return Session{}, fmt.Errorf("failed to compute shared secret: %w", err)
+		return nil, fmt.Errorf("failed to compute shared secret: %w", err)
 	}
 
-	pubkey := nostr.GetPublicKey(p.secretKey)
-	session = Session{
-		PublicKey:       pubkey,
+	session = &Session{
+		PublicKey:       p.secretKey.Public(),
 		ConversationKey: ck,
 	}
 
 	// add to pool
-	p.sessions[pubkey] = session
+	p.sessions[clientPubkey] = session
 
 	return session, nil
+}
+
+// HandleNostrConnectURI works like HandleRequest, but takes a nostrconnect:// URI as input, as scanned/pasted
+// by the user, produced by the client.
+func (p *StaticKeySigner) HandleNostrConnectURI(ctx context.Context, uri *url.URL) (
+	resp Response,
+	eventResponse nostr.Event,
+	err error,
+) {
+	clientPublicKey, err := nostr.PubKeyFromHex(uri.Host)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+
+	secret := uri.Query().Get("secret")
+
+	// pretend they started with a request
+	conversationKey, err := nip44.GenerateConversationKey(clientPublicKey, p.secretKey)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+	reqj, _ := json.Marshal(Request{
+		ID:     "nostrconnect-" + strconv.FormatInt(int64(nostr.Now()), 10),
+		Method: "imagined-nostrconnect",
+		Params: []string{clientPublicKey.Hex(), secret},
+	})
+	ciphertext, err := nip44.Encrypt(string(reqj), conversationKey)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+
+	_, resp, eventResponse, err = p.HandleRequest(ctx, nostr.Event{
+		PubKey:  clientPublicKey,
+		Kind:    nostr.KindNostrConnect,
+		Content: ciphertext,
+	})
+	return resp, eventResponse, err
 }
 
 func (p *StaticKeySigner) HandleRequest(_ context.Context, event nostr.Event) (
@@ -82,6 +123,14 @@ func (p *StaticKeySigner) HandleRequest(_ context.Context, event nostr.Event) (
 	var resultErr error
 
 	switch req.Method {
+	case "imagined-nostrconnect":
+		// this is a fake request we pretend has existed, but was actually just we reading the nostrconnect:// uri
+		if len(req.Params) < 2 || req.Params[1] == "" {
+			resultErr = fmt.Errorf("needs a second argument 'secret'")
+			break
+		}
+		result = req.Params[1]
+		harmless = true
 	case "connect":
 		if len(req.Params) >= 2 {
 			secret = req.Params[1]
@@ -204,6 +253,9 @@ func (p *StaticKeySigner) HandleRequest(_ context.Context, event nostr.Event) (
 	case "ping":
 		result = "pong"
 		harmless = true
+	case "switch_relays":
+		j, _ := json.Marshal(p.DefaultRelays)
+		result = string(j)
 	default:
 		return req, resp, eventResponse,
 			fmt.Errorf("unknown method '%s'", req.Method)

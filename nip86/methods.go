@@ -138,8 +138,7 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		if e := json.Unmarshal(req.Params[0], &kind); e != nil {
 			return nil, fmt.Errorf("invalid kind param for '%s'", req.Method)
 		}
-
-		return AllowKind{kind}, nil
+		return AllowKind{nostr.Kind(kind)}, nil
 	case "disallowkind":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
@@ -149,8 +148,7 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		if e := json.Unmarshal(req.Params[0], &kind); e != nil {
 			return nil, fmt.Errorf("invalid kind param for '%s'", req.Method)
 		}
-
-		return DisallowKind{kind}, nil
+		return DisallowKind{nostr.Kind(kind)}, nil
 	case "listallowedkinds":
 		return ListAllowedKinds{}, nil
 	case "blockip":
@@ -343,13 +341,13 @@ type ChangeRelayIcon struct {
 func (ChangeRelayIcon) MethodName() string { return "changerelayicon" }
 
 type AllowKind struct {
-	Kind int
+	Kind nostr.Kind
 }
 
 func (AllowKind) MethodName() string { return "allowkind" }
 
 type DisallowKind struct {
-	Kind int
+	Kind nostr.Kind
 }
 
 func (DisallowKind) MethodName() string { return "disallowkind" }

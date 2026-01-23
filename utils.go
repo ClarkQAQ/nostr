@@ -82,3 +82,8 @@ func AppendUnique[I comparable](arr []I, item ...I) []I {
 	}
 	return arr
 }
+
+func IsOlder(previous, next Event) bool {
+	return previous.CreatedAt < next.CreatedAt ||
+		(previous.CreatedAt == next.CreatedAt && bytes.Compare(previous.ID[:], next.ID[:]) == 1)
+}

@@ -7,7 +7,6 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
-	"fiatjaf.com/nostr/eventstore/internal"
 	"github.com/cockroachdb/pebble/v2"
 )
 
@@ -79,7 +78,7 @@ func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error
 		}
 
 		// Compare timestamps to decide what to do
-		if internal.IsOlder(existing, evt) {
+		if nostr.IsOlder(existing, evt) {
 			// Existing is older, mark for deletion
 			eventsToDelete = append(eventsToDelete, existing)
 		} else {

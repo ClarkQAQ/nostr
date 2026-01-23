@@ -14,7 +14,6 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
-	"fiatjaf.com/nostr/eventstore/internal"
 	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
@@ -246,7 +245,7 @@ func (b *ClickHouseBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) e
 	var toDelete []nostr.Event
 	shouldStore := true
 	for prev := range existing {
-		if internal.IsOlder(prev, evt) {
+		if nostr.IsOlder(prev, evt) {
 			toDelete = append(toDelete, prev)
 		} else {
 			// there is a newer event already stored

@@ -2,6 +2,7 @@ package nostr
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	stdjson "encoding/json"
 	"fmt"
 	"io"
@@ -50,7 +51,7 @@ func (pk *SecretKey) UnmarshalJSON(buf []byte) error {
 	if len(buf) != 66 {
 		return fmt.Errorf("must be a hex string of 64 characters")
 	}
-	if err := xhex.Decode(pk[:], buf[1:65]); err != nil {
+	if _, err := hex.Decode(pk[:], buf[1:65]); err != nil {
 		return err
 	}
 	return nil
@@ -65,7 +66,7 @@ func SecretKeyFromHex(skh string) (SecretKey, error) {
 		return sk, fmt.Errorf("secret key should be at most 64-char hex, got '%s'", skh)
 	}
 
-	if err := xhex.Decode(sk[:], unsafe.Slice(unsafe.StringData(skh), 64)); err != nil {
+	if _, err := hex.Decode(sk[:], unsafe.Slice(unsafe.StringData(skh), 64)); err != nil {
 		return sk, fmt.Errorf("'%s' is not valid hex: %w", skh, err)
 	}
 

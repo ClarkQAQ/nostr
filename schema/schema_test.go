@@ -124,7 +124,7 @@ func TestValidateNext_ID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next := &nextSpec{Type: "id", Required: true}
+			next := &ContentSpec{Type: "id", Required: true}
 			_, err := v.validateNext(tt.tag, 1, next)
 			if tt.valid {
 				require.NoError(t, err)
@@ -163,7 +163,7 @@ func TestValidateNext_PubKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next := &nextSpec{Type: "pubkey", Required: true}
+			next := &ContentSpec{Type: "pubkey", Required: true}
 			_, err := v.validateNext(tt.tag, 1, next)
 			if tt.valid {
 				require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestValidateNext_Relay(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next := &nextSpec{Type: "relay", Required: true}
+			next := &ContentSpec{Type: "relay", Required: true}
 			_, err := v.validateNext(tt.tag, 1, next)
 			if tt.valid {
 				require.NoError(t, err)
@@ -261,7 +261,7 @@ func TestValidateNext_Kind(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next := &nextSpec{Type: "kind", Required: true}
+			next := &ContentSpec{Type: "kind", Required: true}
 			_, err := v.validateNext(tt.tag, 1, next)
 			if tt.valid {
 				require.NoError(t, err)
@@ -298,7 +298,7 @@ func TestValidateNext_Constrained(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next := &nextSpec{Type: "constrained", Required: true, Either: tt.allowed}
+			next := &ContentSpec{Type: "constrained", Required: true, Either: tt.allowed}
 			_, err := v.validateNext(tt.tag, 3, next)
 			if tt.valid {
 				require.NoError(t, err)
@@ -342,7 +342,7 @@ func TestValidateNext_GitCommit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next := &nextSpec{Type: "hex", Min: 40, Max: 40, Required: true}
+			next := &ContentSpec{Type: "hex", Min: 40, Max: 40, Required: true}
 			_, err := v.validateNext(tt.tag, 1, next)
 			if tt.valid {
 				require.NoError(t, err)
@@ -376,7 +376,7 @@ func TestValidateNext_Addr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			next := &nextSpec{Type: "addr", Required: true}
+			next := &ContentSpec{Type: "addr", Required: true}
 			_, err := v.validateNext(tt.tag, 1, next)
 			if tt.valid {
 				require.NoError(t, err)
@@ -393,7 +393,7 @@ func TestValidateNext_Free(t *testing.T) {
 
 	// free type should accept anything
 	tag := nostr.Tag{"test", "any value here", "even", "multiple", "values"}
-	next := &nextSpec{Type: "free", Required: true}
+	next := &ContentSpec{Type: "free", Required: true}
 	_, err = v.validateNext(tag, 1, next)
 	require.NoError(t, err)
 }
@@ -403,7 +403,7 @@ func TestValidateNext_UnknownType(t *testing.T) {
 	require.NoError(t, err)
 
 	tag := nostr.Tag{"test", "value"}
-	next := &nextSpec{Type: "unknown-type", Required: true}
+	next := &ContentSpec{Type: "unknown-type", Required: true}
 
 	// should not fail when FailOnUnknownType is false (default)
 	_, err = v.validateNext(tag, 1, next)
@@ -422,13 +422,13 @@ func TestValidateNext_RequiredField(t *testing.T) {
 
 	// test missing required field
 	tag := nostr.Tag{"test"} // only name, missing required value
-	next := &nextSpec{Type: "free", Required: true}
+	next := &ContentSpec{Type: "free", Required: true}
 	_, err = v.validateNext(tag, 1, next)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "missing index 1")
 
 	// test optional field
-	next = &nextSpec{Type: "free", Required: false}
+	next = &ContentSpec{Type: "free", Required: false}
 	_, err = v.validateNext(tag, 1, next)
 	require.NoError(t, err)
 }
@@ -439,7 +439,7 @@ func TestValidateNext_Variadic(t *testing.T) {
 
 	// test variadic field with multiple values
 	tag := nostr.Tag{"test", "value1", "value2", "value3"}
-	next := &nextSpec{Type: "free", Variadic: true}
+	next := &ContentSpec{Type: "free", Variadic: true}
 	_, err = v.validateNext(tag, 1, next)
 	require.NoError(t, err)
 
@@ -450,7 +450,7 @@ func TestValidateNext_Variadic(t *testing.T) {
 
 	// test variadic field with no values (should fail if required)
 	tag = nostr.Tag{"test"}
-	next = &nextSpec{Type: "free", Variadic: true, Required: true}
+	next = &ContentSpec{Type: "free", Variadic: true, Required: true}
 	_, err = v.validateNext(tag, 1, next)
 	require.Error(t, err)
 }

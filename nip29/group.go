@@ -49,11 +49,11 @@ type Group struct {
 	// indicates that only members can write messages to the group
 	Restricted bool
 
-	// indicates that relays should hide group metadata from non-members
-	Hidden bool
-
 	// indicates that join requests are ignored unless they include an invite code
 	Closed bool
+
+	// indicates that relays should hide group metadata from non-members
+	Hidden bool
 
 	Roles       []*Role
 	InviteCodes []string
@@ -223,7 +223,7 @@ func (group Group) ToMembersEvent() nostr.Event {
 func (group Group) ToRolesEvent() nostr.Event {
 	evt := nostr.Event{
 		Kind:      nostr.KindSimpleGroupRoles,
-		CreatedAt: group.LastMembersUpdate,
+		CreatedAt: group.LastRolesUpdate,
 		Tags:      make(nostr.Tags, 1, 1+len(group.Members)),
 	}
 	evt.Tags[0] = nostr.Tag{"d", group.Address.ID}
@@ -328,6 +328,41 @@ func (group *Group) MergeInMembersEvent(evt *nostr.Event) error {
 		_, exists := group.Members[member]
 		if !exists {
 			group.Members[member] = nil
+		}
+	}
+
+	return nil
+}
+
+func (group *Group) MergeInRolesEvent(evt *nostr.Event) error {
+	if evt.Kind != nostr.KindSimpleGroupRoles {
+		return fmt.Errorf("expected kind %d, got %d", nostr.KindSimpleGroupRoles, evt.Kind)
+	}
+	if evt.CreatedAt < group.LastRolesUpdate {
+		return fmt.Errorf("event is older than our last update (%d vs %d)", evt.CreatedAt, group.LastRolesUpdate)
+	}
+
+	group.LastRolesUpdate = evt.CreatedAt
+	for _, tag := range evt.Tags {
+		if len(tag) < 2 {
+			continue
+		}
+		if tag[0] != "role" {
+			continue
+		}
+
+		roleName := tag[1]
+		roleDescription := ""
+		if len(tag) >= 3 {
+			roleDescription = tag[2]
+		}
+
+		if idx := slices.IndexFunc(group.Roles, func(role *Role) bool { return role.Name == roleName }); idx >= 0 {
+			// update existing role description
+			group.Roles[idx].Description = roleDescription
+		} else {
+			// add new role
+			group.Roles = append(group.Roles, &Role{Name: roleName, Description: roleDescription})
 		}
 	}
 

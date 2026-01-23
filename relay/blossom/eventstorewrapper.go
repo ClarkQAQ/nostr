@@ -9,6 +9,7 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
+	"fiatjaf.com/nostr/nipb0/blossom"
 )
 
 // EventStoreBlobIndexWrapper uses fake events to keep track of what blobs we have stored and who owns them
@@ -16,7 +17,11 @@ type EventStoreBlobIndexWrapper struct {
 	eventstore.Store
 }
 
-func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescriptor, pubkey nostr.PubKey) error {
+func (es EventStoreBlobIndexWrapper) Keep(
+	ctx context.Context,
+	blob blossom.BlobDescriptor,
+	pubkey nostr.PubKey,
+) error {
 	next, stop := iter.Pull(
 		es.Store.QueryEvents(ctx, nostr.Filter{Authors: []nostr.PubKey{pubkey}, Kinds: []nostr.Kind{24242}, Tags: nostr.TagMap{"x": []string{blob.SHA256}}}, 1),
 	)
@@ -94,8 +99,7 @@ func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event, publicURL *url.
 	ext := ExtensionByMimeType(mimetype)
 	size, _ := strconv.ParseInt(evt.Tags[2][1], 10, 64)
 
-	return BlobDescriptor{
-		Owner:    evt.PubKey,
+	return blossom.BlobDescriptor{
 		Uploaded: evt.CreatedAt,
 		URL:      publicURL.JoinPath(hhash + ext).String(),
 		SHA256:   hhash,

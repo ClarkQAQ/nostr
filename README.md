@@ -23,3 +23,4 @@ go mod tidy
 - **relay/grasp**: Plugin for a relay server that adds Grasp server support
 - **sdk**: Client SDK with caching, data loading, and outbox relay management
 - **keyer**: Key and bunker management utilities
+- NIP-specific libraries with helpers and other things for many NIPs and related stuff, including blossom, negentropy and cashu mini-libraries.

@@ -27,6 +27,7 @@ var tests = []struct {
 	{"second", runSecondTestOn},
 	{"manyauthors", manyAuthorsTest},
 	{"unbalanced", unbalancedTest},
+	{"count", countTest},
 }
 
 func TestSliceStore(t *testing.T) {

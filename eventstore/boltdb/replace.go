@@ -6,7 +6,6 @@ import (
 	"iter"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/eventstore/internal"
 	"go.etcd.io/bbolt"
 )
 
@@ -37,7 +36,7 @@ func (b *BoltBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error {
 
 		shouldStore := true
 		for previous := range results {
-			if internal.IsOlder(previous, evt) {
+			if nostr.IsOlder(previous, evt) {
 				if err := b.delete(txn, previous.ID); err != nil {
 					return fmt.Errorf("failed to delete event %s for replacing: %w", previous.ID, err)
 				}

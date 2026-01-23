@@ -15,7 +15,6 @@ func easyjsonDecodeFilter(in *jlexer.Lexer, out *Filter) {
 		in.Skip()
 		return
 	}
-	out.Tags = make(TagMap)
 	in.Delim('{')
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
@@ -97,6 +96,10 @@ func easyjsonDecodeFilter(in *jlexer.Lexer, out *Filter) {
 			out.Search = in.String()
 		default:
 			if len(key) > 1 && key[0] == '#' {
+				if out.Tags == nil {
+					out.Tags = make(TagMap, 1)
+				}
+
 				tagValues := make([]string, 0, 40)
 				in.Delim('[')
 				if out.Authors == nil {
