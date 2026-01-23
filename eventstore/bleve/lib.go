@@ -56,6 +56,11 @@ func (b *BleveBackend) Init() error {
 	return nil
 }
 
-func (b *BleveBackend) CountEvents(nostr.Filter) (uint32, error) {
+func (b *BleveBackend) CountEvents(filter nostr.Filter) (uint32, error) {
+	if filter.String() == "{}" {
+		count, err := b.index.DocCount()
+		return uint32(count), err
+	}
+
 	return 0, errors.New("not supported")
 }

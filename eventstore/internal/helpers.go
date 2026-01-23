@@ -1,16 +1,10 @@
 package internal
 
 import (
-	"bytes"
 	"math"
 
 	"fiatjaf.com/nostr"
 )
-
-func IsOlder(previous, next nostr.Event) bool {
-	return previous.CreatedAt < next.CreatedAt ||
-		(previous.CreatedAt == next.CreatedAt && bytes.Compare(previous.ID[:], next.ID[:]) == 1)
-}
 
 func ChooseNarrowestTag(filter nostr.Filter) (key string, values []string, goodness int) {
 	var tagKey string

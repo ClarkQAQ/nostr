@@ -5,7 +5,6 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
-	"fiatjaf.com/nostr/eventstore/internal"
 )
 
 func (b *BleveBackend) ReplaceEvent(evt nostr.Event) error {
@@ -19,7 +18,7 @@ func (b *BleveBackend) ReplaceEvent(evt nostr.Event) error {
 
 	shouldStore := true
 	for previous := range b.QueryEvents(filter, 1) {
-		if internal.IsOlder(previous, evt) {
+		if nostr.IsOlder(previous, evt) {
 			if err := b.DeleteEvent(previous.ID); err != nil {
 				return fmt.Errorf("failed to delete event for replacing: %w", err)
 			}

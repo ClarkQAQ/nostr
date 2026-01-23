@@ -6,7 +6,6 @@ import (
 	"runtime"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/eventstore/internal"
 	"github.com/PowerDNS/lmdb-go/lmdb"
 )
 
@@ -72,7 +71,7 @@ func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) error {
 	var acquiredFreeRangeFromDelete *position
 	shouldStore := true
 	for previous := range results {
-		if internal.IsOlder(previous, evt) {
+		if nostr.IsOlder(previous, evt) {
 			if pos, shouldPurge, err := il.delete(mmmtxn, iltxn, previous.ID); err != nil {
 				return fmt.Errorf("failed to delete event %s for replacing: %w", previous.ID, err)
 			} else if shouldPurge {

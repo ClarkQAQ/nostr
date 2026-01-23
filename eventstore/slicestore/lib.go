@@ -10,7 +10,6 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
-	"fiatjaf.com/nostr/eventstore/internal"
 )
 
 var _ eventstore.Store = (*SliceStore)(nil)
@@ -134,7 +133,7 @@ func (b *SliceStore) ReplaceEvent(evt nostr.Event) error {
 
 	shouldStore := true
 	for previous := range b.QueryEvents(filter, 1) {
-		if internal.IsOlder(previous, evt) {
+		if nostr.IsOlder(previous, evt) {
 			if err := b.delete(previous.ID); err != nil {
 				return fmt.Errorf("failed to delete event for replacing: %w", err)
 			}
