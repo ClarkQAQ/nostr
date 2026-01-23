@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"iter"
+	"net/url"
 	"slices"
 
 	"fiatjaf.com/nostr"
@@ -45,7 +46,7 @@ func (x MemoryBlobIndex) Keep(ctx context.Context, blob BlobDescriptor, pubkey n
 	return nil
 }
 
-func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey, _ string) iter.Seq[BlobDescriptor] {
+func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey, _ *url.URL) iter.Seq[BlobDescriptor] {
 	return func(yield func(BlobDescriptor) bool) {
 		x.m.Range(func(key string, value ownedBlob) bool {
 			if value.blob.Owner == value.owners[0] {
@@ -58,7 +59,7 @@ func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey, _ string
 	}
 }
 
-func (x MemoryBlobIndex) Get(ctx context.Context, sha256 string, _ string) (*BlobDescriptor, error) {
+func (x MemoryBlobIndex) Get(ctx context.Context, sha256 string, _ *url.URL) (*BlobDescriptor, error) {
 	if val, ok := x.m.Load(sha256); ok {
 		val.blob.Owner = val.owners[0]
 		return &val.blob, nil

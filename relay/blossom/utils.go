@@ -3,35 +3,37 @@ package blossom
 import (
 	"mime"
 	"net/http"
+
+	"fiatjaf.com/nostr"
+	"github.com/gabriel-vasile/mimetype"
 )
+
+const DefaultContentType = "application/octet-stream"
 
 func blossomError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Add("X-Reason", msg)
 	w.WriteHeader(code)
 }
 
-func getExtension(mimetype string) string {
-	if mimetype == "" {
+func findTagValue(tags nostr.Tags, key string) (string, bool) {
+	tag := tags.Find(key)
+	if len(tag) > 1 {
+		return tag[1], true
+	}
+
+	return "", false
+}
+
+func ExtensionByMimeType(mt string) string {
+	if mt == "" {
 		return ""
 	}
 
-	switch mimetype {
-	case "image/jpeg":
-		return ".jpg"
-	case "image/gif":
-		return ".gif"
-	case "image/png":
-		return ".png"
-	case "image/webp":
-		return ".webp"
-	case "video/mp4":
-		return ".mp4"
-	case "application/vnd.android.package-archive":
-		return ".apk"
+	if m := mimetype.Lookup(mt); m != nil {
+		return m.Extension()
 	}
 
-	exts, _ := mime.ExtensionsByType(mimetype)
-	if len(exts) > 0 {
+	if exts, _ := mime.ExtensionsByType(mt); len(exts) > 0 {
 		return exts[0]
 	}
 

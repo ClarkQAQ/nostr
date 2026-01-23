@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"net/url"
 	"strconv"
 
 	"fiatjaf.com/nostr"
@@ -29,7 +30,7 @@ func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescript
 			Tags: nostr.Tags{
 				{"x", blob.SHA256},
 				{"type", blob.Type},
-				{"size", strconv.Itoa(blob.Size)},
+				{"size", strconv.FormatInt(blob.Size, 10)},
 			},
 			CreatedAt: blob.Uploaded,
 		}
@@ -42,7 +43,7 @@ func (es EventStoreBlobIndexWrapper) Keep(ctx context.Context, blob BlobDescript
 	return nil
 }
 
-func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey, publicURL string) iter.Seq[BlobDescriptor] {
+func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey, publicURL *url.URL) iter.Seq[BlobDescriptor] {
 	return func(yield func(BlobDescriptor) bool) {
 		for evt := range es.Store.QueryEvents(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
@@ -53,7 +54,7 @@ func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubK
 	}
 }
 
-func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL string) (*BlobDescriptor, error) {
+func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL *url.URL) (*BlobDescriptor, error) {
 	next, stop := iter.Pull(
 		es.Store.QueryEvents(ctx, nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
 	)
@@ -87,16 +88,16 @@ func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, 
 	return nil
 }
 
-func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event, publicURL string) BlobDescriptor {
+func (es EventStoreBlobIndexWrapper) parseEvent(evt nostr.Event, publicURL *url.URL) BlobDescriptor {
 	hhash := evt.Tags[0][1]
 	mimetype := evt.Tags[1][1]
-	ext := getExtension(mimetype)
-	size, _ := strconv.Atoi(evt.Tags[2][1])
+	ext := ExtensionByMimeType(mimetype)
+	size, _ := strconv.ParseInt(evt.Tags[2][1], 10, 64)
 
 	return BlobDescriptor{
 		Owner:    evt.PubKey,
 		Uploaded: evt.CreatedAt,
-		URL:      publicURL + "/" + hhash + ext,
+		URL:      publicURL.JoinPath(hhash + ext).String(),
 		SHA256:   hhash,
 		Type:     mimetype,
 		Size:     size,

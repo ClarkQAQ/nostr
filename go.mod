@@ -16,7 +16,6 @@ require (
 	github.com/gomarkdown/markdown v0.0.0-20241205020045-f7e15b2f3e62
 	github.com/json-iterator/go v1.1.12
 	github.com/kr/pretty v0.3.1
-	github.com/liamg/magic v0.0.1
 	github.com/mailru/easyjson v0.9.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/puzpuzpuz/xsync/v3 v3.5.1
@@ -41,6 +40,7 @@ require (
 	github.com/cockroachdb/pebble/v2 v2.1.3
 	github.com/dgraph-io/badger/v4 v4.8.0
 	github.com/dgraph-io/ristretto/v2 v2.3.0
+	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/sivukhin/godjot v1.0.6
 	github.com/templexxx/cpu v0.0.1

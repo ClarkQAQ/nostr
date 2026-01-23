@@ -29,14 +29,19 @@ func main() {
 	}
 	bl := blossom.New()
 	bl.Store = blossom.EventStoreBlobIndexWrapper{Store: bdb}
-	bl.StoreBlob = func(ctx context.Context, sha256 string, ext string, body []byte) error {
-		fmt.Println("storing", sha256, len(body))
+	bl.StoreBlob = func(ctx context.Context, sha256 string, ext string, _ int64, reader io.Reader) error {
+		size, e := io.Copy(io.Discard, reader)
+		if e != nil {
+			return e
+		}
+
+		fmt.Println("storing", sha256, size)
 		return nil
 	}
-	bl.LoadBlob = func(ctx context.Context, sha256 string, ext string) (io.ReadSeeker, *url.URL, error) {
+	bl.LoadBlob = func(ctx context.Context, sha256 string, ext string) (io.ReadSeekCloser, *url.URL, error) {
 		fmt.Println("loading", sha256)
 		blob := strings.NewReader("aaaaa")
-		return blob, nil, nil
+		return nopCloser{blob}, nil, nil
 	}
 
 	fmt.Println("running on :3334")
@@ -44,3 +49,9 @@ func main() {
 		panic(e)
 	}
 }
+
+type nopCloser struct {
+	io.ReadSeeker
+}
+
+func (nopCloser) Close() error { return nil }

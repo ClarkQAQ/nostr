@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"fiatjaf.com/nostr"
@@ -14,15 +13,16 @@ import (
 type BlossomServer struct {
 	Store BlobIndex
 
-	StoreBlob     func(ctx context.Context, sha256 string, ext string, body []byte) error
-	LoadBlob      func(ctx context.Context, sha256 string, ext string) (io.ReadSeeker, *url.URL, error)
-	DeleteBlob    func(ctx context.Context, sha256 string, ext string) error
+	StoreBlob     func(ctx context.Context, sha256 string, mimeType string, size int64, reader io.Reader) error
+	LoadBlob      func(ctx context.Context, sha256 string, mimeType string) (io.ReadSeekCloser, *url.URL, error)
+	DeleteBlob    func(ctx context.Context, sha256 string, mimeType string) error
 	ReceiveReport func(ctx context.Context, reportEvt nostr.Event) error
 
-	RejectUpload func(ctx context.Context, auth *nostr.Event, size int, ext string) (bool, string, int)
-	RejectGet    func(ctx context.Context, auth *nostr.Event, sha256 string, ext string) (bool, string, int)
+	RejectMirror func(ctx context.Context, auth *nostr.Event, sha256 string, url *url.URL) (bool, string, int)
+	RejectUpload func(ctx context.Context, auth *nostr.Event, sha256 string, size int64, mimeType string) (bool, string, int)
+	RejectGet    func(ctx context.Context, auth *nostr.Event, sha256 string, mimeType string) (bool, string, int)
 	RejectList   func(ctx context.Context, auth *nostr.Event, pubkey nostr.PubKey) (bool, string, int)
-	RejectDelete func(ctx context.Context, auth *nostr.Event, sha256 string, ext string) (bool, string, int)
+	RejectDelete func(ctx context.Context, auth *nostr.Event, sha256 string, mimeType string) (bool, string, int)
 }
 
 // ServerOption represents a functional option for configuring a BlossomServer
@@ -76,24 +76,27 @@ func (bs *BlossomServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-func (bs *BlossomServer) getBaseURL(r *http.Request) string {
-	host := r.Header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = r.Host
+func (bs *BlossomServer) getBaseURL(r *http.Request, paths ...string) *url.URL {
+	u := &url.URL{
+		Scheme: "http",
+		Host:   r.Host,
 	}
-	proto := r.Header.Get("X-Forwarded-Proto")
-	if proto == "" {
-		if host == "localhost" {
-			proto = "http"
-		} else if strings.Contains(host, ":") {
-			// has a port number
-			proto = "http"
-		} else if _, err := strconv.Atoi(strings.ReplaceAll(host, ".", "")); err == nil {
-			// it's a naked IP
-			proto = "http"
-		} else {
-			proto = "https"
-		}
+
+	if r.TLS != nil {
+		u.Scheme = "https"
 	}
-	return proto + "://" + host
+
+	if fh := r.Header.Get("X-Forwarded-Host"); fh != "" {
+		u.Host = fh
+	}
+
+	if fp := r.Header.Get("X-Forwarded-Proto"); fp != "" {
+		u.Scheme = fp
+	}
+
+	if len(paths) > 0 {
+		u = u.JoinPath(paths...)
+	}
+
+	return u
 }
