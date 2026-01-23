@@ -1,6 +1,8 @@
 package blossom
 
-import "mime"
+import (
+	"mime"
+)
 
 func GetExtension(mimetype string) string {
 	if mimetype == "" {
@@ -24,6 +26,9 @@ func GetExtension(mimetype string) string {
 
 	exts, _ := mime.ExtensionsByType(mimetype)
 	if len(exts) > 0 {
+		if exts[0] == ".moov" {
+			return ".mov"
+		}
 		return exts[0]
 	}
 
