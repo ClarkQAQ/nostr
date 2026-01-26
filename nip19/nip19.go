@@ -30,7 +30,9 @@ func Decode(bech32string string) (prefix string, value any, err error) {
 		if len(data) != 32 {
 			return prefix, nil, fmt.Errorf("note should be 32 bytes (%d)", len(data))
 		}
-		return prefix, nostr.ID(data[0:32]), nil
+		return prefix, nostr.EventPointer{
+			ID: nostr.ID(data[0:32]),
+		}, nil
 	case "npub":
 		if len(data) != 32 {
 			return prefix, nil, fmt.Errorf("npub should be 32 bytes (%d)", len(data))
