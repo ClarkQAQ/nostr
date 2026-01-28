@@ -2,12 +2,13 @@ package sdk
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"fiatjaf.com/nostr"
 )
 
-var outboxShortTermCache = [256]ostcEntry{}
+var outboxShortTermCache = [256]atomic.Pointer[ostcEntry]{}
 
 type ostcEntry struct {
 	pubkey nostr.PubKey
@@ -22,7 +23,9 @@ type ostcEntry struct {
 func (sys *System) FetchOutboxRelays(ctx context.Context, pubkey nostr.PubKey, n int) []string {
 	ostcIndex := pubkey[7]
 	now := time.Now()
-	if entry := outboxShortTermCache[ostcIndex]; entry.pubkey == pubkey && entry.when.Add(time.Minute*2).After(now) {
+	if entry := outboxShortTermCache[ostcIndex].Load(); entry != nil &&
+		entry.pubkey == pubkey &&
+		entry.when.Add(time.Minute*2).After(now) {
 		return entry.relays
 	}
 
@@ -38,7 +41,7 @@ func (sys *System) FetchOutboxRelays(ctx context.Context, pubkey nostr.PubKey, n
 	// we will have a reference to a thing that the caller to this function may change at will)
 	relaysCopy := make([]string, len(relays))
 	copy(relaysCopy, relays)
-	outboxShortTermCache[ostcIndex] = ostcEntry{pubkey, relaysCopy, now}
+	outboxShortTermCache[ostcIndex].Store(&ostcEntry{pubkey, relaysCopy, now})
 
 	if len(relays) > n {
 		relays = relays[0:n]

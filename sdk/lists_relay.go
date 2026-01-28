@@ -25,27 +25,33 @@ func (sys *System) FetchRelayList(ctx context.Context, pubkey nostr.PubKey) Gene
 }
 
 func (sys *System) FetchBlockedRelayList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, RelayURL] {
-	if sys.BlockedRelayListCache == nil {
-		sys.BlockedRelayListCache = cache_memory.New[GenericList[string, RelayURL]](1000)
-	}
+	sys.blockedRelayListCacheOnce.Do(func() {
+		if sys.BlockedRelayListCache == nil {
+			sys.BlockedRelayListCache = cache_memory.New[GenericList[string, RelayURL]](1000)
+		}
+	})
 
 	ml, _ := fetchGenericList(sys, ctx, pubkey, 10006, kind_10006, parseRelayURL, sys.BlockedRelayListCache)
 	return ml
 }
 
 func (sys *System) FetchSearchRelayList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, RelayURL] {
-	if sys.SearchRelayListCache == nil {
-		sys.SearchRelayListCache = cache_memory.New[GenericList[string, RelayURL]](1000)
-	}
+	sys.searchRelayListCacheOnce.Do(func() {
+		if sys.SearchRelayListCache == nil {
+			sys.SearchRelayListCache = cache_memory.New[GenericList[string, RelayURL]](1000)
+		}
+	})
 
 	ml, _ := fetchGenericList(sys, ctx, pubkey, 10007, kind_10007, parseRelayURL, sys.SearchRelayListCache)
 	return ml
 }
 
 func (sys *System) FetchRelaySets(ctx context.Context, pubkey nostr.PubKey) GenericSets[string, RelayURL] {
-	if sys.RelaySetsCache == nil {
-		sys.RelaySetsCache = cache_memory.New[GenericSets[string, RelayURL]](1000)
-	}
+	sys.relaySetsCacheOnce.Do(func() {
+		if sys.RelaySetsCache == nil {
+			sys.RelaySetsCache = cache_memory.New[GenericSets[string, RelayURL]](1000)
+		}
+	})
 
 	ml, _ := fetchGenericSets(sys, ctx, pubkey, 30002, kind_30002, parseRelayURL, sys.RelaySetsCache)
 	return ml

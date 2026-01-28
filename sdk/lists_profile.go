@@ -18,27 +18,33 @@ type ProfileRef struct {
 func (f ProfileRef) Value() nostr.PubKey { return f.Pubkey }
 
 func (sys *System) FetchFollowList(ctx context.Context, pubkey nostr.PubKey) GenericList[nostr.PubKey, ProfileRef] {
-	if sys.FollowListCache == nil {
-		sys.FollowListCache = cache_memory.New[GenericList[nostr.PubKey, ProfileRef]](1000)
-	}
+	sys.followListCacheOnce.Do(func() {
+		if sys.FollowListCache == nil {
+			sys.FollowListCache = cache_memory.New[GenericList[nostr.PubKey, ProfileRef]](1000)
+		}
+	})
 
 	fl, _ := fetchGenericList(sys, ctx, pubkey, 3, kind_3, parseProfileRef, sys.FollowListCache)
 	return fl
 }
 
 func (sys *System) FetchMuteList(ctx context.Context, pubkey nostr.PubKey) GenericList[nostr.PubKey, ProfileRef] {
-	if sys.MuteListCache == nil {
-		sys.MuteListCache = cache_memory.New[GenericList[nostr.PubKey, ProfileRef]](1000)
-	}
+	sys.muteListCacheOnce.Do(func() {
+		if sys.MuteListCache == nil {
+			sys.MuteListCache = cache_memory.New[GenericList[nostr.PubKey, ProfileRef]](1000)
+		}
+	})
 
 	ml, _ := fetchGenericList(sys, ctx, pubkey, 10000, kind_10000, parseProfileRef, sys.MuteListCache)
 	return ml
 }
 
 func (sys *System) FetchFollowSets(ctx context.Context, pubkey nostr.PubKey) GenericSets[nostr.PubKey, ProfileRef] {
-	if sys.FollowSetsCache == nil {
-		sys.FollowSetsCache = cache_memory.New[GenericSets[nostr.PubKey, ProfileRef]](1000)
-	}
+	sys.followSetsCacheOnce.Do(func() {
+		if sys.FollowSetsCache == nil {
+			sys.FollowSetsCache = cache_memory.New[GenericSets[nostr.PubKey, ProfileRef]](1000)
+		}
+	})
 
 	ml, _ := fetchGenericSets(sys, ctx, pubkey, 30000, kind_30000, parseProfileRef, sys.FollowSetsCache)
 	return ml
