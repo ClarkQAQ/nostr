@@ -190,9 +190,11 @@ func (r *Relay) handleMessage(message string) {
 		}
 		r.challenge = *env.Challenge
 		if r.authHandler != nil {
-			r.Auth(r.Context(), func(ctx context.Context, evt *Event) error {
-				return r.authHandler(ctx, r, evt)
-			})
+			go func() {
+				r.Auth(r.Context(), func(ctx context.Context, evt *Event) error {
+					return r.authHandler(ctx, r, evt)
+				})
+			}()
 		}
 	case *EventEnvelope:
 		// we already have the subscription from the pre-check above, so we can just reuse it
