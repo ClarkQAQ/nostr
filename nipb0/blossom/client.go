@@ -1,7 +1,7 @@
 package blossom
 
 import (
-	"strings"
+	"net/url"
 	"time"
 
 	"fiatjaf.com/nostr"
@@ -10,17 +10,15 @@ import (
 
 // Client represents a Blossom client for interacting with a media server
 type Client struct {
-	mediaserver string
+	mediaserver *url.URL
 	httpClient  *fasthttp.Client
 	signer      nostr.Signer
 }
 
 // NewClient creates a new Blossom client
-func NewClient(mediaserver string, signer nostr.Signer) *Client {
-	mediaserver = "http" + nostr.NormalizeURL(mediaserver)[2:]
-
+func NewClient(mediaserver *url.URL, signer nostr.Signer) *Client {
 	return &Client{
-		mediaserver: strings.TrimSuffix(mediaserver, "/") + "/",
+		mediaserver: mediaserver,
 		httpClient:  createHTTPClient(),
 		signer:      signer,
 	}
@@ -50,5 +48,5 @@ func (c *Client) GetSigner() nostr.Signer {
 
 // GetMediaServer returns the client's media server URL
 func (c *Client) GetMediaServer() string {
-	return c.mediaserver
+	return c.mediaserver.String()
 }

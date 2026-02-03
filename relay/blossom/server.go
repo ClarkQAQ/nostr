@@ -23,6 +23,8 @@ type BlossomServer struct {
 	RejectGet    func(ctx context.Context, auth *nostr.Event, sha256 string, mimeType string) (bool, string, int)
 	RejectList   func(ctx context.Context, auth *nostr.Event, pubkey nostr.PubKey) (bool, string, int)
 	RejectDelete func(ctx context.Context, auth *nostr.Event, sha256 string, mimeType string) (bool, string, int)
+
+	CustomBlobNotFound func(w http.ResponseWriter, r *http.Request, sha256 string, mimeType string)
 }
 
 // ServerOption represents a functional option for configuring a BlossomServer

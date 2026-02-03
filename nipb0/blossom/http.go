@@ -16,7 +16,7 @@ import (
 func (c *Client) httpCall(
 	ctx context.Context,
 	method string,
-	url string,
+	path string,
 	contentType string,
 	addAuthorization func() string,
 	body io.Reader,
@@ -28,7 +28,9 @@ func (c *Client) httpCall(
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 
-	req.SetRequestURI(c.mediaserver + url)
+	ru := c.mediaserver.JoinPath(path).String()
+
+	req.SetRequestURI(ru)
 	req.Header.SetMethod(method)
 	req.Header.SetContentType(contentType)
 
@@ -54,11 +56,11 @@ func (c *Client) httpCall(
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to call %s: %w\n", url, err)
+		return fmt.Errorf("failed to call %s: %w\n", ru, err)
 	}
 	if resp.Header.StatusCode() >= 300 {
 		reason := resp.Header.Peek("X-Reason")
-		return fmt.Errorf("%s returned an error (%d): %s", url, resp.StatusCode(), string(reason))
+		return fmt.Errorf("%s returned an error (%d): %s", ru, resp.StatusCode(), string(reason))
 	}
 
 	if result != nil {

@@ -16,7 +16,7 @@ func (c *Client) Download(ctx context.Context, hash string) ([]byte, error) {
 		return nil, fmt.Errorf("%s is not a valid 32-byte hex string", hash)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+hash, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver.JoinPath(hash).String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -46,7 +46,7 @@ func (c *Client) DownloadToFile(ctx context.Context, hash string, filePath strin
 		return fmt.Errorf("%s is not a valid 32-byte hex string", hash)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+"/"+hash, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver.JoinPath(hash).String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"fiatjaf.com/nostr/eventstore/boltdb"
+	blossomclient "fiatjaf.com/nostr/nipb0/blossom"
 	"fiatjaf.com/nostr/relay"
 	"fiatjaf.com/nostr/relay/blossom"
 )
@@ -40,8 +41,7 @@ func main() {
 	}
 	bl.LoadBlob = func(ctx context.Context, sha256 string, ext string) (io.ReadSeekCloser, *url.URL, error) {
 		fmt.Println("loading", sha256)
-		blob := strings.NewReader("aaaaa")
-		return nopCloser{blob}, nil, nil
+		return blossomclient.NopSeekCloser(strings.NewReader("aaaaa")), nil, nil
 	}
 
 	fmt.Println("running on :3334")
@@ -49,9 +49,3 @@ func main() {
 		panic(e)
 	}
 }
-
-type nopCloser struct {
-	io.ReadSeeker
-}
-
-func (nopCloser) Close() error { return nil }

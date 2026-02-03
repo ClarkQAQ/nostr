@@ -316,6 +316,11 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if bs.CustomBlobNotFound != nil {
+		bs.CustomBlobNotFound(w, r, hash, mimeType)
+		return
+	}
+
 	blossomError(w, "file not found", http.StatusNotFound)
 }
 

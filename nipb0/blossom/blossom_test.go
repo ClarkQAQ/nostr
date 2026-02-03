@@ -18,10 +18,10 @@ import (
 
 func TestBlossomBasicOperations(t *testing.T) {
 	// setup two test servers
-	server1 := setupTestServer(t, ":38081")
+	server1 := setupTestServer()
 	defer server1.Close()
 
-	server2 := setupTestServer(t, ":38082")
+	server2 := setupTestServer()
 	defer server2.Close()
 
 	// create signers for two different pubkeys
@@ -30,10 +30,19 @@ func TestBlossomBasicOperations(t *testing.T) {
 	signer1 := keyer.NewPlainKeySigner(secretKey1)
 	signer2 := keyer.NewPlainKeySigner(secretKey2)
 
+	server1Url, e := url.Parse(server1.URL)
+	if e != nil {
+		t.Fatal(e)
+	}
+	server2Url, e := url.Parse(server2.URL)
+	if e != nil {
+		t.Fatal(e)
+	}
+
 	// create clients
-	client1 := blossomclient.NewClient(server1.URL, signer1)
-	client2 := blossomclient.NewClient(server1.URL, signer2)
-	client2Server := blossomclient.NewClient(server2.URL, signer2)
+	client1 := blossomclient.NewClient(server1Url, signer1)
+	client2 := blossomclient.NewClient(server1Url, signer2)
+	client2Server := blossomclient.NewClient(server2Url, signer2)
 
 	ctx := context.Background()
 
@@ -287,7 +296,7 @@ func TestBlossomBasicOperations(t *testing.T) {
 	})
 }
 
-func setupTestServer(t *testing.T, addr string) *httptest.Server {
+func setupTestServer() *httptest.Server {
 	// use memory-based blob index for testing
 	memoryIndex := relay_blossom.NewMemoryBlobIndex()
 
