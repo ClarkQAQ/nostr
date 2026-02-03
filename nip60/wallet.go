@@ -249,6 +249,10 @@ func (w *Wallet) removeDeletedToken(eventId nostr.ID) {
 func (w *Wallet) Balance() uint64 {
 	var sum uint64
 	for _, token := range w.Tokens {
+		if token.reserved {
+			continue
+		}
+
 		sum += token.Proofs.Amount()
 	}
 	return sum

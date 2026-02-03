@@ -94,6 +94,11 @@ meltworked:
 		nil,
 	)
 
+	// mark tokens as reserved before attempting melt
+	for _, i := range chosen.tokenIndexes {
+		w.Tokens[i].reserved = true
+	}
+
 	// request from mint to _melt_ into paying the invoice
 	delay := 200 * time.Millisecond
 	// this request will block until the invoice is paid or it fails
@@ -103,17 +108,44 @@ meltworked:
 		Inputs:  chosen.proofs,
 		Outputs: preChange.bm,
 	})
-inspectmeltstatusresponse:
-	if err != nil || meltStatus.State == nut05.Unpaid {
-		return "", fmt.Errorf("error melting token: %w", err)
-	} else if meltStatus.State == nut05.Unknown {
-		return "", fmt.Errorf("we don't know what happened with the melt at %s: %v", chosen.mint, meltStatus)
-	} else if meltStatus.State == nut05.Pending {
-		for {
+	for {
+		if err != nil || meltStatus.State == nut05.Unpaid {
+			// unreserve tokens to available state on failure
+			for _, i := range chosen.tokenIndexes {
+				w.Tokens[i].reserved = false
+			}
+			return "", fmt.Errorf("error melting token: %w", err)
+		} else if meltStatus.State == nut05.Unknown {
+			// unreserve tokens to available state on failure
+			for _, i := range chosen.tokenIndexes {
+				w.Tokens[i].reserved = false
+			}
+			return "", fmt.Errorf("we don't know what happened with the melt at %s: %v", chosen.mint, meltStatus)
+		} else if meltStatus.State == nut05.Pending {
 			time.Sleep(delay)
 			delay *= 2
 			meltStatus, err = client.GetMeltQuoteState(ctx, chosen.mint, meltStatus.Quote)
-			goto inspectmeltstatusresponse
+			if err != nil {
+				// unreserve tokens to available state on failure
+				for _, i := range chosen.tokenIndexes {
+					w.Tokens[i].reserved = false
+				}
+				return "", fmt.Errorf("error checking melt status: %w", err)
+			}
+			if meltStatus.State == nut05.Unpaid || meltStatus.State == nut05.Unknown {
+				// unreserve tokens to available state on failure
+				for _, i := range chosen.tokenIndexes {
+					w.Tokens[i].reserved = false
+				}
+				return "", fmt.Errorf("melt failed with state %v", meltStatus.State)
+			} else if meltStatus.State == nut05.Paid {
+				// payment successful
+				break
+			}
+			// continue looping for pending state
+			continue
+		} else if meltStatus.State == nut05.Paid {
+			break
 		}
 	}
 
