@@ -108,17 +108,20 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		),
 	)
 
+	killOnce := sync.Once{}
 	kill := func() {
-		if nil != rl.OnDisconnect {
-			rl.OnDisconnect(ctx)
-		}
+		killOnce.Do(func() {
+			if nil != rl.OnDisconnect {
+				rl.OnDisconnect(ctx)
+			}
 
-		ticker.Stop()
-		cancel()
-		ws.cancel()
-		ws.conn.Close()
+			ticker.Stop()
+			cancel()
+			ws.cancel()
+			ws.conn.Close()
 
-		rl.removeClientAndListeners(ws)
+			rl.removeClientAndListeners(ws)
+		})
 	}
 
 	go func() {
