@@ -30,7 +30,9 @@ func (rl *Relay) handleRequest(ctx context.Context, id string, eose *sync.WaitGr
 	// run the function to query events
 	if nil != rl.QueryStored {
 		for event := range rl.QueryStored(ctx, filter) {
-			ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: event})
+			if nil != ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: event}) {
+				break
+			}
 		}
 	}
 
