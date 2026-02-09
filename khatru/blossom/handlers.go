@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -316,12 +317,14 @@ func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 		blossomError(w, err.Error(), 400)
 		return
 	}
+	if auth == nil {
+		blossomError(w, "missing \"Authorization\" header", 401)
+		return
+	}
 
-	if auth != nil {
-		if auth.Tags.FindWithValue("t", "delete") == nil {
-			blossomError(w, "invalid \"Authorization\" event \"t\" tag", 403)
-			return
-		}
+	if auth.Tags.FindWithValue("t", "delete") == nil {
+		blossomError(w, "invalid \"Authorization\" event \"t\" tag", 403)
+		return
 	}
 
 	spl := strings.SplitN(r.URL.Path, ".", 2)
@@ -427,8 +430,14 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// download the blob
-	resp, err := http.Get(req.URL)
+	parsedURL, err := url.Parse(req.URL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+		blossomError(w, "url must be a valid http or https URL", 400)
+		return
+	}
+
+	// download the blob, refusing to reach local/internal network destinations
+	resp, err := mirrorHTTPClient.Get(req.URL)
 	if err != nil {
 		blossomError(w, "failed to download from url: "+err.Error(), 503)
 		return

@@ -14,7 +14,7 @@ type RelayInformationDocument struct {
 	PubKey        *nostr.PubKey `json:"pubkey,omitempty"`
 	Self          *nostr.PubKey `json:"self,omitempty"`
 	Contact       string        `json:"contact,omitempty"`
-	SupportedNIPs []any         `json:"supported_nips,omitempty"`
+	SupportedNIPs []string      `json:"supported_nips,omitempty"`
 	Software      string        `json:"software,omitempty"`
 	Version       string        `json:"version,omitempty"`
 
@@ -33,16 +33,16 @@ type RelayInformationDocument struct {
 	SupportedGrasps []string `json:"supported_grasps,omitempty"`
 }
 
-func (info *RelayInformationDocument) AddSupportedNIP(number int) {
-	idx := slices.IndexFunc(info.SupportedNIPs, func(n any) bool { return n == number })
+func (info *RelayInformationDocument) AddSupportedNIP(nip string) {
+	idx := slices.IndexFunc(info.SupportedNIPs, func(n string) bool { return n == nip })
 	if idx != -1 {
 		return
 	}
 
-	info.SupportedNIPs = append(info.SupportedNIPs, number)
+	info.SupportedNIPs = append(info.SupportedNIPs, nip)
 }
 
-func (info *RelayInformationDocument) AddSupportedNIPs(numbers []int) {
+func (info *RelayInformationDocument) AddSupportedNIPs(numbers []string) {
 	for _, n := range numbers {
 		info.AddSupportedNIP(n)
 	}

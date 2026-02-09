@@ -31,7 +31,7 @@ func New(rl *khatru.Relay, repositoryDir string) *GraspServer {
 		},
 	}
 
-	rl.Info.AddSupportedNIP(34)
+	rl.Info.AddSupportedNIP("34")
 	rl.Info.SupportedGrasps = append(rl.Info.SupportedGrasps, "GRASP-01")
 
 	base := rl.Router()

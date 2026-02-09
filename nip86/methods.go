@@ -32,6 +32,24 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		return BanPubKey{pk, reason}, nil
 	case "listbannedpubkeys":
 		return ListBannedPubKeys{}, nil
+	case "unbanpubkey":
+		if len(req.Params) == 0 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		pkh, ok := req.Params[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
+		}
+		pk, err := nostr.PubKeyFromHex(pkh)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
+		}
+
+		var reason string
+		if len(req.Params) >= 2 {
+			reason, _ = req.Params[1].(string)
+		}
+		return UnbanPubKey{pk, reason}, nil
 	case "allowpubkey":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
@@ -52,6 +70,24 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		return AllowPubKey{pk, reason}, nil
 	case "listallowedpubkeys":
 		return ListAllowedPubKeys{}, nil
+	case "unallowpubkey":
+		if len(req.Params) == 0 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		pkh, ok := req.Params[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
+		}
+		pk, err := nostr.PubKeyFromHex(pkh)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
+		}
+
+		var reason string
+		if len(req.Params) >= 2 {
+			reason, _ = req.Params[1].(string)
+		}
+		return UnallowPubKey{pk, reason}, nil
 	case "listeventsneedingmoderation":
 		return ListEventsNeedingModeration{}, nil
 	case "allowevent":
@@ -211,12 +247,12 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		id, _ := req.Params[0].(string)
 		label, _ := req.Params[1].(string)
 		description, _ := req.Params[2].(string)
-		color, _ := req.Params[3].(float64)
+		hue, _ := req.Params[3].(float64)
 		order, ok := req.Params[4].(float64)
 		if !ok || math.Trunc(order) != order {
 			return nil, fmt.Errorf("invalid order param for '%s'", req.Method)
 		}
-		return CreateRole{id, label, description, int(color), int(order)}, nil
+		return CreateRole{id, label, description, int(hue), int(order)}, nil
 	case "editrole":
 		if len(req.Params) < 5 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
@@ -224,12 +260,12 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		id, _ := req.Params[0].(string)
 		label, _ := req.Params[1].(string)
 		description, _ := req.Params[2].(string)
-		color, _ := req.Params[3].(float64)
+		hue, _ := req.Params[3].(float64)
 		order, ok := req.Params[4].(float64)
 		if !ok || math.Trunc(order) != order {
 			return nil, fmt.Errorf("invalid order param for '%s'", req.Method)
 		}
-		return EditRole{id, label, description, int(color), int(order)}, nil
+		return EditRole{id, label, description, int(hue), int(order)}, nil
 	case "deleterole":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
@@ -264,11 +300,86 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		}
 		roleID, _ := req.Params[1].(string)
 		return UnassignRole{pk, roleID}, nil
+	case "listclaims":
+		return ListClaims{}, nil
+	case "createclaim":
+		if len(req.Params) == 0 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		claim, ok := req.Params[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing claim param for '%s'", req.Method)
+		}
+		return CreateClaim{claim}, nil
+	case "deleteclaim":
+		if len(req.Params) == 0 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		claim, ok := req.Params[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing claim param for '%s'", req.Method)
+		}
+		return DeleteClaim{claim}, nil
+	case "signevent":
+		if len(req.Params) == 0 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		tmpl, ok := req.Params[0].(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("missing event param for '%s'", req.Method)
+		}
+		kind, ok := tmpl["kind"].(float64)
+		if !ok || math.Trunc(kind) != kind {
+			return nil, fmt.Errorf("invalid kind '%v' for '%s'", tmpl["kind"], req.Method)
+		}
+		var createdAt nostr.Timestamp
+		if ca, ok := tmpl["created_at"]; ok {
+			caf, ok := ca.(float64)
+			if !ok || math.Trunc(caf) != caf {
+				return nil, fmt.Errorf("invalid created_at '%v' for '%s'", ca, req.Method)
+			}
+			createdAt = nostr.Timestamp(caf)
+		}
+		tags, err := coerceTags(tmpl["tags"])
+		if err != nil {
+			return nil, fmt.Errorf("invalid tags for '%s': %w", req.Method, err)
+		}
+		content, _ := tmpl["content"].(string)
+		return SignEvent{nostr.Kind(kind), createdAt, tags, content}, nil
 	case "stats":
 		return Stats{}, nil
 	default:
 		return nil, fmt.Errorf("unknown method '%s'", req.Method)
 	}
+}
+
+// coerceTags converts a decoded JSON value (an array of arrays of strings) into
+// nostr.Tags. A nil value yields nil tags; any other shape is an error.
+func coerceTags(v any) (nostr.Tags, error) {
+	if v == nil {
+		return nil, nil
+	}
+	rawTags, ok := v.([]any)
+	if !ok {
+		return nil, fmt.Errorf("tags must be an array")
+	}
+	tags := make(nostr.Tags, len(rawTags))
+	for i, rt := range rawTags {
+		rawTag, ok := rt.([]any)
+		if !ok {
+			return nil, fmt.Errorf("tag %d must be an array", i)
+		}
+		tag := make(nostr.Tag, len(rawTag))
+		for j, el := range rawTag {
+			s, ok := el.(string)
+			if !ok {
+				return nil, fmt.Errorf("tag %d element %d must be a string", i, j)
+			}
+			tag[j] = s
+		}
+		tags[i] = tag
+	}
+	return tags, nil
 }
 
 type MethodParams interface {
@@ -279,8 +390,10 @@ var (
 	_ MethodParams = (*SupportedMethods)(nil)
 	_ MethodParams = (*BanPubKey)(nil)
 	_ MethodParams = (*ListBannedPubKeys)(nil)
+	_ MethodParams = (*UnbanPubKey)(nil)
 	_ MethodParams = (*AllowPubKey)(nil)
 	_ MethodParams = (*ListAllowedPubKeys)(nil)
+	_ MethodParams = (*UnallowPubKey)(nil)
 	_ MethodParams = (*ListEventsNeedingModeration)(nil)
 	_ MethodParams = (*AllowEvent)(nil)
 	_ MethodParams = (*BanEvent)(nil)
@@ -303,6 +416,10 @@ var (
 	_ MethodParams = (*DeleteRole)(nil)
 	_ MethodParams = (*AssignRole)(nil)
 	_ MethodParams = (*UnassignRole)(nil)
+	_ MethodParams = (*ListClaims)(nil)
+	_ MethodParams = (*CreateClaim)(nil)
+	_ MethodParams = (*DeleteClaim)(nil)
+	_ MethodParams = (*SignEvent)(nil)
 	_ MethodParams = (*Stats)(nil)
 )
 
@@ -321,6 +438,13 @@ type ListBannedPubKeys struct{}
 
 func (ListBannedPubKeys) MethodName() string { return "listbannedpubkeys" }
 
+type UnbanPubKey struct {
+	PubKey nostr.PubKey
+	Reason string
+}
+
+func (UnbanPubKey) MethodName() string { return "unbanpubkey" }
+
 type AllowPubKey struct {
 	PubKey nostr.PubKey
 	Reason string
@@ -331,6 +455,13 @@ func (AllowPubKey) MethodName() string { return "allowpubkey" }
 type ListAllowedPubKeys struct{}
 
 func (ListAllowedPubKeys) MethodName() string { return "listallowedpubkeys" }
+
+type UnallowPubKey struct {
+	PubKey nostr.PubKey
+	Reason string
+}
+
+func (UnallowPubKey) MethodName() string { return "unallowpubkey" }
 
 type ListEventsNeedingModeration struct{}
 
@@ -428,15 +559,11 @@ type RevokeAdmin struct {
 
 func (RevokeAdmin) MethodName() string { return "revokeadmin" }
 
-type Stats struct{}
-
-func (Stats) MethodName() string { return "stats" }
-
 type CreateRole struct {
 	ID          string
 	Label       string
 	Description string
-	Color       int
+	Hue         int
 	Order       int
 }
 
@@ -446,7 +573,7 @@ type EditRole struct {
 	ID          string
 	Label       string
 	Description string
-	Color       int
+	Hue         int
 	Order       int
 }
 
@@ -471,3 +598,36 @@ type UnassignRole struct {
 }
 
 func (UnassignRole) MethodName() string { return "unassignrole" }
+
+// ListClaims lists all NIP-43 invite codes ("claims") the relay knows about.
+type ListClaims struct{}
+
+func (ListClaims) MethodName() string { return "listclaims" }
+
+// CreateClaim registers a NIP-43 invite code ("claim") that can later be
+// redeemed to join the relay.
+type CreateClaim struct {
+	Claim string
+}
+
+func (CreateClaim) MethodName() string { return "createclaim" }
+
+// DeleteClaim revokes a previously created NIP-43 invite code ("claim").
+type DeleteClaim struct {
+	Claim string
+}
+
+func (DeleteClaim) MethodName() string { return "deleteclaim" }
+
+type SignEvent struct {
+	Kind      nostr.Kind
+	CreatedAt nostr.Timestamp
+	Tags      nostr.Tags
+	Content   string
+}
+
+func (SignEvent) MethodName() string { return "signevent" }
+
+type Stats struct{}
+
+func (Stats) MethodName() string { return "stats" }

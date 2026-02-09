@@ -167,14 +167,14 @@ func (rl *Relay) StartExpirationManager(
 	}
 
 	go rl.expirationManager.start(rl.ctx)
-	rl.Info.AddSupportedNIP(40)
+	rl.Info.AddSupportedNIP("40")
 }
 
 func (rl *Relay) DisableExpirationManager() {
 	rl.expirationManager.stop()
 	rl.expirationManager = nil
 
-	idx := slices.Index(rl.Info.SupportedNIPs, 40)
+	idx := slices.Index(rl.Info.SupportedNIPs, "40")
 	if idx != -1 {
 		rl.Info.SupportedNIPs[idx] = rl.Info.SupportedNIPs[len(rl.Info.SupportedNIPs)-1]
 		rl.Info.SupportedNIPs = rl.Info.SupportedNIPs[0 : len(rl.Info.SupportedNIPs)-1]

@@ -33,7 +33,7 @@ func NewRelay() *Relay {
 		Info: &nip11.RelayInformationDocument{
 			Software:      "https://pkg.go.dev/fiatjaf.com/nostr/khatru",
 			Version:       "n/a",
-			SupportedNIPs: []any{1, 11, 42, 70, 86},
+			SupportedNIPs: []string{"1", "11", "42", "70", "86"},
 		},
 
 		upgrader: websocket.Upgrader{

@@ -21,8 +21,10 @@ type RelayManagementAPI struct {
 
 	BanPubKey                   func(ctx context.Context, pubkey nostr.PubKey, reason string) error
 	ListBannedPubKeys           func(ctx context.Context) ([]nip86.PubKeyReason, error)
+	UnbanPubKey                 func(ctx context.Context, pubkey nostr.PubKey, reason string) error
 	AllowPubKey                 func(ctx context.Context, pubkey nostr.PubKey, reason string) error
 	ListAllowedPubKeys          func(ctx context.Context) ([]nip86.PubKeyReason, error)
+	UnallowPubKey               func(ctx context.Context, pubkey nostr.PubKey, reason string) error
 	ListEventsNeedingModeration func(ctx context.Context) ([]nip86.IDReason, error)
 	AllowEvent                  func(ctx context.Context, id nostr.ID, reason string) error
 	BanEvent                    func(ctx context.Context, id nostr.ID, reason string) error
@@ -41,11 +43,15 @@ type RelayManagementAPI struct {
 	Stats                       func(ctx context.Context) (nip86.Response, error)
 	GrantAdmin                  func(ctx context.Context, pubkey nostr.PubKey, methods []string) error
 	RevokeAdmin                 func(ctx context.Context, pubkey nostr.PubKey, methods []string) error
-	CreateRole                  func(ctx context.Context, id string, label string, description string, color int, order int) error
-	EditRole                    func(ctx context.Context, id string, label string, description string, color int, order int) error
+	CreateRole                  func(ctx context.Context, id string, label string, description string, hue int, order int) error
+	EditRole                    func(ctx context.Context, id string, label string, description string, hue int, order int) error
 	DeleteRole                  func(ctx context.Context, id string) error
 	AssignRole                  func(ctx context.Context, pubkey nostr.PubKey, roleID string) error
 	UnassignRole                func(ctx context.Context, pubkey nostr.PubKey, roleID string) error
+	ListClaims                  func(ctx context.Context) ([]string, error)
+	CreateClaim                 func(ctx context.Context, claim string) error
+	DeleteClaim                 func(ctx context.Context, claim string) error
+	SignEvent                   func(ctx context.Context, kind nostr.Kind, createdAt nostr.Timestamp, tags nostr.Tags, content string) (nostr.Event, error)
 	Generic                     func(ctx context.Context, request nip86.Request) (nip86.Response, error)
 }
 
@@ -173,6 +179,14 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Result = result
 			}
+		case nip86.UnbanPubKey:
+			if rl.ManagementAPI.UnbanPubKey == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.UnbanPubKey(ctx, thing.PubKey, thing.Reason); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
+			}
 		case nip86.AllowPubKey:
 			if rl.ManagementAPI.AllowPubKey == nil {
 				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
@@ -188,6 +202,14 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 				resp.Error = err.Error()
 			} else {
 				resp.Result = result
+			}
+		case nip86.UnallowPubKey:
+			if rl.ManagementAPI.UnallowPubKey == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.UnallowPubKey(ctx, thing.PubKey, thing.Reason); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
 			}
 		case nip86.BanEvent:
 			if rl.ManagementAPI.BanEvent == nil {
@@ -216,7 +238,7 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 		case nip86.ListBannedEvents:
 			if rl.ManagementAPI.ListBannedEvents == nil {
 				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
-			} else if result, err := rl.ManagementAPI.ListEventsNeedingModeration(ctx); err != nil {
+			} else if result, err := rl.ManagementAPI.ListBannedEvents(ctx); err != nil {
 				resp.Error = err.Error()
 			} else {
 				resp.Result = result
@@ -317,26 +339,10 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 			} else {
 				resp.Result = true
 			}
-		case nip86.ListDisallowedKinds:
-			if rl.ManagementAPI.ListDisallowedKinds == nil {
-				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
-			} else if result, err := rl.ManagementAPI.ListDisallowedKinds(ctx); err != nil {
-				resp.Error = err.Error()
-			} else {
-				resp.Result = result
-			}
-		case nip86.ListAllowedEvents:
-			if rl.ManagementAPI.ListAllowedEvents == nil {
-				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
-			} else if result, err := rl.ManagementAPI.ListAllowedEvents(ctx); err != nil {
-				resp.Error = err.Error()
-			} else {
-				resp.Result = result
-			}
 		case nip86.CreateRole:
 			if rl.ManagementAPI.CreateRole == nil {
 				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
-			} else if err := rl.ManagementAPI.CreateRole(ctx, thing.ID, thing.Label, thing.Description, thing.Color, thing.Order); err != nil {
+			} else if err := rl.ManagementAPI.CreateRole(ctx, thing.ID, thing.Label, thing.Description, thing.Hue, thing.Order); err != nil {
 				resp.Error = err.Error()
 			} else {
 				resp.Result = true
@@ -344,7 +350,7 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 		case nip86.EditRole:
 			if rl.ManagementAPI.EditRole == nil {
 				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
-			} else if err := rl.ManagementAPI.EditRole(ctx, thing.ID, thing.Label, thing.Description, thing.Color, thing.Order); err != nil {
+			} else if err := rl.ManagementAPI.EditRole(ctx, thing.ID, thing.Label, thing.Description, thing.Hue, thing.Order); err != nil {
 				resp.Error = err.Error()
 			} else {
 				resp.Result = true
@@ -372,6 +378,54 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 				resp.Error = err.Error()
 			} else {
 				resp.Result = true
+			}
+		case nip86.ListClaims:
+			if rl.ManagementAPI.ListClaims == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if result, err := rl.ManagementAPI.ListClaims(ctx); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = result
+			}
+		case nip86.CreateClaim:
+			if rl.ManagementAPI.CreateClaim == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.CreateClaim(ctx, thing.Claim); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
+			}
+		case nip86.DeleteClaim:
+			if rl.ManagementAPI.DeleteClaim == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.DeleteClaim(ctx, thing.Claim); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
+			}
+		case nip86.SignEvent:
+			if rl.ManagementAPI.SignEvent == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if result, err := rl.ManagementAPI.SignEvent(ctx, thing.Kind, thing.CreatedAt, thing.Tags, thing.Content); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = result
+			}
+		case nip86.ListDisallowedKinds:
+			if rl.ManagementAPI.ListDisallowedKinds == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if result, err := rl.ManagementAPI.ListDisallowedKinds(ctx); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = result
+			}
+		case nip86.ListAllowedEvents:
+			if rl.ManagementAPI.ListAllowedEvents == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if result, err := rl.ManagementAPI.ListAllowedEvents(ctx); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = result
 			}
 		default:
 			if rl.ManagementAPI.Generic == nil {

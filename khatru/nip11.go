@@ -12,13 +12,13 @@ func (rl *Relay) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	info := *rl.Info
 
 	if nil != rl.DeleteEvent {
-		info.AddSupportedNIP(9)
+		info.AddSupportedNIP("9")
 	}
 	if nil != rl.Count {
-		info.AddSupportedNIP(45)
+		info.AddSupportedNIP("45")
 	}
 	if rl.Negentropy {
-		info.AddSupportedNIP(77)
+		info.AddSupportedNIP("77")
 	}
 
 	// resolve relative icon and banner URLs against base URL
