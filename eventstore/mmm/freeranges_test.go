@@ -45,7 +45,7 @@ func FuzzFreeRanges(f *testing.F) {
 
 		total := 0
 		for {
-			freeBefore, spaceBefore := countUsableFreeRanges(mmmm)
+			freeBefore, spaceBefore := countUsableFreeRanges(t, mmmm)
 
 			hasAdded := false
 			for i := range rnd.IntN(40) {
@@ -69,7 +69,7 @@ func FuzzFreeRanges(f *testing.F) {
 				total++
 			}
 
-			freeAfter, spaceAfter := countUsableFreeRanges(mmmm)
+			freeAfter, spaceAfter := countUsableFreeRanges(t, mmmm)
 			if hasAdded && freeBefore > 0 {
 				require.Lessf(t, spaceAfter, spaceBefore, "must use some of the existing free ranges when inserting new events (before: %d, after: %d)", freeBefore, freeAfter)
 			}
@@ -86,9 +86,35 @@ func FuzzFreeRanges(f *testing.F) {
 				}
 			}
 
+			verifyFreeRangesInvariants(t, mmmm)
+
+			// add more events
+			for i := range rnd.IntN(40) {
+				content := "1"
+				if i > 0 {
+					content = strings.Repeat("z", rnd.IntN(1000))
+				}
+
+				evt := nostr.Event{
+					CreatedAt: nostr.Timestamp(rnd.Uint32()),
+					Kind:      1,
+					Content:   content,
+					Tags:      nostr.Tags{},
+				}
+				evt.Sign(sk)
+				err := il.SaveEvent(evt)
+				require.NoError(t, err)
+
+				total++
+			}
+
+			verifyFreeRangesInvariants(t, mmmm)
+
 			mmmm.lmdbEnv.View(func(txn *lmdb.Txn) error {
-				expectedFreeRanges, _ := mmmm.gatherFreeRanges(txn)
-				require.Equalf(t, expectedFreeRanges, mmmm.freeRanges, "expected %s, got %s", expectedFreeRanges, mmmm.freeRanges)
+				before := mmmm.freeRangesAll
+				err := mmmm.gatherFreeRanges(txn)
+				require.NoError(t, err)
+				require.Equalf(t, mmmm.freeRangesAll, before, "expected %s, got %s", before, mmmm.freeRangesAll)
 				return nil
 			})
 
@@ -99,12 +125,54 @@ func FuzzFreeRanges(f *testing.F) {
 	})
 }
 
-func countUsableFreeRanges(mmmm *MultiMmapManager) (count int, space int) {
-	for _, fr := range mmmm.freeRanges {
-		if fr.size >= 142 {
+func countUsableFreeRanges(t *testing.T, mmmm *MultiMmapManager) (count int, space int) {
+	for _, fr := range mmmm.freeRangesAll {
+		if fr.size >= LARGE_FREERANGE {
 			count++
 			space += int(fr.size)
 		}
 	}
+
+	require.Equal(t, count, len(mmmm.freeRangesLarge))
+
 	return count, space
+}
+
+func verifyFreeRangesInvariants(t *testing.T, mmmm *MultiMmapManager) {
+	all := mmmm.freeRangesAll
+	large := mmmm.freeRangesLarge
+
+	for _, l := range large {
+		found := false
+		for _, a := range all {
+			if l.start == a.start && l.size == a.size {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "large range %v not found in all ranges", l)
+	}
+
+	for i := 1; i < len(all); i++ {
+		require.Greater(t, all[i].start, all[i-1].start, "all ranges should be sorted by start")
+	}
+
+	for i := range all {
+		for j := i + 1; j < len(all); j++ {
+			end1 := all[i].start + uint64(all[i].size)
+			end2 := all[j].start + uint64(all[j].size)
+			require.False(t, (all[i].start >= all[j].start && all[i].start < end2) ||
+				(all[j].start >= all[i].start && all[j].start < end1),
+				"ranges %v and %v overlap", all[i], all[j])
+		}
+	}
+
+	mmmm.lmdbEnv.View(func(txn *lmdb.Txn) error {
+		before := make(positions, len(mmmm.freeRangesAll))
+		copy(before, mmmm.freeRangesAll)
+		err := mmmm.gatherFreeRanges(txn)
+		require.NoError(t, err)
+		require.Equal(t, before, mmmm.freeRangesAll, "recomputing free ranges should yield the same result")
+		return nil
+	})
 }

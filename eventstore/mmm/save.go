@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"slices"
 	"syscall"
 	"unsafe"
 
@@ -104,25 +103,41 @@ func (b *MultiMmapManager) storeOn(
 			return false, fmt.Errorf("event too large to store, max %d, got %d", 1<<16, pos.size)
 		}
 
-		// find a suitable place for this to be stored in
+		// find a suitable place for this to be stored in (search only large free ranges)
 		appendToMmap := true
-		for f, fr := range b.freeRanges {
+		for f, fr := range b.freeRangesLarge {
 			if fr.size >= pos.size {
-				// found the smallest possible place that can fit this event
+				// found a place that can fit this event
 				appendToMmap = false
 				pos.start = fr.start
 
 				// modify the free ranges we're keeping track of
 				// (in case of conflict we lose this free range but it's ok, it will be recovered on the next startup)
 				if pos.size == fr.size {
-					// if we've used it entirely just delete it
-					b.freeRanges = slices.Delete(b.freeRanges, f, f+1)
+					// if we've used it entirely just delete it (swap-delete since it's unsorted)
+					b.freeRangesLarge[f] = b.freeRangesLarge[len(b.freeRangesLarge)-1]
+					b.freeRangesLarge = b.freeRangesLarge[0 : len(b.freeRangesLarge)-1]
+
+					// also delete it from b.freeRangesAll
+					b.freeRangesAll = b.freeRangesAll.del(fr.start)
 				} else {
 					// otherwise modify it in place
-					b.freeRanges[f] = position{
+					newFreeRange := position{
 						start: fr.start + uint64(pos.size),
 						size:  fr.size - pos.size,
 					}
+					// only keep it in freeRangesLarge if it's still large enough
+					if newFreeRange.size >= LARGE_FREERANGE {
+						b.freeRangesLarge[f] = newFreeRange
+					} else {
+						// remove it from freeRangesLarge if it's no longer large enough
+						b.freeRangesLarge[f] = b.freeRangesLarge[len(b.freeRangesLarge)-1]
+						b.freeRangesLarge = b.freeRangesLarge[0 : len(b.freeRangesLarge)-1]
+					}
+
+					// also modify it in b.freeRangesAll
+					idx := b.freeRangesAll.find(fr.start)
+					b.freeRangesAll[idx] = newFreeRange
 				}
 
 				break

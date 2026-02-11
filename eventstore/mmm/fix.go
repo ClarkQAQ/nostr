@@ -116,8 +116,7 @@ func (b *MultiMmapManager) Rescan() error {
 			}
 		}
 
-		b.freeRanges, err = b.gatherFreeRanges(mmmtxn)
-		if err != nil {
+		if err := b.gatherFreeRanges(mmmtxn); err != nil {
 			return err
 		}
 
