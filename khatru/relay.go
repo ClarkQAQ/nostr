@@ -69,6 +69,7 @@ type Relay struct {
 	ReplaceEvent              func(ctx context.Context, event nostr.Event) error
 	DeleteEvent               func(ctx context.Context, id nostr.ID) error
 	OnEventSaved              func(ctx context.Context, event nostr.Event)
+	OnEventDeleted            func(ctx context.Context, deleted nostr.Event)
 	OnEphemeralEvent          func(ctx context.Context, event nostr.Event)
 	OnRequest                 func(ctx context.Context, filter nostr.Filter) (reject bool, msg string)
 	OnCount                   func(ctx context.Context, filter nostr.Filter) (reject bool, msg string)
@@ -155,7 +156,15 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 	}
 
 	// only when using the eventstore we automatically set up the expiration manager
-	rl.StartExpirationManager(rl.QueryStored, rl.DeleteEvent)
+	rl.StartExpirationManager(func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event] {
+		return rl.QueryStored(ctx, filter)
+	}, func(ctx context.Context, id nostr.ID) error {
+		return rl.DeleteEvent(ctx, id)
+	}, func(ctx context.Context, evt nostr.Event) {
+		if rl.OnEventDeleted != nil {
+			rl.OnEventDeleted(ctx, evt)
+		}
+	})
 }
 
 func (rl *Relay) getBaseURL(r *http.Request) string {

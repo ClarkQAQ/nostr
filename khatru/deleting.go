@@ -78,6 +78,9 @@ func (rl *Relay) handleDeleteRequest(ctx context.Context, evt nostr.Event) error
 						}
 
 						haveDeletedSomething = true
+						if rl.OnEventDeleted != nil {
+							rl.OnEventDeleted(ctx, target)
+						}
 						return nil
 					})
 				} else {
