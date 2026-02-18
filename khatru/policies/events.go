@@ -183,7 +183,7 @@ func PreventNormalDuplicates(query func(nostr.Filter, int) iter.Seq[nostr.Event]
 		case 1018:
 			reject = exists(event, "e")
 		case 1163:
-			reject = exists(event, "p")
+			reject = exists(event, "p") && exists(event, "a")
 		case 7516:
 			reject = exists(event, "a")
 		case 7517:
