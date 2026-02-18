@@ -153,12 +153,12 @@ func RejectUnprefixedNostrReferences(ctx context.Context, event nostr.Event) (bo
 func PreventNormalDuplicates(query func(nostr.Filter, int) iter.Seq[nostr.Event]) func(ctx context.Context, event nostr.Event) (bool, string) {
 	exists := func(event nostr.Event, tagName string) bool {
 		hasAll := true
-		for e := range event.Tags.FindAll("e") {
+		for t := range event.Tags.FindAll(tagName) {
 			hasThis := false
 			for range query(nostr.Filter{
 				Authors: []nostr.PubKey{event.PubKey},
 				Kinds:   []nostr.Kind{event.Kind},
-				Tags:    nostr.TagMap{"e": []string{e[1]}},
+				Tags:    nostr.TagMap{tagName: []string{t[1]}},
 			}, 1) {
 				hasThis = true
 			}
