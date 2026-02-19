@@ -6,8 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -58,10 +56,6 @@ func NewRelay() *Relay {
 type Relay struct {
 	ctx    context.Context
 	cancel context.CancelCauseFunc
-
-	// setting this variable overwrites the hackish workaround we do to try to figure out our own base URL.
-	// it also ensures the relay stuff is served only from that path and not from any path possible.
-	ServiceURL string
 
 	// hooks that will be called at various times
 	OnEvent                   func(ctx context.Context, event nostr.Event) (reject bool, msg string)
@@ -158,31 +152,4 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 
 	// only when using the eventstore we automatically set up the expiration manager
 	rl.StartExpirationManager(rl.QueryStored, rl.DeleteEvent)
-}
-
-func (rl *Relay) getBaseURL(r *http.Request) string {
-	if rl.ServiceURL != "" {
-		return rl.ServiceURL
-	}
-
-	host := r.Header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = r.Host
-	}
-	proto := r.Header.Get("X-Forwarded-Proto")
-	if proto == "" {
-		if host == "localhost" {
-			proto = "http"
-		} else if strings.Contains(host, ":") {
-			// has a port number
-			proto = "http"
-		} else if _, err := strconv.Atoi(strings.ReplaceAll(host, ".", "")); err == nil {
-			// it's a naked IP
-			proto = "http"
-		} else {
-			proto = "https"
-		}
-	}
-
-	return proto + "://" + host + r.URL.Path
 }

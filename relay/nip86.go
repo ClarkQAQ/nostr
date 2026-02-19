@@ -91,7 +91,7 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 			goto respond
 		}
 
-		expected := nostr.NormalizeURL(rl.getBaseURL(r))
+		expected := nostr.NormalizeURL(nostr.HttpRequestBaseURL(r).String())
 		got := nostr.NormalizeURL(uTag[1])
 		if expected != got {
 			resp.Error = fmt.Sprintf("invalid \"u\" tag, expected '%s', got '%s'", expected, got)

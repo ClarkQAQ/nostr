@@ -76,28 +76,3 @@ func (bs *BlossomServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	http.NotFound(w, r)
 }
-
-func (bs *BlossomServer) getBaseURL(r *http.Request, paths ...string) *url.URL {
-	u := &url.URL{
-		Scheme: "http",
-		Host:   r.Host,
-	}
-
-	if r.TLS != nil {
-		u.Scheme = "https"
-	}
-
-	if fh := r.Header.Get("X-Forwarded-Host"); fh != "" {
-		u.Host = fh
-	}
-
-	if fp := r.Header.Get("X-Forwarded-Proto"); fp != "" {
-		u.Scheme = fp
-	}
-
-	if len(paths) > 0 {
-		u = u.JoinPath(paths...)
-	}
-
-	return u
-}

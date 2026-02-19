@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"fiatjaf.com/nostr"
 )
 
 func (rl *Relay) HandleNIP11(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +24,7 @@ func (rl *Relay) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// resolve relative icon and banner URLs against base URL
-	baseURL := rl.getBaseURL(r)
+	baseURL := nostr.HttpRequestBaseURL(r).String()
 	if info.Icon != "" && !strings.HasPrefix(info.Icon, "http://") && !strings.HasPrefix(info.Icon, "https://") {
 		info.Icon = strings.TrimSuffix(baseURL, "/") + "/" + strings.TrimPrefix(info.Icon, "/")
 	}

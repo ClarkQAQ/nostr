@@ -3,6 +3,7 @@ package nostr
 import (
 	"bytes"
 	"cmp"
+	"net/http"
 	"net/url"
 	"slices"
 	"unsafe"
@@ -86,4 +87,29 @@ func AppendUnique[I comparable](arr []I, item ...I) []I {
 func IsOlder(previous, next Event) bool {
 	return previous.CreatedAt < next.CreatedAt ||
 		(previous.CreatedAt == next.CreatedAt && bytes.Compare(previous.ID[:], next.ID[:]) == 1)
+}
+
+func HttpRequestBaseURL(r *http.Request, paths ...string) *url.URL {
+	u := &url.URL{
+		Scheme: "http",
+		Host:   r.Host,
+	}
+
+	if r.TLS != nil {
+		u.Scheme = "https"
+	}
+
+	if fh := r.Header.Get("X-Forwarded-Host"); fh != "" {
+		u.Host = fh
+	}
+
+	if fp := r.Header.Get("X-Forwarded-Proto"); fp != "" {
+		u.Scheme = fp
+	}
+
+	if len(paths) > 0 {
+		u = u.JoinPath(paths...)
+	}
+
+	return u
 }

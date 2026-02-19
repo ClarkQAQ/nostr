@@ -168,7 +168,7 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 
 // handleSaveBlob handles the common logic of hashing, saving to temp, and finalizing storage.
 func (bs *BlossomServer) handleStoreBlob(w http.ResponseWriter, r *http.Request, auth *nostr.Event, reader io.Reader, hash string, size int64, mimeType string) {
-	if bd, e := bs.Store.Get(r.Context(), hash, bs.getBaseURL(r)); e != nil {
+	if bd, e := bs.Store.Get(r.Context(), hash, nostr.HttpRequestBaseURL(r)); e != nil {
 		blossomError(w, "failed to get metadata: "+e.Error(), http.StatusInternalServerError)
 		return
 	} else if bd != nil {
@@ -228,7 +228,7 @@ func (bs *BlossomServer) handleStoreBlob(w http.ResponseWriter, r *http.Request,
 	}
 
 	bd := blossom.BlobDescriptor{
-		URL:      bs.getBaseURL(r, hash+blossom.ExtensionByMimeType(mimeType)).String(),
+		URL:      nostr.HttpRequestBaseURL(r, hash+blossom.ExtensionByMimeType(mimeType)).String(),
 		SHA256:   hash,
 		Size:     size,
 		Type:     mimeType,
@@ -268,14 +268,14 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if auth.Tags.FindWithValue("x", hash) == nil &&
-			auth.Tags.FindWithValue("server", bs.getBaseURL(r).String()) == nil {
+			auth.Tags.FindWithValue("server", nostr.HttpRequestBaseURL(r).String()) == nil {
 			blossomError(w, "invalid \"Authorization\" event \"x\" or \"server\" tag", http.StatusForbidden)
 			return
 		}
 	}
 
 	var modtime time.Time
-	if bd, _ := bs.Store.Get(r.Context(), hash, bs.getBaseURL(r)); bd != nil {
+	if bd, _ := bs.Store.Get(r.Context(), hash, nostr.HttpRequestBaseURL(r)); bd != nil {
 		mimeType = bd.Type
 		modtime = bd.Uploaded.Time()
 	}
@@ -332,7 +332,7 @@ func (bs BlossomServer) handleHasBlob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if bd, e := bs.Store.Get(r.Context(), hash, bs.getBaseURL(r)); e != nil {
+	if bd, e := bs.Store.Get(r.Context(), hash, nostr.HttpRequestBaseURL(r)); e != nil {
 		blossomError(w, "query failed: "+e.Error(), http.StatusInternalServerError)
 		return
 	} else if bd != nil {
@@ -381,7 +381,7 @@ func (bs BlossomServer) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	enc := json.NewEncoder(w)
 	first := true
-	for bd := range bs.Store.List(r.Context(), pubkey, bs.getBaseURL(r)) {
+	for bd := range bs.Store.List(r.Context(), pubkey, nostr.HttpRequestBaseURL(r)) {
 		if !first {
 			if _, e := w.Write([]byte{','}); e != nil {
 				blossomError(w, e.Error(), http.StatusInternalServerError)
@@ -422,12 +422,12 @@ func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if auth.Tags.FindWithValue("x", hash) == nil &&
-		auth.Tags.FindWithValue("server", bs.getBaseURL(r).String()) == nil {
+		auth.Tags.FindWithValue("server", nostr.HttpRequestBaseURL(r).String()) == nil {
 		blossomError(w, "invalid \"Authorization\" event \"x\" or \"server\" tag", http.StatusForbidden)
 		return
 	}
 
-	if bd, _ := bs.Store.Get(r.Context(), hash, bs.getBaseURL(r)); bd != nil {
+	if bd, _ := bs.Store.Get(r.Context(), hash, nostr.HttpRequestBaseURL(r)); bd != nil {
 		mimeType = bd.Type
 	}
 
@@ -444,7 +444,7 @@ func (bs BlossomServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if any other user owns this blob before physical deletion
-	if bd, e := bs.Store.Get(r.Context(), hash, bs.getBaseURL(r)); e == nil && bd == nil {
+	if bd, e := bs.Store.Get(r.Context(), hash, nostr.HttpRequestBaseURL(r)); e == nil && bd == nil {
 		if bs.DeleteBlob != nil {
 			if e := bs.DeleteBlob(r.Context(), hash, mimeType); e != nil {
 				blossomError(w, "failed to delete blob: "+e.Error(), http.StatusInternalServerError)
