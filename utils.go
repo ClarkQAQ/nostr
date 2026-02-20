@@ -3,6 +3,7 @@ package nostr
 import (
 	"bytes"
 	"cmp"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -89,27 +90,135 @@ func IsOlder(previous, next Event) bool {
 		(previous.CreatedAt == next.CreatedAt && bytes.Compare(previous.ID[:], next.ID[:]) == 1)
 }
 
-func HttpRequestBaseURL(r *http.Request, paths ...string) *url.URL {
-	u := &url.URL{
-		Scheme: "http",
-		Host:   r.Host,
-	}
+var DefaultIPChecker = NewIPChecker(nil)
 
-	if r.TLS != nil {
-		u.Scheme = "https"
-	}
-
-	if fh := r.Header.Get("X-Forwarded-Host"); fh != "" {
-		u.Host = fh
-	}
-
-	if fp := r.Header.Get("X-Forwarded-Proto"); fp != "" {
-		u.Scheme = fp
-	}
+func HTTPHostURL(r *http.Request, checker *IPChecker, paths ...string) *url.URL {
+	u := baseURL(r, checker)
 
 	if len(paths) > 0 {
 		u = u.JoinPath(paths...)
 	}
 
 	return u
+}
+
+func baseURL(r *http.Request, checker *IPChecker) *url.URL {
+	u := &url.URL{
+		Path:     r.URL.Path,
+		RawQuery: r.URL.RawQuery,
+	}
+
+	if r.URL.Scheme != "" && r.URL.Host != "" {
+		u.Scheme = r.URL.Scheme
+		u.Host = r.URL.Host
+
+		return u
+	}
+
+	u.Scheme = "http"
+	u.Host = r.Host
+
+	if r.TLS != nil {
+		u.Scheme = "https"
+	}
+
+	if checker == nil {
+		return u
+	}
+
+	remoteHost, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if remoteHost == "" {
+		remoteHost = r.RemoteAddr
+	}
+
+	if ip := net.ParseIP(remoteHost); ip == nil || !checker.Trust(ip) {
+		return u
+	}
+
+	if fh := r.Header.Get("X-Forwarded-Host"); fh != "" {
+		u.Host = fh
+	}
+	if fp := r.Header.Get("X-Forwarded-Proto"); fp != "" {
+		u.Scheme = fp
+	}
+	if fport := r.Header.Get("X-Forwarded-Port"); fport != "" {
+		host, _, _ := net.SplitHostPort(u.Host)
+		if host == "" {
+			host = u.Host
+		}
+
+		if (u.Scheme == "https" && fport != "443") ||
+			(u.Scheme == "http" && fport != "80") {
+			u.Host = net.JoinHostPort(host, fport)
+		} else {
+			u.Host = host
+		}
+	}
+
+	return u
+}
+
+// copy from https://github.com/labstack/echo/v4@v4.14.0/ip.go
+type IPChecker struct {
+	trustExtraRanges []*net.IPNet
+	trustLoopback    bool
+	trustLinkLocal   bool
+	trustPrivateNet  bool
+}
+
+// TrustOption is config for which IP address to trust
+type TrustOption func(*IPChecker)
+
+// TrustLoopback configures if you trust loopback address (default: true).
+func TrustLoopback(v bool) TrustOption {
+	return func(c *IPChecker) {
+		c.trustLoopback = v
+	}
+}
+
+// TrustLinkLocal configures if you trust link-local address (default: true).
+func TrustLinkLocal(v bool) TrustOption {
+	return func(c *IPChecker) {
+		c.trustLinkLocal = v
+	}
+}
+
+// TrustPrivateNet configures if you trust private network address (default: true).
+func TrustPrivateNet(v bool) TrustOption {
+	return func(c *IPChecker) {
+		c.trustPrivateNet = v
+	}
+}
+
+// TrustIPRange add trustable IP ranges using CIDR notation.
+func TrustIPRange(ipRange *net.IPNet) TrustOption {
+	return func(c *IPChecker) {
+		c.trustExtraRanges = append(c.trustExtraRanges, ipRange)
+	}
+}
+
+func NewIPChecker(configs []TrustOption) *IPChecker {
+	checker := &IPChecker{trustLoopback: true, trustLinkLocal: true, trustPrivateNet: true}
+	for _, configure := range configs {
+		configure(checker)
+	}
+	return checker
+}
+
+func (c *IPChecker) Trust(ip net.IP) bool {
+	if c.trustLoopback && ip.IsLoopback() {
+		return true
+	}
+	if c.trustLinkLocal && ip.IsLinkLocalUnicast() {
+		return true
+	}
+	if c.trustPrivateNet && ip.IsPrivate() {
+		return true
+	}
+	for _, trustedRange := range c.trustExtraRanges {
+		if trustedRange.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }

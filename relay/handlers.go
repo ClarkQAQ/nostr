@@ -320,7 +320,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					id := string(*env)
 					rl.removeListenerId(ws, id)
 				case *nostr.AuthEnvelope:
-					wsBaseUrl := strings.Replace(nostr.HttpRequestBaseURL(r).String(), "http", "ws", 1)
+					wsBaseUrl := strings.Replace(nostr.HTTPHostURL(r, nostr.DefaultIPChecker).String(), "http", "ws", 1)
 					if pubkey, err := nip42.ValidateAuthEvent(env.Event, ws.Challenge, wsBaseUrl); err == nil {
 						ws.authLock.Lock()
 						total := len(ws.AuthedPublicKeys)

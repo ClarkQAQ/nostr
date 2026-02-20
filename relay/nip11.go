@@ -24,7 +24,7 @@ func (rl *Relay) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// resolve relative icon and banner URLs against base URL
-	baseURL := nostr.HttpRequestBaseURL(r).String()
+	baseURL := nostr.HTTPHostURL(r, nostr.DefaultIPChecker).String()
 	if info.Icon != "" && !strings.HasPrefix(info.Icon, "http://") && !strings.HasPrefix(info.Icon, "https://") {
 		info.Icon = strings.TrimSuffix(baseURL, "/") + "/" + strings.TrimPrefix(info.Icon, "/")
 	}
