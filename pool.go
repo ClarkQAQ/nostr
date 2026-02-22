@@ -484,10 +484,8 @@ func (pool *Pool) subMany(
 			hasAuthed := false
 			interval := 3 * time.Second
 			for {
-				select {
-				case <-ctx.Done():
+				if ctx.Err() != nil {
 					return
-				default:
 				}
 
 				var sub *Subscription
