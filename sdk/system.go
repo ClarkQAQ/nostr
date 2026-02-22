@@ -112,17 +112,17 @@ func (rs *RelayStream) Next() string {
 func NewSystem() *System {
 	sys := &System{
 		KVStore:          kvstore_memory.NewStore(),
-		RelayListRelays:  NewRelayStream("wss://indexer.coracle.social", "wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
-		FollowListRelays: NewRelayStream("wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
-		MetadataRelays:   NewRelayStream("wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
+		RelayListRelays:  NewRelayStream("wss://indexer.coracle.social", "wss://purplepag.es", "wss://relay.primal.net", "wss://relay.nos.social"),
+		FollowListRelays: NewRelayStream("wss://purplepag.es", "wss://antiprimal.net", "wss://relay.damus.io", "wss://relay.nos.social"),
+		MetadataRelays:   NewRelayStream("wss://purplepag.es", "wss://antiprimal.net", "wss://relay.damus.io", "wss://relay.nos.social"),
 		FallbackRelays: NewRelayStream(
 			"wss://offchain.pub",
-			"wss://no.str.cr",
 			"wss://relay.damus.io",
 			"wss://nostr.mom",
 			"wss://nos.lol",
 			"wss://relay.mostr.pub",
 			"wss://nostr.land",
+			"wss://relay.ditto.pub",
 		),
 		JustIDRelays: NewRelayStream(
 			"wss://cache2.primal.net/v1",
