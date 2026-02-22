@@ -72,7 +72,7 @@ type System struct {
 	NoteSearchRelays          *RelayStream
 	Store                     eventstore.Store
 
-	Publisher wrappers.StorePublisher
+	Publisher nostr.Publisher
 
 	replaceableLoaders []*dataloader.Loader[nostr.PubKey, nostr.Event]
 	addressableLoaders []*dataloader.Loader[nostr.PubKey, []nostr.Event]
@@ -178,7 +178,7 @@ func NewSystem() *System {
 		sys.Store = &nullstore.NullStore{}
 		sys.Store.Init()
 	}
-	sys.Publisher = wrappers.StorePublisher{Store: sys.Store, MaxLimit: 1000}
+	sys.Publisher = wrappers.DynamicPublisher{GetStore: func() eventstore.Store { return sys.Store }, MaxLimit: 1000}
 
 	sys.initializeReplaceableDataloaders()
 	sys.initializeAddressableDataloaders()
