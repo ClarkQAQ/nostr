@@ -78,48 +78,46 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 	nostr.KindSimpleGroupEditMetadata: func(evt nostr.Event) (Action, error) {
 		ok := false
 		edit := EditMetadata{When: evt.CreatedAt}
-		if t := evt.Tags.Find("name"); t != nil {
-			edit.NameValue = &t[1]
-			ok = true
-		}
-		if t := evt.Tags.Find("picture"); t != nil {
-			edit.PictureValue = &t[1]
-			ok = true
-		}
-		if t := evt.Tags.Find("about"); t != nil {
-			edit.AboutValue = &t[1]
-			ok = true
-		}
-
 		y := true
-		n := false
-		if evt.Tags.Has("closed") {
-			edit.ClosedValue = &y
-			ok = true
-		} else if evt.Tags.Has("open") {
-			edit.ClosedValue = &n
-			ok = true
-		}
-		if evt.Tags.Has("restricted") {
-			edit.RestrictedValue = &y
-			ok = true
-		} else if evt.Tags.Has("unrestricted") {
-			edit.RestrictedValue = &n
-			ok = true
-		}
-		if evt.Tags.Has("hidden") {
-			edit.HiddenValue = &y
-			ok = true
-		} else if evt.Tags.Has("visible") {
-			edit.HiddenValue = &n
-			ok = true
-		}
-		if evt.Tags.Has("private") {
-			edit.PrivateValue = &y
-			ok = true
-		} else if evt.Tags.Has("public") {
-			edit.PrivateValue = &n
-			ok = true
+
+		for _, tag := range evt.Tags {
+			if len(tag) >= 1 {
+				switch tag[0] {
+				case "name":
+					if len(tag) >= 2 {
+						edit.NameValue = &tag[1]
+						ok = true
+					}
+				case "picture":
+					if len(tag) >= 2 {
+						edit.PictureValue = &tag[1]
+						ok = true
+					}
+				case "about":
+					if len(tag) >= 2 {
+						edit.AboutValue = &tag[1]
+						ok = true
+					}
+				case "closed":
+					edit.ClosedValue = &y
+					ok = true
+				case "restricted":
+					edit.RestrictedValue = &y
+					ok = true
+				case "hidden":
+					edit.HiddenValue = &y
+					ok = true
+				case "private":
+					edit.PrivateValue = &y
+					ok = true
+				case "no-text":
+					edit.NoTextValue = &y
+					ok = true
+				case "livekit":
+					edit.LivekitValue = &y
+					ok = true
+				}
+			}
 		}
 
 		if ok {
@@ -233,6 +231,8 @@ type EditMetadata struct {
 	ClosedValue     *bool
 	HiddenValue     *bool
 	PrivateValue    *bool
+	NoTextValue     *bool
+	LivekitValue    *bool
 	When            nostr.Timestamp
 }
 
@@ -260,6 +260,12 @@ func (a EditMetadata) Apply(group *Group) {
 	if a.PrivateValue != nil {
 		group.Private = *a.PrivateValue
 	}
+	if a.NoTextValue != nil {
+		group.NoText = *a.NoTextValue
+	}
+	if a.LivekitValue != nil {
+		group.Livekit = *a.LivekitValue
+	}
 }
 
 type CreateGroup struct {
@@ -285,9 +291,11 @@ func (a DeleteGroup) Apply(group *Group) {
 	group.Private = true
 	group.Restricted = true
 	group.Hidden = true
+	group.NoText = true
 	group.Name = "[deleted]"
 	group.About = ""
 	group.Picture = ""
+	group.Livekit = false
 	group.LastMetadataUpdate = a.When
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
