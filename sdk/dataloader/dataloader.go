@@ -83,7 +83,9 @@ func (l *Loader[K, V]) Load(ctx context.Context, key K) (value V, err error) {
 			case <-b.thresholdReached:
 			case <-time.After(l.wait):
 				l.batchLock.Lock()
-				l.curBatcher = l.newBatcher()
+				if l.curBatcher == b {
+					l.curBatcher = l.newBatcher()
+				}
 				l.batchLock.Unlock()
 			}
 

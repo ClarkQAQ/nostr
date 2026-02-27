@@ -47,10 +47,11 @@ type Subscription struct {
 	// if it returns true that event will not be processed further.
 	checkDuplicateReplaceable func(rk ReplaceableKey, ts Timestamp) bool
 
-	match  func(Event) bool // this will be either Filters.Match or Filters.MatchIgnoringTimestampConstraints
-	live   atomic.Bool
-	eosed  atomic.Bool
-	cancel context.CancelCauseFunc
+	match        func(Event) bool // this will be either Filters.Match or Filters.MatchIgnoringTimestampConstraints
+	live         atomic.Bool
+	eosed        atomic.Bool
+	eoseTimedOut chan struct{}
+	cancel       context.CancelCauseFunc
 
 	// this keeps track of the events we've received before the EOSE that we must dispatch before
 	// closing the EndOfStoredEvents channel
@@ -90,25 +91,29 @@ func (sub *Subscription) start() {
 func (sub *Subscription) GetID() string { return sub.id }
 
 func (sub *Subscription) dispatchEvent(evt Event) {
-	added := false
+	isStored := false
 	if !sub.eosed.Load() {
 		sub.storedwg.Add(1)
-		added = true
+		isStored = true
 	}
 
 	go func() {
-		sub.mu.Lock()
-		defer sub.mu.Unlock()
-
-		if sub.live.Load() {
-			select {
-			case sub.Events <- evt:
-			case <-sub.Context.Done():
+		if isStored {
+			if sub.live.Load() {
+				select {
+				case sub.Events <- evt:
+				case <-sub.Context.Done():
+				case <-sub.eoseTimedOut:
+				}
 			}
-		}
-
-		if added {
 			sub.storedwg.Done()
+		} else {
+			if sub.live.Load() {
+				select {
+				case sub.Events <- evt:
+				case <-sub.Context.Done():
+				}
+			}
 		}
 	}()
 }

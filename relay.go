@@ -423,6 +423,7 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 		ClosedReason:      make(chan string, 1),
 		Filter:            filter,
 		match:             filter.Matches,
+		eoseTimedOut:      make(chan struct{}),
 	}
 
 	sub.checkDuplicate = opts.CheckDuplicate
@@ -447,6 +448,7 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 
 		go func() {
 			time.Sleep(opts.MaxWaitForEOSE)
+			sub.eoseTimedOut <- struct{}{}
 			sub.dispatchEose()
 		}()
 	}
