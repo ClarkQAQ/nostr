@@ -85,7 +85,7 @@ func (sys *System) batchLoadReplaceableEvents(
 		defer cancel()
 
 		// build batched queries for the external relays
-		go func(i int, pubkey nostr.PubKey) {
+		go func(i int, pubkey nostr.PubKey, ctx context.Context) {
 			// gather relays we'll use for this pubkey
 			relays := sys.determineRelaysToQuery(ctx, pubkey, kind)
 
@@ -118,7 +118,7 @@ func (sys *System) batchLoadReplaceableEvents(
 			if waiting.Add(-1) == 0 {
 				aggregatedCancel()
 			}
-		}(i, pubkey)
+		}(i, pubkey, ctx)
 	}
 
 	// query all relays with the prepared filters

@@ -384,10 +384,12 @@ func (r *Relay) Subscribe(ctx context.Context, filter Filter, opts SubscriptionO
 	sub := r.PrepareSubscription(ctx, filter, opts)
 
 	if r.conn == nil {
+		sub.unsub(ErrNotConnected)
 		return nil, fmt.Errorf("not connected to %s", r.URL)
 	}
 
 	if err := sub.Fire(); err != nil {
+		sub.unsub(ErrFireFailed)
 		return nil, fmt.Errorf("couldn't subscribe to %v at %s: %w", filter, r.URL, err)
 	}
 
@@ -396,6 +398,7 @@ func (r *Relay) Subscribe(ctx context.Context, filter Filter, opts SubscriptionO
 		case <-r.closedNotify:
 			sub.unsub(ErrDisconnected)
 		case <-ctx.Done():
+			sub.unsub(nil)
 		}
 	}()
 

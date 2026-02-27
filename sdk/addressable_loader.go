@@ -3,6 +3,7 @@ package sdk
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"fiatjaf.com/nostr"
@@ -55,14 +56,15 @@ func (sys *System) batchLoadAddressableEvents(
 	cm := sync.Mutex{}
 
 	aggregatedContext, aggregatedCancel := context.WithCancel(context.Background())
-	waiting := len(pubkeys)
+	waiting := atomic.Int32{}
+	waiting.Add(int32(len(pubkeys)))
 
 	for i, pubkey := range pubkeys {
 		ctx, cancel := context.WithCancel(ctxs[i])
 		defer cancel()
 
 		// build batched queries for the external relays
-		go func(i int, pubkey nostr.PubKey) {
+		go func(i int, pubkey nostr.PubKey, ctx context.Context) {
 			// gather relays we'll use for this pubkey
 			relays := sys.determineRelaysToQuery(ctx, pubkey, kind)
 
@@ -92,11 +94,10 @@ func (sys *System) batchLoadAddressableEvents(
 			wg.Done()
 
 			<-ctx.Done()
-			waiting--
-			if waiting == 0 {
+			if waiting.Add(-1) == 0 {
 				aggregatedCancel()
 			}
-		}(i, pubkey)
+		}(i, pubkey, ctx)
 	}
 
 	// wait for relay batches to be prepared

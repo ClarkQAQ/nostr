@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+var (
+	ErrNotConnected = errors.New("not connected")
+	ErrFireFailed   = errors.New("failed to fire")
+)
+
 // Subscription represents a subscription to a relay.
 type Subscription struct {
 	counter int64
