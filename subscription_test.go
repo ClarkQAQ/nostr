@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const RELAY = "wss://nos.lol"
+const RELAY = "wss://relay.damus.io"
 
 // test if we can fetch a couple of random events
 func TestSubscribeBasic(t *testing.T) {

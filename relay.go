@@ -1,28 +1,54 @@
 package nostr
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"log"
 	"math"
 	"net/http"
+	"net/textproto"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"fiatjaf.com/lib/channelmutex"
 	ws "github.com/coder/websocket"
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
 var subscriptionIDCounter atomic.Int64
 
+var (
+	ErrDisconnected = errors.New("<disconnected>")
+	ErrPingFailed   = errors.New("<ping failed>")
+)
+
+type writeRequest struct {
+	msg    []byte
+	answer chan error
+}
+
+type closeCause struct {
+	code   ws.StatusCode
+	reason string
+}
+
+func (c closeCause) Error() string {
+	if c.reason == "" {
+		return "relay closed"
+	}
+	return c.reason
+}
+
 // Relay represents a connection to a Nostr relay.
 type Relay struct {
-	closeMutex sync.Mutex
+	closeMutex *channelmutex.Mutex
 
 	URL           string
 	requestHeader http.Header // e.g. for origin header
@@ -66,7 +92,25 @@ func NewRelay(ctx context.Context, url string, opts RelayOptions) *Relay {
 		customHandler:                 opts.CustomHandler,
 		noticeHandler:                 opts.NoticeHandler,
 		authHandler:                   opts.AuthHandler,
+		closeMutex:                    channelmutex.New(),
+		closed:                        &atomic.Bool{},
+		closedNotify:                  make(chan struct{}),
 	}
+
+	go func() {
+		<-ctx.Done()
+		cause := context.Cause(ctx)
+		code := ws.StatusNormalClosure
+		reason := ""
+		var cc closeCause
+		if errors.As(cause, &cc) {
+			code = cc.code
+			reason = cc.reason
+		} else if cause != nil {
+			reason = cause.Error()
+		}
+		r.closeConnection(code, reason)
+	}()
 
 	return r
 }
@@ -136,6 +180,9 @@ func (r *Relay) ConnectWithClient(ctx context.Context, client *http.Client) erro
 	if r.connectionContext == nil || r.Subscriptions == nil {
 		return fmt.Errorf("relay must be initialized with a call to NewRelay()")
 	}
+	if r.connectionContext.Err() != nil {
+		return fmt.Errorf("relay context canceled")
+	}
 
 	if r.URL == "" {
 		return fmt.Errorf("invalid relay URL '%s'", r.URL)
@@ -146,6 +193,157 @@ func (r *Relay) ConnectWithClient(ctx context.Context, client *http.Client) erro
 	}
 
 	return nil
+}
+
+func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) error {
+	debugLogf("{%s} connecting!\n", r.URL)
+	if r.connectionContext.Err() != nil {
+		return fmt.Errorf("relay context canceled")
+	}
+
+	dialCtx := ctx
+	if _, ok := dialCtx.Deadline(); !ok {
+		// if no timeout is set, force it to 7 seconds
+		dialCtx, _ = context.WithTimeoutCause(ctx, 7*time.Second, errors.New("connection took too long"))
+	}
+
+	dialOpts := &ws.DialOptions{
+		HTTPHeader: http.Header{
+			textproto.CanonicalMIMEHeaderKey("User-Agent"): {"fiatjaf.com/nostr"},
+		},
+		CompressionMode: ws.CompressionContextTakeover,
+		HTTPClient:      httpClient,
+	}
+	for k, v := range r.requestHeader {
+		dialOpts.HTTPHeader[k] = v
+	}
+
+	c, _, err := ws.Dial(dialCtx, r.URL, dialOpts)
+	if err != nil {
+		return err
+	}
+	c.SetReadLimit(2 << 24) // 33MB
+
+	// ping every 19 seconds
+	ticker := time.NewTicker(19 * time.Second)
+
+	// main websocket loop
+	readQueue := make(chan string)
+
+	r.conn = c
+	r.writeQueue = make(chan writeRequest)
+	if r.closed == nil {
+		r.closed = &atomic.Bool{}
+	}
+	r.closed.Store(false)
+	r.closedNotify = make(chan struct{})
+
+	connCtx := r.connectionContext
+	go func() {
+		pingAttempt := 0
+
+		for {
+			select {
+			case <-connCtx.Done():
+				return
+			case <-r.closedNotify:
+				return
+			case <-ticker.C:
+				debugLogf("{%s} pinging\n", r.URL)
+				pingCtx, cancel := context.WithTimeoutCause(connCtx, time.Millisecond*800, errors.New("ping took too long"))
+				err := c.Ping(pingCtx)
+				cancel()
+
+				if err != nil {
+					pingAttempt++
+					debugLogf("{%s} error writing ping (attempt %d): %v", r.URL, pingAttempt, err)
+
+					if pingAttempt >= 3 {
+						debugLogf("{%s} error writing ping after multiple attempts; closing websocket", r.URL)
+						_ = r.close(ErrPingFailed)
+					}
+
+					continue
+				}
+
+				// ping was OK
+				debugLogf("{%s} ping OK", r.URL)
+				pingAttempt = 0
+			case wr := <-r.writeQueue:
+				debugLogf("{%s} sending '%v'\n", r.URL, string(wr.msg))
+				writeCtx, cancel := context.WithTimeoutCause(connCtx, time.Second*10, errors.New("write took too long"))
+				err := c.Write(writeCtx, ws.MessageText, wr.msg)
+				cancel()
+				if err != nil {
+					debugLogf("{%s} closing!, write failed: '%s'\n", r.URL, err)
+					_ = r.close(closeCause{code: ws.StatusAbnormalClosure, reason: "write failed"})
+					if wr.answer != nil {
+						wr.answer <- err
+					}
+					return
+				}
+				if wr.answer != nil {
+					close(wr.answer)
+				}
+			case msg := <-readQueue:
+				debugLogf("{%s} received %v\n", r.URL, msg)
+				r.handleMessage(msg)
+			}
+		}
+	}()
+
+	// read loop -- loops back to the main loop
+	go func() {
+		buf := new(bytes.Buffer)
+
+		for {
+			buf.Reset()
+
+			_, reader, err := c.Reader(connCtx)
+			if err != nil {
+				debugLogf("{%s} closing!, reader failure: '%s'\n", r.URL, err)
+				_ = r.close(closeCause{code: ws.StatusAbnormalClosure, reason: "failed to get reader"})
+				return
+			}
+			if _, err := io.Copy(buf, reader); err != nil {
+				debugLogf("{%s} closing!, read failure: '%s'\n", r.URL, err)
+				_ = r.close(closeCause{code: ws.StatusAbnormalClosure, reason: "failed to read"})
+				return
+			}
+
+			msg := string(buf.Bytes())
+			readQueue <- msg
+		}
+	}()
+
+	return nil
+}
+
+func (r *Relay) closeConnection(code ws.StatusCode, reason string) {
+	if r.closed == nil {
+		r.closed = &atomic.Bool{}
+	}
+	wasClosed := r.closed.Swap(true)
+	if wasClosed {
+		return
+	}
+	if r.closeMutex != nil {
+		r.closeMutex.Invalidate()
+	}
+	if r.conn != nil {
+		_ = r.conn.Close(code, reason)
+	}
+	if r.closeMutex != nil {
+		r.closeMutex.Lock()
+		if r.closedNotify != nil {
+			close(r.closedNotify)
+		}
+		if r.writeQueue != nil {
+			close(r.writeQueue)
+		}
+		r.conn = nil
+		r.closeMutex.Unlock()
+	}
 }
 
 func (r *Relay) handleMessage(message string) {
@@ -244,13 +442,15 @@ func (r *Relay) handleMessage(message string) {
 
 // Write queues an arbitrary message to be sent to the relay.
 func (r *Relay) Write(msg []byte) {
-	r.closeMutex.Lock()
-	defer r.closeMutex.Unlock()
 	select {
+	case <-r.closeMutex.C(): // this locks the mutex
 	case <-r.closedNotify:
 		return
-	default:
+	case <-r.connectionContext.Done():
+		return
 	}
+
+	defer r.closeMutex.Unlock()
 
 	select {
 	case <-r.connectionContext.Done():
@@ -261,13 +461,17 @@ func (r *Relay) Write(msg []byte) {
 // WriteWithError is like Write, but returns an error if the write fails (and the connection gets closed).
 func (r *Relay) WriteWithError(msg []byte) error {
 	ch := make(chan error)
-	r.closeMutex.Lock()
-	defer r.closeMutex.Unlock()
+
 	select {
+	case <-r.closeMutex.C(): // this locks the channel/mutex
 	case <-r.closedNotify:
 		return fmt.Errorf("failed to write to %s: <closed>", r.URL)
-	default:
+	case <-r.connectionContext.Done():
+		return fmt.Errorf("failed to write to %s: <closed>", r.URL)
 	}
+
+	defer r.closeMutex.Unlock()
+
 	select {
 	case <-r.connectionContext.Done():
 		return fmt.Errorf("failed to write to %s: %w", r.URL, context.Cause(r.connectionContext))
@@ -396,9 +600,9 @@ func (r *Relay) Subscribe(ctx context.Context, filter Filter, opts SubscriptionO
 	go func() {
 		select {
 		case <-r.closedNotify:
-			sub.unsub(ErrDisconnected)
+			sub.cancel(ErrDisconnected)
 		case <-ctx.Done():
-			sub.unsub(nil)
+			sub.cancel(nil)
 		}
 	}()
 
@@ -448,7 +652,7 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 
 		go func() {
 			time.Sleep(opts.MaxWaitForEOSE)
-			sub.eoseTimedOut <- struct{}{}
+			close(sub.eoseTimedOut)
 			sub.dispatchEose()
 		}()
 	}
@@ -535,19 +739,7 @@ func (r *Relay) Close() error {
 }
 
 func (r *Relay) close(reason error) error {
-	r.closeMutex.Lock()
-	defer r.closeMutex.Unlock()
-
-	if r.connectionContextCancel == nil {
-		return fmt.Errorf("relay already closed")
-	}
-
-	if r.conn == nil {
-		return fmt.Errorf("relay not connected")
-	}
-
 	r.connectionContextCancel(reason)
-
 	return nil
 }
 

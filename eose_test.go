@@ -17,7 +17,7 @@ func TestEOSEMadness(t *testing.T) {
 	}, SubscriptionOptions{})
 	assert.NoError(t, err)
 
-	timeout := time.After(3 * time.Second)
+	timeout := time.After(2 * time.Second)
 	n := 0
 	e := 0
 
