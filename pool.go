@@ -164,6 +164,12 @@ func (pool *Pool) EnsureRelay(url string) (*Relay, error) {
 	}
 
 	pool.Relays.Store(nm, relay)
+	go func(r *Relay, relayURL string) {
+		<-r.Context().Done()
+		if current, ok := pool.Relays.Load(relayURL); ok && current == r {
+			pool.Relays.Delete(relayURL)
+		}
+	}(relay, nm)
 	return relay, nil
 }
 
