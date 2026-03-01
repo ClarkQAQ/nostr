@@ -585,12 +585,12 @@ func (r *Relay) Subscribe(ctx context.Context, filter Filter, opts SubscriptionO
 	sub := r.PrepareSubscription(ctx, filter, opts)
 
 	if r.conn == nil {
-		sub.unsub(ErrNotConnected)
+		sub.cancel(ErrNotConnected)
 		return nil, fmt.Errorf("not connected to %s", r.URL)
 	}
 
 	if err := sub.Fire(); err != nil {
-		sub.unsub(ErrFireFailed)
+		sub.cancel(ErrFireFailed)
 		return nil, fmt.Errorf("couldn't subscribe to %v at %s: %w", filter, r.URL, err)
 	}
 
@@ -655,7 +655,24 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 	}
 
 	// start handling events, eose, unsub etc:
-	go sub.start()
+	go func() {
+		<-sub.Context.Done()
+
+		// mark subscription as closed and send a CLOSE to the relay (naïve sync.Once implementation)
+		if sub.live.CompareAndSwap(true, false) {
+			closeMsg := CloseEnvelope(sub.id)
+			closeb, _ := (&closeMsg).MarshalJSON()
+			sub.Relay.Write(closeb)
+		}
+
+		// remove subscription from our map
+		sub.Relay.Subscriptions.Delete(sub.counter)
+
+		// do this so we don't have the possibility of closing the Events channel and then trying to send to it
+		sub.mu.Lock()
+		close(sub.Events)
+		sub.mu.Unlock()
+	}()
 
 	return sub
 }
@@ -711,7 +728,7 @@ func (r *Relay) countInternal(ctx context.Context, filter Filter, opts Subscript
 		return CountEnvelope{}, err
 	}
 
-	defer sub.unsub(errors.New("countInternal() ended"))
+	defer sub.cancel(errors.New("countInternal() ended"))
 
 	if _, ok := ctx.Deadline(); !ok {
 		// if no timeout is set, force it to 7 seconds

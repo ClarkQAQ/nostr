@@ -75,18 +75,6 @@ type SubscriptionOptions struct {
 	MaxWaitForEOSE time.Duration
 }
 
-func (sub *Subscription) start() {
-	<-sub.Context.Done()
-
-	// the subscription ends once the context is canceled (if not already)
-	sub.unsub(errors.New("context done on start()")) // this will set sub.live to false
-
-	// do this so we don't have the possibility of closing the Events channel and then trying to send to it
-	sub.mu.Lock()
-	close(sub.Events)
-	sub.mu.Unlock()
-}
-
 // GetID returns the subscription ID.
 func (sub *Subscription) GetID() string { return sub.id }
 
@@ -133,37 +121,14 @@ func (sub *Subscription) handleClosed(reason string) {
 	go func() {
 		sub.ClosedReason <- reason
 		sub.live.Store(false) // set this so we don't send an unnecessary CLOSE to the relay
-		sub.unsub(fmt.Errorf("CLOSED received: %s", reason))
+		sub.cancel(fmt.Errorf("CLOSED received: %s", reason))
 	}()
 }
 
 // Unsub closes the subscription, sending "CLOSE" to relay as in NIP-01.
 // Unsub() also closes the channel sub.Events and makes a new one.
 func (sub *Subscription) Unsub() {
-	sub.unsub(errors.New("Unsub() called"))
-}
-
-// unsub is the internal implementation of Unsub.
-func (sub *Subscription) unsub(err error) {
-	// cancel the context (if it's not canceled already)
-	sub.cancel(err)
-
-	// mark subscription as closed and send a CLOSE to the relay (naïve sync.Once implementation)
-	if sub.live.CompareAndSwap(true, false) {
-		sub.Close()
-	}
-
-	// remove subscription from our map
-	sub.Relay.Subscriptions.Delete(sub.counter)
-}
-
-// Close just sends a CLOSE message. You probably want Unsub() instead.
-func (sub *Subscription) Close() {
-	if sub.Relay.IsConnected() {
-		closeMsg := CloseEnvelope(sub.id)
-		closeb, _ := (&closeMsg).MarshalJSON()
-		sub.Relay.Write(closeb)
-	}
+	sub.cancel(errors.New("Unsub() called"))
 }
 
 // Sub sets sub.Filters and then calls sub.Fire(ctx).
