@@ -40,7 +40,7 @@ require (
 )
 
 require (
-	fiatjaf.com/lib v0.3.5
+	fiatjaf.com/lib v0.3.6
 	github.com/dgraph-io/ristretto/v2 v2.3.0
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/sivukhin/godjot v1.0.6

@@ -197,9 +197,6 @@ func (r *Relay) ConnectWithClient(ctx context.Context, client *http.Client) erro
 
 func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) error {
 	debugLogf("{%s} connecting!\n", r.URL)
-	if r.connectionContext.Err() != nil {
-		return fmt.Errorf("relay context canceled")
-	}
 
 	dialCtx := ctx
 	if _, ok := dialCtx.Deadline(); !ok {
