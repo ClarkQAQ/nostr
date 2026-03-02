@@ -474,6 +474,10 @@ func (r *Relay) WriteWithError(msg []byte) error {
 
 	defer r.closeMutex.Unlock()
 
+	if r.writeQueue != nil {
+		return nil
+	}
+
 	select {
 	case <-r.connectionContext.Done():
 		return fmt.Errorf("failed to write to %s: %w", r.URL, context.Cause(r.connectionContext))
