@@ -474,7 +474,7 @@ func (r *Relay) WriteWithError(msg []byte) error {
 
 	defer r.closeMutex.Unlock()
 
-	if r.writeQueue != nil {
+	if r.writeQueue == nil {
 		return nil
 	}
 
