@@ -79,6 +79,7 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 		ok := false
 		edit := EditMetadata{When: evt.CreatedAt}
 		y := true
+		n := false
 
 		for _, tag := range evt.Tags {
 			if len(tag) >= 1 {
@@ -101,20 +102,38 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 				case "closed":
 					edit.ClosedValue = &y
 					ok = true
+				case "open":
+					edit.ClosedValue = &n
+					ok = true
 				case "restricted":
 					edit.RestrictedValue = &y
+					ok = true
+				case "unrestricted":
+					edit.RestrictedValue = &n
 					ok = true
 				case "hidden":
 					edit.HiddenValue = &y
 					ok = true
+				case "visible":
+					edit.HiddenValue = &n
+					ok = true
 				case "private":
 					edit.PrivateValue = &y
+					ok = true
+				case "public":
+					edit.PrivateValue = &n
 					ok = true
 				case "no-text":
 					edit.NoTextValue = &y
 					ok = true
+				case "text":
+					edit.NoTextValue = &n
+					ok = true
 				case "livekit":
 					edit.LivekitValue = &y
+					ok = true
+				case "no-livekit":
+					edit.LivekitValue = &n
 					ok = true
 				}
 			}
