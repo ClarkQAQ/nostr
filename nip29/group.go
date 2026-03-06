@@ -284,6 +284,8 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 				group.Hidden = true
 			case "no-text":
 				group.NoText = true
+			case "livekit":
+				group.Livekit = true
 			default:
 				if len(tag) >= 2 {
 					switch tag[0] {
@@ -293,8 +295,6 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 						group.About = tag[1]
 					case "picture":
 						group.Picture = tag[1]
-					case "livekit":
-						group.Livekit = true
 					}
 				}
 			}
