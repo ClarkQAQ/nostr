@@ -125,9 +125,6 @@ func NewRelay(ctx context.Context, url string, opts RelayOptions) *Relay {
 			if r.closedNotify != nil {
 				close(r.closedNotify)
 			}
-			if r.writeQueue != nil {
-				close(r.writeQueue)
-			}
 			r.conn = nil
 			r.closeMutex.Unlock()
 		}
