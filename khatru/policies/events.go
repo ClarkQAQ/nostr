@@ -111,6 +111,9 @@ func RejectEventsWithBase64Media(ctx context.Context, evt nostr.Event) (bool, st
 }
 
 func OnlyAllowNIP70ProtectedEvents(ctx context.Context, event nostr.Event) (reject bool, msg string) {
+	if event.Kind == 5 {
+		return false, ""
+	}
 	if nip70.IsProtected(event) {
 		return false, ""
 	}
