@@ -12,18 +12,22 @@ type EventRef struct{ nostr.Pointer }
 func (e EventRef) Value() string { return e.Pointer.AsTagReference() }
 
 func (sys *System) FetchBookmarkList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, EventRef] {
-	if sys.BookmarkListCache == nil {
-		sys.BookmarkListCache = cache_memory.New[GenericList[string, EventRef]](1000)
-	}
+	sys.bookmarkListCacheOnce.Do(func() {
+		if sys.BookmarkListCache == nil {
+			sys.BookmarkListCache = cache_memory.New[GenericList[string, EventRef]](1000)
+		}
+	})
 
 	ml, _ := fetchGenericList(sys, ctx, pubkey, 10003, kind_10003, parseEventRef, sys.BookmarkListCache)
 	return ml
 }
 
 func (sys *System) FetchPinList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, EventRef] {
-	if sys.PinListCache == nil {
-		sys.PinListCache = cache_memory.New[GenericList[string, EventRef]](1000)
-	}
+	sys.pinListCacheOnce.Do(func() {
+		if sys.PinListCache == nil {
+			sys.PinListCache = cache_memory.New[GenericList[string, EventRef]](1000)
+		}
+	})
 
 	ml, _ := fetchGenericList(sys, ctx, pubkey, 10001, kind_10001, parseEventRef, sys.PinListCache)
 	return ml

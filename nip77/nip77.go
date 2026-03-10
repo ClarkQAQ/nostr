@@ -128,17 +128,27 @@ func NegentropySync(
 		})
 	}
 
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		wg.Wait()
-		errch <- nil
+		select {
+		case errch <- nil:
+		case <-ctx.Done():
+		}
 	}()
 
-	err = <-errch
-	if err != nil {
-		return err
+	select {
+	case err = <-errch:
+		if err != nil {
+			return err
+		}
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
 	}
-
-	return nil
 }
 
 func SyncEventsFromIDs(ctx context.Context, dir Direction) {

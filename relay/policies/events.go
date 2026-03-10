@@ -3,6 +3,7 @@ package policies
 import (
 	"context"
 	"fmt"
+	"iter"
 	"regexp"
 	"slices"
 	"strings"
@@ -110,6 +111,9 @@ func RejectEventsWithBase64Media(ctx context.Context, evt nostr.Event) (bool, st
 }
 
 func OnlyAllowNIP70ProtectedEvents(ctx context.Context, event nostr.Event) (reject bool, msg string) {
+	if event.Kind == 5 {
+		return false, ""
+	}
 	if nip70.IsProtected(event) {
 		return false, ""
 	}
@@ -143,4 +147,56 @@ func RejectUnprefixedNostrReferences(ctx context.Context, event nostr.Event) (bo
 	}
 
 	return false, ""
+}
+
+// PreventNormalDuplicates prevents normal events that refer to the same thing from being saved.
+// For kinds 6, 7, 16, 1018 it checks "e" tags.
+// For kind 1163 it checks "p" tags.
+// For kinds 1163, 6, 16, 7516, 7517 it checks "a" tags.
+func PreventNormalDuplicates(query func(nostr.Filter, int) iter.Seq[nostr.Event]) func(ctx context.Context, event nostr.Event) (bool, string) {
+	exists := func(event nostr.Event, tagName string) bool {
+		hasAll := true
+		for t := range event.Tags.FindAll(tagName) {
+			hasThis := false
+			for range query(nostr.Filter{
+				Authors: []nostr.PubKey{event.PubKey},
+				Kinds:   []nostr.Kind{event.Kind},
+				Tags:    nostr.TagMap{tagName: []string{t[1]}},
+			}, 1) {
+				hasThis = true
+			}
+			if !hasThis {
+				hasAll = false
+				break
+			}
+		}
+		return hasAll
+	}
+
+	return func(ctx context.Context, event nostr.Event) (bool, string) {
+		reject := false
+
+		switch event.Kind {
+		case 6:
+			reject = exists(event, "e") && exists(event, "a")
+		case 7:
+			reject = exists(event, "e") && exists(event, "a")
+		case 16:
+			reject = exists(event, "e") && exists(event, "a")
+		case 1018:
+			reject = exists(event, "e")
+		case 1163:
+			reject = exists(event, "p") && exists(event, "a")
+		case 7516:
+			reject = exists(event, "a")
+		case 7517:
+			reject = exists(event, "a")
+		}
+
+		if reject {
+			return true, "an event similar to this already exists"
+		}
+
+		return false, ""
+	}
 }

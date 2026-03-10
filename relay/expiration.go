@@ -39,8 +39,14 @@ type expirationManager struct {
 	events expiringEventHeap
 	mu     sync.Mutex
 
+	// a function to query the relay database, generally the same as relay.queryStored
 	queryStored func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event]
+
+	// a function to delete an event from the relay database, generally the same as relay.DeleteEvent
 	deleteEvent func(ctx context.Context, id nostr.ID) error
+
+	// a function to call after an event has been deleted, generally the same as relay.OnEventDeleted
+	deleteCallback func(ctx context.Context, id nostr.Event)
 
 	interval        time.Duration
 	initialScanDone bool
@@ -109,7 +115,11 @@ func (em *expirationManager) checkExpiredEvents(ctx context.Context) {
 		heap.Pop(&em.events)
 
 		ctx := context.WithValue(ctx, internalCallKey, struct{}{})
-		em.deleteEvent(ctx, next.id)
+		if nil == em.deleteEvent(ctx, next.id) && em.deleteCallback != nil {
+			for evt := range em.queryStored(ctx, nostr.Filter{IDs: []nostr.ID{next.id}}) {
+				em.deleteCallback(ctx, evt)
+			}
+		}
 	}
 }
 
@@ -142,12 +152,14 @@ func (em *expirationManager) removeEvent(id nostr.ID) {
 func (rl *Relay) StartExpirationManager(
 	queryStored func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event],
 	deleteEvent func(ctx context.Context, id nostr.ID) error,
+	onDeleteCallback func(ctx context.Context, evt nostr.Event),
 ) {
 	rl.expirationManager = &expirationManager{
 		events: make(expiringEventHeap, 0),
 
-		queryStored: queryStored,
-		deleteEvent: deleteEvent,
+		queryStored:    queryStored,
+		deleteEvent:    deleteEvent,
+		deleteCallback: onDeleteCallback,
 
 		interval: time.Hour,
 		kill:     make(chan struct{}),

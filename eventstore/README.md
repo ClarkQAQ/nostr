@@ -29,8 +29,6 @@ type Store interface {
 }
 ```
 
-[![Go Reference](https://pkg.go.dev/badge/fiatjaf.com/nostr/eventstore.svg)](https://pkg.go.dev/fiatjaf.com/nostr/eventstore) [![Run Tests](https://fiatjaf.com/nostr/eventstore/actions/workflows/test.yml/badge.svg)](https://fiatjaf.com/nostr/eventstore/actions/workflows/test.yml)
-
 ## Available Implementations
 
 - **bleve**: Full-text search and indexing using the Bleve search library

@@ -153,6 +153,9 @@ func (w *Wallet) getProofsForSending(
 ) (chosenTokens, uint64, error) {
 	byMint := make(map[string]chosenTokens)
 	for t, token := range w.Tokens {
+		if token.reserved {
+			continue
+		}
 		if fromMint != "" && token.Mint != fromMint {
 			continue
 		}

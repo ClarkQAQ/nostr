@@ -73,6 +73,22 @@ func CompareEventReverse(b, a Event) int {
 	return cmp.Compare(a.CreatedAt, b.CreatedAt)
 }
 
+// CompareRelayEvent is meant to to be used with slices.Sort
+func CompareRelayEvent(a, b RelayEvent) int {
+	if a.CreatedAt == b.CreatedAt {
+		return bytes.Compare(a.ID[:], b.ID[:])
+	}
+	return cmp.Compare(a.CreatedAt, b.CreatedAt)
+}
+
+// CompareRelayEventReverse is meant to to be used with slices.Sort
+func CompareRelayEventReverse(b, a RelayEvent) int {
+	if a.CreatedAt == b.CreatedAt {
+		return bytes.Compare(a.ID[:], b.ID[:])
+	}
+	return cmp.Compare(a.CreatedAt, b.CreatedAt)
+}
+
 // AppendUnique adds items to an array only if they don't already exist in the array.
 // Returns the modified array.
 func AppendUnique[I comparable](arr []I, item ...I) []I {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"fiatjaf.com/nostr"
@@ -23,7 +24,7 @@ type TagItemWithValue[V comparable] interface {
 
 var (
 	genericListMutexes = [60]sync.Mutex{}
-	valueWasJustCached = [60]bool{}
+	valueWasJustCached = [60]atomic.Bool{}
 )
 
 func fetchGenericList[V comparable, I TagItemWithValue[V]](
@@ -42,10 +43,9 @@ func fetchGenericList[V comparable, I TagItemWithValue[V]](
 	lockIdx := (nostr.Kind(n) + actualKind) % 60
 	genericListMutexes[lockIdx].Lock()
 
-	if valueWasJustCached[lockIdx] {
+	if valueWasJustCached[lockIdx].CompareAndSwap(true, false) {
 		// this ensures the cache has had time to commit the values
 		// so we don't repeat a fetch immediately after the other
-		valueWasJustCached[lockIdx] = false
 		time.Sleep(time.Millisecond * 10)
 	}
 
@@ -83,7 +83,7 @@ func fetchGenericList[V comparable, I TagItemWithValue[V]](
 
 		// and finally save this to cache
 		cache.SetWithTTL(pubkey, v, time.Hour*6)
-		valueWasJustCached[lockIdx] = true
+		valueWasJustCached[lockIdx].Store(true)
 
 		return v, true
 	}
@@ -99,7 +99,7 @@ func fetchGenericList[V comparable, I TagItemWithValue[V]](
 
 	// save cache even if we didn't get anything
 	cache.SetWithTTL(pubkey, v, time.Hour*6)
-	valueWasJustCached[lockIdx] = true
+	valueWasJustCached[lockIdx].Store(true)
 
 	return v, false
 }

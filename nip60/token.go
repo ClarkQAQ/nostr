@@ -14,6 +14,7 @@ type Token struct {
 	Proofs  cashu.Proofs `json:"proofs"`
 	Deleted []nostr.ID   `json:"del,omitempty"`
 
+	reserved bool
 	mintedAt nostr.Timestamp
 	event    *nostr.Event
 }

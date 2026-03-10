@@ -31,14 +31,15 @@ func (db *HintDB) Save(pubkey nostr.PubKey, relay string, key hints.HintKey, ts 
 		ts = now
 	}
 
+	db.Lock()
+	defer db.Unlock()
+
 	relayIndex := slices.Index(db.RelayBySerial, relay)
 	if relayIndex == -1 {
 		relayIndex = len(db.RelayBySerial)
 		db.RelayBySerial = append(db.RelayBySerial, relay)
 	}
 
-	db.Lock()
-	defer db.Unlock()
 	// fmt.Println(" ", relay, "index", relayIndex, "--", "adding", hints.HintKey(key).String(), ts)
 
 	entries, _ := db.OrderedRelaysByPubKey[pubkey]

@@ -68,7 +68,7 @@ func NewBatchedLoader[K comparable, V any](batchFn BatchFunc[K, V], opts Options
 // The first context passed to this function within a given batch window will be provided to
 // the registered BatchFunc.
 func (l *Loader[K, V]) Load(ctx context.Context, key K) (value V, err error) {
-	c := make(chan Result[V])
+	c := make(chan Result[V], 1)
 
 	// this is sent to batch fn. It contains the key and the channel to return
 	// the result on
@@ -83,7 +83,9 @@ func (l *Loader[K, V]) Load(ctx context.Context, key K) (value V, err error) {
 			case <-b.thresholdReached:
 			case <-time.After(l.wait):
 				l.batchLock.Lock()
-				l.curBatcher = l.newBatcher()
+				if l.curBatcher == b {
+					l.curBatcher = l.newBatcher()
+				}
 				l.batchLock.Unlock()
 			}
 
@@ -117,11 +119,15 @@ func (l *Loader[K, V]) Load(ctx context.Context, key K) (value V, err error) {
 
 	l.batchLock.Unlock()
 
-	if v, ok := <-c; ok {
-		return v.Data, v.Error
+	select {
+	case v, ok := <-c:
+		if ok {
+			return v.Data, v.Error
+		}
+		return value, NoValueError
+	case <-ctx.Done():
+		return value, ctx.Err()
 	}
-
-	return value, NoValueError
 }
 
 type batcher[K comparable, V any] struct {

@@ -55,6 +55,12 @@ type Group struct {
 	// indicates that relays should hide group metadata from non-members
 	Hidden bool
 
+	// indicates that text messages are not allowed in the group
+	NoText bool
+
+	// indicates that the group supports audio/video live chat
+	Livekit bool
+
 	Roles       []*Role
 	InviteCodes []string
 
@@ -69,6 +75,7 @@ func (group Group) String() string {
 	maybeRestricted := ""
 	maybeHidden := ""
 	maybeClosed := ""
+	maybeNoText := ""
 
 	if group.Private {
 		maybePrivate = " private"
@@ -81,6 +88,14 @@ func (group Group) String() string {
 	}
 	if group.Closed {
 		maybeClosed = " closed"
+	}
+	if group.NoText {
+		maybeNoText = " no-text"
+	}
+
+	maybeLivekit := ""
+	if group.Livekit {
+		maybeLivekit = " livekit"
 	}
 
 	members := make([]string, len(group.Members))
@@ -101,13 +116,15 @@ func (group Group) String() string {
 		i++
 	}
 
-	return fmt.Sprintf(`<Group %s name="%s"%s%s%s%s picture="%s" about="%s" members=[%v]>`,
+	return fmt.Sprintf(`<Group %s name="%s"%s%s%s%s%s%s picture="%s" about="%s" members=[%v]>`,
 		group.Address,
 		group.Name,
 		maybePrivate,
 		maybeRestricted,
 		maybeHidden,
 		maybeClosed,
+		maybeNoText,
+		maybeLivekit,
 		group.Picture,
 		group.About,
 		strings.Join(members, " "),
@@ -172,6 +189,13 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	}
 	if group.Closed {
 		evt.Tags = append(evt.Tags, nostr.Tag{"closed"})
+	}
+	if group.NoText {
+		evt.Tags = append(evt.Tags, nostr.Tag{"no-text"})
+	}
+
+	if group.Livekit {
+		evt.Tags = append(evt.Tags, nostr.Tag{"livekit"})
 	}
 
 	return evt
@@ -247,27 +271,34 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 	group.LastMetadataUpdate = evt.CreatedAt
 	group.Name = group.Address.ID
 
-	if tag := evt.Tags.Find("name"); tag != nil {
-		group.Name = tag[1]
-	}
-	if tag := evt.Tags.Find("about"); tag != nil {
-		group.About = tag[1]
-	}
-	if tag := evt.Tags.Find("picture"); tag != nil {
-		group.Picture = tag[1]
-	}
-
-	if tag := evt.Tags.Find("private"); tag != nil {
-		group.Private = true
-	}
-	if tag := evt.Tags.Find("restricted"); tag != nil {
-		group.Restricted = true
-	}
-	if tag := evt.Tags.Find("hidden"); tag != nil {
-		group.Hidden = true
-	}
-	if tag := evt.Tags.Find("closed"); tag != nil {
-		group.Closed = true
+	for _, tag := range evt.Tags {
+		if len(tag) >= 1 {
+			switch tag[0] {
+			case "private":
+				group.Private = true
+			case "restricted":
+				group.Restricted = true
+			case "closed":
+				group.Closed = true
+			case "hidden":
+				group.Hidden = true
+			case "no-text":
+				group.NoText = true
+			case "livekit":
+				group.Livekit = true
+			default:
+				if len(tag) >= 2 {
+					switch tag[0] {
+					case "name":
+						group.Name = tag[1]
+					case "about":
+						group.About = tag[1]
+					case "picture":
+						group.Picture = tag[1]
+					}
+				}
+			}
+		}
 	}
 
 	return nil

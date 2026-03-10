@@ -39,6 +39,7 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.41.0
 	github.com/cockroachdb/pebble/v2 v2.1.3
 	github.com/dgraph-io/badger/v4 v4.8.0
+	fiatjaf.com/lib v0.3.6
 	github.com/dgraph-io/ristretto/v2 v2.3.0
 	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/go-git/go-git/v5 v5.16.3

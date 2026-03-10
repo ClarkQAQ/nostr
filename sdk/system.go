@@ -2,7 +2,9 @@ package sdk
 
 import (
 	"context"
-	"math/rand/v2"
+	"math/rand"
+	"sync"
+	"sync/atomic"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
@@ -29,34 +31,49 @@ import (
 // default they're set to in-memory stores, but ideally persisteable
 // implementations should be given (some alternatives are provided in subpackages).
 type System struct {
-	KVStore               kvstore.KVStore
-	MetadataCache         cache.Cache32[ProfileMetadata]
-	RelayListCache        cache.Cache32[GenericList[string, Relay]]
-	FollowListCache       cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
-	MuteListCache         cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
-	BookmarkListCache     cache.Cache32[GenericList[string, EventRef]]
-	PinListCache          cache.Cache32[GenericList[string, EventRef]]
-	BlockedRelayListCache cache.Cache32[GenericList[string, RelayURL]]
-	SearchRelayListCache  cache.Cache32[GenericList[string, RelayURL]]
-	TopicListCache        cache.Cache32[GenericList[string, Topic]]
-	RelaySetsCache        cache.Cache32[GenericSets[string, RelayURL]]
-	FollowSetsCache       cache.Cache32[GenericSets[nostr.PubKey, ProfileRef]]
-	TopicSetsCache        cache.Cache32[GenericSets[string, Topic]]
-	ZapProviderCache      cache.Cache32[nostr.PubKey]
-	MintKeysCache         cache.Cache32[map[uint64]*btcec.PublicKey]
-	NutZapInfoCache       cache.Cache32[NutZapInfo]
-	Hints                 hints.HintsDB
-	Pool                  *nostr.Pool
-	RelayListRelays       *RelayStream
-	FollowListRelays      *RelayStream
-	MetadataRelays        *RelayStream
-	FallbackRelays        *RelayStream
-	JustIDRelays          *RelayStream
-	UserSearchRelays      *RelayStream
-	NoteSearchRelays      *RelayStream
-	Store                 eventstore.Store
+	KVStore                   kvstore.KVStore
+	metadataCacheOnce         sync.Once
+	MetadataCache             cache.Cache32[ProfileMetadata]
+	relayListCacheOnce        sync.Once
+	RelayListCache            cache.Cache32[GenericList[string, Relay]]
+	followListCacheOnce       sync.Once
+	FollowListCache           cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	muteListCacheOnce         sync.Once
+	MuteListCache             cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	bookmarkListCacheOnce     sync.Once
+	BookmarkListCache         cache.Cache32[GenericList[string, EventRef]]
+	pinListCacheOnce          sync.Once
+	PinListCache              cache.Cache32[GenericList[string, EventRef]]
+	blockedRelayListCacheOnce sync.Once
+	BlockedRelayListCache     cache.Cache32[GenericList[string, RelayURL]]
+	searchRelayListCacheOnce  sync.Once
+	SearchRelayListCache      cache.Cache32[GenericList[string, RelayURL]]
+	topicListCacheOnce        sync.Once
+	TopicListCache            cache.Cache32[GenericList[string, Topic]]
+	relaySetsCacheOnce        sync.Once
+	RelaySetsCache            cache.Cache32[GenericSets[string, RelayURL]]
+	followSetsCacheOnce       sync.Once
+	FollowSetsCache           cache.Cache32[GenericSets[nostr.PubKey, ProfileRef]]
+	topicSetsCacheOnce        sync.Once
+	TopicSetsCache            cache.Cache32[GenericSets[string, Topic]]
+	zapProviderCacheOnce      sync.Once
+	ZapProviderCache          cache.Cache32[nostr.PubKey]
+	mintKeysCacheOnce         sync.Once
+	MintKeysCache             cache.Cache32[map[uint64]*btcec.PublicKey]
+	nutZapInfoCacheOnce       sync.Once
+	NutZapInfoCache           cache.Cache32[NutZapInfo]
+	Hints                     hints.HintsDB
+	Pool                      *nostr.Pool
+	RelayListRelays           *RelayStream
+	FollowListRelays          *RelayStream
+	MetadataRelays            *RelayStream
+	FallbackRelays            *RelayStream
+	JustIDRelays              *RelayStream
+	UserSearchRelays          *RelayStream
+	NoteSearchRelays          *RelayStream
+	Store                     eventstore.Store
 
-	Publisher wrappers.StorePublisher
+	Publisher nostr.Publisher
 
 	replaceableLoaders []*dataloader.Loader[nostr.PubKey, nostr.Event]
 	addressableLoaders []*dataloader.Loader[nostr.PubKey, []nostr.Event]
@@ -70,18 +87,20 @@ type SystemModifier func(sys *System)
 // It's used to distribute requests across multiple relays.
 type RelayStream struct {
 	URLs   []string
-	serial int
+	serial atomic.Int32
 }
 
 // NewRelayStream creates a new RelayStream with the provided URLs.
 func NewRelayStream(urls ...string) *RelayStream {
-	return &RelayStream{URLs: urls, serial: rand.Int()}
+	rs := &RelayStream{URLs: urls}
+	rs.serial.Add(rand.Int31n(int32(len(urls))))
+	return rs
 }
 
 // Next returns the next URL in the rotation.
 func (rs *RelayStream) Next() string {
-	rs.serial++
-	return rs.URLs[rs.serial%len(rs.URLs)]
+	v := rs.serial.Add(1)
+	return rs.URLs[int(v)%len(rs.URLs)]
 }
 
 // NewSystem creates a new System with default configuration,
@@ -94,17 +113,17 @@ func (rs *RelayStream) Next() string {
 func NewSystem() *System {
 	sys := &System{
 		KVStore:          kvstore_memory.NewStore(),
-		RelayListRelays:  NewRelayStream("wss://indexer.coracle.social", "wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
-		FollowListRelays: NewRelayStream("wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
-		MetadataRelays:   NewRelayStream("wss://purplepag.es", "wss://user.kindpag.es", "wss://relay.nos.social"),
+		RelayListRelays:  NewRelayStream("wss://indexer.coracle.social", "wss://purplepag.es", "wss://relay.primal.net", "wss://relay.nos.social"),
+		FollowListRelays: NewRelayStream("wss://purplepag.es", "wss://antiprimal.net", "wss://relay.damus.io", "wss://relay.nos.social"),
+		MetadataRelays:   NewRelayStream("wss://purplepag.es", "wss://antiprimal.net", "wss://relay.damus.io", "wss://relay.nos.social"),
 		FallbackRelays: NewRelayStream(
 			"wss://offchain.pub",
-			"wss://no.str.cr",
 			"wss://relay.damus.io",
 			"wss://nostr.mom",
 			"wss://nos.lol",
 			"wss://relay.mostr.pub",
 			"wss://nostr.land",
+			"wss://relay.ditto.pub",
 		),
 		JustIDRelays: NewRelayStream(
 			"wss://cache2.primal.net/v1",
@@ -130,27 +149,37 @@ func NewSystem() *System {
 		PenaltyBox:                true,
 	})
 
-	if sys.MetadataCache == nil {
-		sys.MetadataCache = cache_memory.New[ProfileMetadata](8000)
-	}
-	if sys.RelayListCache == nil {
-		sys.RelayListCache = cache_memory.New[GenericList[string, Relay]](8000)
-	}
-	if sys.ZapProviderCache == nil {
-		sys.ZapProviderCache = cache_memory.New[nostr.PubKey](8000)
-	}
-	if sys.MintKeysCache == nil {
-		sys.MintKeysCache = cache_memory.New[map[uint64]*btcec.PublicKey](8000)
-	}
-	if sys.NutZapInfoCache == nil {
-		sys.NutZapInfoCache = cache_memory.New[NutZapInfo](8000)
-	}
+	sys.metadataCacheOnce.Do(func() {
+		if sys.MetadataCache == nil {
+			sys.MetadataCache = cache_memory.New[ProfileMetadata](8000)
+		}
+	})
+	sys.relayListCacheOnce.Do(func() {
+		if sys.RelayListCache == nil {
+			sys.RelayListCache = cache_memory.New[GenericList[string, Relay]](8000)
+		}
+	})
+	sys.zapProviderCacheOnce.Do(func() {
+		if sys.ZapProviderCache == nil {
+			sys.ZapProviderCache = cache_memory.New[nostr.PubKey](8000)
+		}
+	})
+	sys.mintKeysCacheOnce.Do(func() {
+		if sys.MintKeysCache == nil {
+			sys.MintKeysCache = cache_memory.New[map[uint64]*btcec.PublicKey](8000)
+		}
+	})
+	sys.nutZapInfoCacheOnce.Do(func() {
+		if sys.NutZapInfoCache == nil {
+			sys.NutZapInfoCache = cache_memory.New[NutZapInfo](8000)
+		}
+	})
 
 	if sys.Store == nil {
 		sys.Store = &nullstore.NullStore{}
 		sys.Store.Init(context.Background())
 	}
-	sys.Publisher = wrappers.StorePublisher{Store: sys.Store, MaxLimit: 1000}
+	sys.Publisher = wrappers.DynamicPublisher{GetStore: func() eventstore.Store { return sys.Store }, MaxLimit: 1000}
 
 	sys.initializeReplaceableDataloaders()
 	sys.initializeAddressableDataloaders()
