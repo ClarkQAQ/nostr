@@ -94,6 +94,7 @@ var DefaultIPChecker = NewIPChecker(nil)
 
 func HTTPHostURL(r *http.Request, checker *IPChecker, paths ...string) *url.URL {
 	u := baseURL(r, checker)
+	u.Path, u.RawQuery = "", ""
 
 	if len(paths) > 0 {
 		u = u.JoinPath(paths...)
