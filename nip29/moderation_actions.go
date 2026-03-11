@@ -124,10 +124,10 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 					edit.PrivateValue = &n
 					ok = true
 				case "livekit":
-					edit.LivekitValue = &y
+					edit.LiveKitValue = &y
 					ok = true
 				case "no-livekit":
-					edit.LivekitValue = &n
+					edit.LiveKitValue = &n
 					ok = true
 				}
 			}
@@ -244,7 +244,7 @@ type EditMetadata struct {
 	ClosedValue     *bool
 	HiddenValue     *bool
 	PrivateValue    *bool
-	LivekitValue    *bool
+	LiveKitValue    *bool
 	When            nostr.Timestamp
 }
 
@@ -272,8 +272,8 @@ func (a EditMetadata) Apply(group *Group) {
 	if a.PrivateValue != nil {
 		group.Private = *a.PrivateValue
 	}
-	if a.LivekitValue != nil {
-		group.Livekit = *a.LivekitValue
+	if a.LiveKitValue != nil {
+		group.LiveKit = *a.LiveKitValue
 	}
 }
 
@@ -287,6 +287,7 @@ func (a CreateGroup) Apply(group *Group) {
 	group.LastMetadataUpdate = a.When
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
+	group.LastLiveKitParticipantsUpdate = a.When
 }
 
 type DeleteGroup struct {
@@ -296,6 +297,7 @@ type DeleteGroup struct {
 func (_ DeleteGroup) Name() string { return "delete-group" }
 func (a DeleteGroup) Apply(group *Group) {
 	group.Members = make(map[nostr.PubKey][]*Role)
+	group.LiveKitParticipants = make(map[nostr.PubKey]string)
 	group.Closed = true
 	group.Private = true
 	group.Restricted = true
@@ -303,10 +305,11 @@ func (a DeleteGroup) Apply(group *Group) {
 	group.Name = "[deleted]"
 	group.About = ""
 	group.Picture = ""
-	group.Livekit = false
+	group.LiveKit = false
 	group.LastMetadataUpdate = a.When
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
+	group.LastLiveKitParticipantsUpdate = a.When
 }
 
 type CreateInvite struct {
