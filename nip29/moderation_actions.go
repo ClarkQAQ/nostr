@@ -123,12 +123,6 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 				case "public":
 					edit.PrivateValue = &n
 					ok = true
-				case "no-text":
-					edit.NoTextValue = &y
-					ok = true
-				case "text":
-					edit.NoTextValue = &n
-					ok = true
 				case "livekit":
 					edit.LivekitValue = &y
 					ok = true
@@ -250,7 +244,6 @@ type EditMetadata struct {
 	ClosedValue     *bool
 	HiddenValue     *bool
 	PrivateValue    *bool
-	NoTextValue     *bool
 	LivekitValue    *bool
 	When            nostr.Timestamp
 }
@@ -278,9 +271,6 @@ func (a EditMetadata) Apply(group *Group) {
 	}
 	if a.PrivateValue != nil {
 		group.Private = *a.PrivateValue
-	}
-	if a.NoTextValue != nil {
-		group.NoText = *a.NoTextValue
 	}
 	if a.LivekitValue != nil {
 		group.Livekit = *a.LivekitValue
@@ -310,7 +300,6 @@ func (a DeleteGroup) Apply(group *Group) {
 	group.Private = true
 	group.Restricted = true
 	group.Hidden = true
-	group.NoText = true
 	group.Name = "[deleted]"
 	group.About = ""
 	group.Picture = ""

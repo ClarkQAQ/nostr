@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"fiatjaf.com/nostr"
@@ -55,11 +56,11 @@ type Group struct {
 	// indicates that relays should hide group metadata from non-members
 	Hidden bool
 
-	// indicates that text messages are not allowed in the group
-	NoText bool
-
 	// indicates that the group supports audio/video live chat
 	Livekit bool
+
+	// indicates which event kinds this group supports
+	SupportedKinds []nostr.Kind
 
 	Roles       []*Role
 	InviteCodes []string
@@ -75,7 +76,6 @@ func (group Group) String() string {
 	maybeRestricted := ""
 	maybeHidden := ""
 	maybeClosed := ""
-	maybeNoText := ""
 
 	if group.Private {
 		maybePrivate = " private"
@@ -88,9 +88,6 @@ func (group Group) String() string {
 	}
 	if group.Closed {
 		maybeClosed = " closed"
-	}
-	if group.NoText {
-		maybeNoText = " no-text"
 	}
 
 	maybeLivekit := ""
@@ -123,7 +120,6 @@ func (group Group) String() string {
 		maybeRestricted,
 		maybeHidden,
 		maybeClosed,
-		maybeNoText,
 		maybeLivekit,
 		group.Picture,
 		group.About,
@@ -190,12 +186,17 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	if group.Closed {
 		evt.Tags = append(evt.Tags, nostr.Tag{"closed"})
 	}
-	if group.NoText {
-		evt.Tags = append(evt.Tags, nostr.Tag{"no-text"})
-	}
-
 	if group.Livekit {
 		evt.Tags = append(evt.Tags, nostr.Tag{"livekit"})
+	}
+
+	if group.SupportedKinds != nil {
+		tag := make(nostr.Tag, 1, 1+len(group.SupportedKinds))
+		tag[0] = "supported_kinds"
+		for _, kind := range group.SupportedKinds {
+			tag = append(tag, strconv.Itoa(int(kind)))
+		}
+		evt.Tags = append(evt.Tags, tag)
 	}
 
 	return evt
@@ -282,10 +283,18 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 				group.Closed = true
 			case "hidden":
 				group.Hidden = true
-			case "no-text":
-				group.NoText = true
 			case "livekit":
 				group.Livekit = true
+			case "supported_kinds":
+				kinds := make([]nostr.Kind, 0, len(tag)-1)
+				for _, raw := range tag[1:] {
+					kind, err := strconv.Atoi(raw)
+					if err != nil {
+						continue
+					}
+					kinds = append(kinds, nostr.Kind(kind))
+				}
+				group.SupportedKinds = kinds
 			default:
 				if len(tag) >= 2 {
 					switch tag[0] {
