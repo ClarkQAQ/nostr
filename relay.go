@@ -254,10 +254,10 @@ func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) erro
 	ticker := time.NewTicker(19 * time.Second)
 
 	// main websocket loop
-	readQueue := make(chan string)
+	readQueue := make(chan string, 64 /* add some buffer to account for processing/IO mismatches */)
 
 	r.conn = c
-	r.writeQueue = make(chan writeRequest)
+	r.writeQueue = make(chan writeRequest, 64 /* idem */)
 	r.closed = &atomic.Bool{}
 	r.closedNotify = make(chan struct{})
 
