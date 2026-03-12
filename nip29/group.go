@@ -43,7 +43,7 @@ type Group struct {
 	Picture             string
 	About               string
 	Members             map[nostr.PubKey][]*Role
-	LiveKitParticipants map[nostr.PubKey]string
+	LiveKitParticipants []nostr.PubKey
 
 	// indicates that only members can read group messages
 	Private bool
@@ -140,7 +140,7 @@ func NewGroup(gadstr string) (Group, error) {
 		Address:             gad,
 		Name:                gad.ID,
 		Members:             make(map[nostr.PubKey][]*Role),
-		LiveKitParticipants: make(map[nostr.PubKey]string),
+		LiveKitParticipants: make([]nostr.PubKey, 0),
 	}, nil
 }
 
@@ -152,7 +152,7 @@ func NewGroupFromMetadataEvent(relayURL string, evt *nostr.Event) (Group, error)
 		},
 		Name:                evt.Tags.GetD(),
 		Members:             make(map[nostr.PubKey][]*Role),
-		LiveKitParticipants: make(map[nostr.PubKey]string),
+		LiveKitParticipants: make([]nostr.PubKey, 0),
 	}
 
 	err := g.MergeInMetadataEvent(evt)
@@ -273,13 +273,8 @@ func (group Group) ToLiveKitParticipantsEvent() nostr.Event {
 	}
 	evt.Tags[0] = nostr.Tag{"d", group.Address.ID}
 
-	for member, identity := range group.LiveKitParticipants {
+	for _, member := range group.LiveKitParticipants {
 		tag := nostr.Tag{"participant", member.Hex()}
-		if identity != "" {
-			tag = append(tag, identity)
-		} else {
-			tag = append(tag, "")
-		}
 		evt.Tags = append(evt.Tags, tag)
 	}
 
@@ -443,7 +438,7 @@ func (group *Group) MergeInLiveKitParticipantsEvent(evt *nostr.Event) error {
 	}
 
 	group.LastLiveKitParticipantsUpdate = evt.CreatedAt
-	group.LiveKitParticipants = make(map[nostr.PubKey]string)
+	group.LiveKitParticipants = make([]nostr.PubKey, 0, len(evt.Tags))
 	for _, tag := range evt.Tags {
 		if len(tag) < 2 {
 			continue
@@ -456,12 +451,10 @@ func (group *Group) MergeInLiveKitParticipantsEvent(evt *nostr.Event) error {
 		if err != nil {
 			continue
 		}
-
-		identity := ""
-		if len(tag) >= 3 {
-			identity = tag[2]
+		if slices.Contains(group.LiveKitParticipants, member) {
+			continue
 		}
-		group.LiveKitParticipants[member] = identity
+		group.LiveKitParticipants = append(group.LiveKitParticipants, member)
 	}
 
 	return nil
