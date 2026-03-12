@@ -119,6 +119,16 @@ func HTTPHostURL(r *http.Request, checker *IPChecker, paths ...string) *url.URL 
 	return u
 }
 
+func HTTPURL(r *http.Request, checker *IPChecker, paths ...string) *url.URL {
+	u := baseURL(r, checker)
+
+	if len(paths) > 0 {
+		u = u.JoinPath(paths...)
+	}
+
+	return u
+}
+
 func baseURL(r *http.Request, checker *IPChecker) *url.URL {
 	u := &url.URL{
 		Path:     r.URL.Path,
