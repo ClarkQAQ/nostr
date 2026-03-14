@@ -316,7 +316,11 @@ func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) erro
 			}
 
 			msg := string(buf.Bytes())
-			readQueue <- msg
+			select {
+			case readQueue <- msg:
+			case <-connCtx.Done():
+				return
+			}
 		}
 	}()
 
