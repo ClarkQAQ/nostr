@@ -11,20 +11,24 @@ import (
 )
 
 func NormalizeIdentifier(name string) string {
-	name = strings.TrimSpace(strings.ToLower(name))
 	res, _, _ := transform.Bytes(norm.NFKC, []byte(name))
-	runes := []rune(string(res))
+	runes := []rune(strings.ToLower(string(res)))
 
-	b := make([]rune, len(runes))
-	for i, letter := range runes {
+	words := make([]string, 0, 3)
+	word := make([]rune, 0, 12)
+	for _, letter := range runes {
 		if unicode.IsLetter(letter) || unicode.IsNumber(letter) {
-			b[i] = letter
-		} else {
-			b[i] = '-'
+			word = append(word, letter)
+		} else if len(word) > 0 {
+			words = append(words, string(word))
+			word = make([]rune, 0, 12)
 		}
 	}
+	if len(word) > 0 {
+		words = append(words, string(word))
+	}
 
-	return string(b)
+	return strings.Join(words, "-")
 }
 
 func ArticleAsHTML(content string) string {
