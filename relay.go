@@ -434,7 +434,7 @@ func (r *Relay) Write(msg []byte) {
 
 // WriteWithError is like Write, but returns an error if the write fails (and the connection gets closed).
 func (r *Relay) WriteWithError(msg []byte) error {
-	ch := make(chan error)
+	ch := make(chan error, 1)
 
 	if r.writeQueue == nil {
 		return nil
@@ -445,7 +445,13 @@ func (r *Relay) WriteWithError(msg []byte) error {
 		return fmt.Errorf("failed to write to %s: %w", r.URL, context.Cause(r.connectionContext))
 	case r.writeQueue <- writeRequest{msg: msg, answer: ch}:
 	}
-	return <-ch
+
+	select {
+	case err := <-ch:
+		return err
+	case <-r.connectionContext.Done():
+		return fmt.Errorf("failed to write to %s: %w", r.URL, context.Cause(r.connectionContext))
+	}
 }
 
 // Publish sends an "EVENT" command to the relay r as in NIP-01 and waits for an OK response.
