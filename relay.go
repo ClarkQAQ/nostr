@@ -620,6 +620,16 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 		}()
 	}
 
+	// if the relay connection dies, cancel this subscription
+	go func() {
+		select {
+		case <-sub.Context.Done():
+			return
+		case <-r.connectionContext.Done():
+			sub.cancel(context.Cause(r.connectionContext))
+		}
+	}()
+
 	// start handling events, eose, unsub etc:
 	go func() {
 		<-sub.Context.Done()
