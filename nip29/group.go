@@ -115,7 +115,7 @@ func (group Group) String() string {
 		i++
 	}
 
-	return fmt.Sprintf(`<Group %s name="%s"%s%s%s%s%s%s picture="%s" about="%s" members=[%v]>`,
+	return fmt.Sprintf(`<Group %s name="%s"%s%s%s%s%s picture="%s" about="%s" members=[%v]>`,
 		group.Address,
 		group.Name,
 		maybePrivate,
