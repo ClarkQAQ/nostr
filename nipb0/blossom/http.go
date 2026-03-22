@@ -58,6 +58,12 @@ func (c *Client) httpCall(
 	}
 	if resp.Header.StatusCode() >= 300 {
 		reason := resp.Header.Peek("X-Reason")
+		if len(reason) == 0 {
+			reason = resp.Body()
+			if len(reason) > 200 {
+				reason = append(reason[0:199], []byte("…")...)
+			}
+		}
 		return fmt.Errorf("%s returned an error (%d): %s", url, resp.StatusCode(), string(reason))
 	}
 
