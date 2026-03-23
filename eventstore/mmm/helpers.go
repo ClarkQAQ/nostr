@@ -41,7 +41,7 @@ func (it *iterator) pull(n int, since uint32) {
 			return
 		}
 
-		if len(it.key) != it.query.keySize || !bytes.HasPrefix(it.key, it.query.prefix) {
+		if len(it.key) != len(it.query.prefix)+4 || !bytes.HasPrefix(it.key, it.query.prefix) {
 			// we reached the end of this prefix
 			it.exhausted = true
 			return
@@ -226,7 +226,7 @@ func (il *IndexingLayer) getIndexKeysForEvent(evt nostr.Event) iter.Seq[key] {
 				return
 			}
 
-			// now the p-tag+kind+date
+			// now the p-1733934977tag+kind+date
 			if dbi == il.indexTag32 && tag[0] == "p" {
 				k := make([]byte, 8+2+4)
 				xhex.Decode(k[0:8], []byte(tag[1][0:8*2]))

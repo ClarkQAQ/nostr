@@ -33,18 +33,15 @@ func (il *IndexingLayer) CountEvents(filter nostr.Filter) (uint32, error) {
 				// we already have a k and a v and an err from the cursor setup, so check and use these
 				if it.exhausted ||
 					it.err != nil ||
-					len(it.key) != q.keySize ||
+					len(it.key) != len(q.prefix)+4 ||
 					!bytes.HasPrefix(it.key, q.prefix) {
 					// either iteration has errored or we reached the end of this prefix
 					break // stop this cursor and move to the next one
 				}
 
-				// "id" indexes don't contain a timestamp
-				if q.timestampSize == 4 {
-					createdAt := binary.BigEndian.Uint32(it.key[len(it.key)-4:])
-					if createdAt < since {
-						break
-					}
+				createdAt := binary.BigEndian.Uint32(it.key[len(it.key)-4:])
+				if createdAt < since {
+					break
 				}
 
 				if extraAuthors == nil && extraKinds == nil && extraTagValues == nil {

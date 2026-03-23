@@ -45,7 +45,7 @@ func (it *iterator) pull(n int, since uint32) {
 			return
 		}
 
-		if len(it.key) != query.keySize || !bytes.HasPrefix(it.key, query.prefix) {
+		if len(it.key) != len(query.prefix)+4 || !bytes.HasPrefix(it.key, query.prefix) {
 			// we reached the end of this prefix
 			it.exhausted = true
 			return

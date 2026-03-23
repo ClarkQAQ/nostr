@@ -14,8 +14,6 @@ type query struct {
 	i             int
 	dbi           lmdb.DBI
 	prefix        []byte
-	keySize       int
-	timestampSize int
 	startingPoint []byte
 }
 
@@ -41,10 +39,10 @@ func (il *IndexingLayer) prepareQueries(filter nostr.Filter) (
 			}
 		}
 		for i, q := range queries {
-			sp := make([]byte, len(q.prefix))
-			sp = sp[0:len(q.prefix)]
-			copy(sp, q.prefix)
-			queries[i].startingPoint = binary.BigEndian.AppendUint32(sp, uint32(until))
+			sp := make([]byte, len(q.prefix)+4)
+			copy(sp[0:len(q.prefix)], q.prefix)
+			binary.BigEndian.PutUint32(sp[len(q.prefix):], uint32(until))
+			queries[i].startingPoint = sp
 		}
 	}()
 
@@ -65,39 +63,27 @@ func (il *IndexingLayer) prepareQueries(filter nostr.Filter) (
 		}
 
 		// only "p" tag has a goodness of 2, so
-		if goodness == 2 {
+		if goodness == 2 && filter.Kinds != nil {
 			// this means we got a "p" tag, so we will use the ptag-kind index
 			i := 0
-			if filter.Kinds != nil {
-				queries = make([]query, len(tagValues)*len(filter.Kinds))
-				for _, value := range tagValues {
-					if len(value) != 64 {
-						return nil, nil, nil, "", nil, 0, fmt.Errorf("invalid 'p' tag '%s'", value)
-					}
-
-					for _, kind := range filter.Kinds {
-						k := make([]byte, 8+2)
-						if err := xhex.Decode(k[0:8], []byte(value[0:8*2])); err != nil {
-							return nil, nil, nil, "", nil, 0, fmt.Errorf("invalid 'p' tag '%s'", value)
-						}
-						binary.BigEndian.PutUint16(k[8:8+2], uint16(kind))
-						queries[i] = query{i: i, dbi: il.indexPTagKind, prefix: k[0 : 8+2], keySize: 8 + 2 + 4, timestampSize: 4}
-						i++
-					}
+			queries = make([]query, len(tagValues)*len(filter.Kinds))
+			for _, value := range tagValues {
+				if len(value) != 64 {
+					return nil, nil, nil, "", nil, 0, fmt.Errorf("invalid 'p' tag '%s'", value)
 				}
-			} else {
-				// even if there are no kinds, in that case we will just return any kind and not care
-				queries = make([]query, len(tagValues))
-				for i, value := range tagValues {
-					if len(value) != 64 {
-						return nil, nil, nil, "", nil, 0, fmt.Errorf("invalid 'p' tag '%s'", value)
-					}
 
-					k := make([]byte, 8)
+				for _, kind := range filter.Kinds {
+					k := make([]byte, 8+2)
 					if err := xhex.Decode(k[0:8], []byte(value[0:8*2])); err != nil {
 						return nil, nil, nil, "", nil, 0, fmt.Errorf("invalid 'p' tag '%s'", value)
 					}
-					queries[i] = query{i: i, dbi: il.indexPTagKind, prefix: k[0:8], keySize: 8 + 2 + 4, timestampSize: 4}
+					binary.BigEndian.PutUint16(k[8:8+2], uint16(kind))
+					queries[i] = query{
+						i:      i,
+						dbi:    il.indexPTagKind,
+						prefix: k[0 : 8+2],
+					}
+					i++
 				}
 			}
 		} else {
@@ -108,7 +94,11 @@ func (il *IndexingLayer) prepareQueries(filter nostr.Filter) (
 				dbi, k, offset := il.getTagIndexPrefix(tagKey, value)
 				// remove the last parts part to get just the prefix we want here
 				prefix := k[0:offset]
-				queries[i] = query{i: i, dbi: dbi, prefix: prefix, keySize: len(prefix) + 4, timestampSize: 4}
+				queries[i] = query{
+					i:      i,
+					dbi:    dbi,
+					prefix: prefix,
+				}
 			}
 
 			// add an extra kind filter if available (only do this on plain tag index, not on ptag-kind index)
@@ -143,9 +133,11 @@ pubkeyMatching:
 			// will use pubkey index
 			queries = make([]query, len(filter.Authors))
 			for i, pk := range filter.Authors {
-				prefix := make([]byte, 8)
-				copy(prefix[0:8], pk[0:8])
-				queries[i] = query{i: i, dbi: il.indexPubkey, prefix: prefix[0:8], keySize: 8 + 4, timestampSize: 4}
+				queries[i] = query{
+					i:      i,
+					dbi:    il.indexPubkey,
+					prefix: pk[0:8],
+				}
 			}
 		} else {
 			// will use pubkeyKind index
@@ -156,7 +148,11 @@ pubkeyMatching:
 					prefix := make([]byte, 8+2)
 					copy(prefix[0:8], pk[0:8])
 					binary.BigEndian.PutUint16(prefix[8:8+2], uint16(kind))
-					queries[i] = query{i: i, dbi: il.indexPubkeyKind, prefix: prefix[0 : 8+2], keySize: 10 + 4, timestampSize: 4}
+					queries[i] = query{
+						i:      i,
+						dbi:    il.indexPubkeyKind,
+						prefix: prefix[0 : 8+2],
+					}
 					i++
 				}
 			}
@@ -173,7 +169,11 @@ pubkeyMatching:
 		for i, kind := range filter.Kinds {
 			prefix := make([]byte, 2)
 			binary.BigEndian.PutUint16(prefix[0:2], uint16(kind))
-			queries[i] = query{i: i, dbi: il.indexKind, prefix: prefix[0:2], keySize: 2 + 4, timestampSize: 4}
+			queries[i] = query{
+				i:      i,
+				dbi:    il.indexKind,
+				prefix: prefix[0:2],
+			}
 		}
 
 		// potentially with an extra useless tag filtering
@@ -184,6 +184,10 @@ pubkeyMatching:
 	// if we got here our query will have nothing to filter with
 	queries = make([]query, 1)
 	prefix := make([]byte, 0)
-	queries[0] = query{i: 0, dbi: il.indexCreatedAt, prefix: prefix, keySize: 0 + 4, timestampSize: 4}
+	queries[0] = query{
+		i:      0,
+		dbi:    il.indexCreatedAt,
+		prefix: prefix,
+	}
 	return queries, nil, nil, "", nil, since, nil
 }
