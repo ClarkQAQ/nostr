@@ -128,6 +128,24 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			require.Len(t, results, 1)
 			require.Equal(t, events[5].ID, results[0].ID, "author + kind query error")
 		}
+
+		// test 5: until
+		{
+			results := slices.Collect(db.QueryEvents(nostr.Filter{Until: 102}, 1000))
+			require.NoError(t, err)
+			require.Len(t, results, 3)
+
+			resultsWithTag := slices.Collect(db.QueryEvents(nostr.Filter{
+				Until: 102,
+				Tags: nostr.TagMap{
+					"e": []string{
+						"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					},
+				},
+			}, 1000))
+			require.NoError(t, err)
+			require.Len(t, resultsWithTag, 1)
+		}
 	}
 
 	// from another-basic-test.patch

@@ -33,6 +33,7 @@ var tests = []struct {
 	{"manyauthors", manyAuthorsTest},
 	{"unbalanced", unbalancedTest},
 	{"count", countTest},
+	{"pfilter-until", pTagUntilMismatchTest},
 }
 
 func TestSliceStore(t *testing.T) {
