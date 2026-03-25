@@ -62,7 +62,10 @@ type Relay struct {
 	connectionContext       context.Context // will be canceled when the connection closes
 	connectionContextCancel context.CancelCauseFunc
 
-	challenge                     string // NIP-42 challenge, we only keep the last
+	challenge   string // NIP-42 challenge, we only keep the last
+	performAuth sync.Once
+	authed      bool
+
 	authHandler                   func(context.Context, *Relay, *Event) error
 	noticeHandler                 func(*Relay, string) // NIP-01 NOTICEs
 	customHandler                 func(string)         // nonstandard unparseable messages
@@ -371,7 +374,10 @@ func (r *Relay) handleMessage(message string) {
 		if env.Challenge == nil {
 			return
 		}
+
+		r.performAuth = sync.Once{} // this ensures we can try to auth again
 		r.challenge = *env.Challenge
+
 		if r.authHandler != nil {
 			go func() {
 				r.Auth(r.Context(), func(ctx context.Context, evt *Event) error {
@@ -465,20 +471,38 @@ func (r *Relay) Publish(ctx context.Context, event Event) error {
 // You don't have to build the AUTH event yourself, this function takes a function to which the
 // event that must be signed will be passed, so it's only necessary to sign that.
 func (r *Relay) Auth(ctx context.Context, sign func(context.Context, *Event) error) error {
-	authEvent := Event{
-		CreatedAt: Now(),
-		Kind:      KindClientAuthentication,
-		Tags: Tags{
-			Tag{"relay", r.URL},
-			Tag{"challenge", r.challenge},
-		},
-		Content: "",
-	}
-	if err := sign(ctx, &authEvent); err != nil {
-		return fmt.Errorf("error signing auth event: %w", err)
+	if r.authed {
+		return nil
 	}
 
-	return r.publish(ctx, authEvent.ID, &AuthEnvelope{Event: authEvent})
+	if r.challenge == "" {
+		return fmt.Errorf("no challenge, can't AUTH")
+	}
+
+	var err error
+
+	r.performAuth.Do(func() {
+		authEvent := Event{
+			CreatedAt: Now(),
+			Kind:      KindClientAuthentication,
+			Tags: Tags{
+				Tag{"relay", r.URL},
+				Tag{"challenge", r.challenge},
+			},
+			Content: "",
+		}
+		if err := sign(ctx, &authEvent); err != nil {
+			err = fmt.Errorf("error signing auth event: %w", err)
+		}
+
+		err = r.publish(ctx, authEvent.ID, &AuthEnvelope{Event: authEvent})
+	})
+
+	if err == nil {
+		r.authed = true
+	}
+
+	return err
 }
 
 // publish can be used both for EVENT and for AUTH
