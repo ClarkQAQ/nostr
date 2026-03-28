@@ -7,12 +7,19 @@ import (
 	"log"
 	"math"
 	"slices"
+	"sync"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
 	"fiatjaf.com/nostr/eventstore/internal"
 	"github.com/PowerDNS/lmdb-go/lmdb"
 )
+
+var tempResultsPool = sync.Pool{
+	New: func() any {
+		return make([]nostr.Event, 0, 64)
+	},
+}
 
 // GetByID returns the event -- if found in this mmm -- and all the IndexingLayers it belongs to.
 func (b *MultiMmapManager) GetByID(id nostr.ID) (*nostr.Event, IndexingLayers) {
@@ -140,7 +147,8 @@ func (il *IndexingLayer) query(txn *lmdb.Txn, filter nostr.Filter, limit int, yi
 
 	numberOfIteratorsToPullOnEachRound := max(1, int(math.Ceil(float64(len(iterators))/float64(12))))
 	totalEventsEmitted := 0
-	tempResults := make([]nostr.Event, 0, batchSizePerQuery*2)
+	tempResults := tempResultsPool.Get().([]nostr.Event)
+	defer tempResultsPool.Put(tempResults[:0])
 
 	for len(iterators) > 0 {
 		// reset stuff
