@@ -8,9 +8,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
+	"fiatjaf.com/lib/channelmutex"
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/nip11"
@@ -39,7 +39,9 @@ func NewRelay() *Relay {
 			CheckOrigin:     func(r *http.Request) bool { return true },
 		},
 
-		clients:   make(map[*WebSocket][]listenerSpec, 100),
+		clients:      make(map[*WebSocket][]listenerSpec, 100),
+		clientsMutex: channelmutex.New(),
+
 		listeners: make([]listener, 0, 100),
 
 		serveMux: &http.ServeMux{},
@@ -107,7 +109,7 @@ type Relay struct {
 	// also used for keeping track of who is listening to what
 	clients      map[*WebSocket][]listenerSpec
 	listeners    []listener
-	clientsMutex sync.Mutex
+	clientsMutex *channelmutex.Mutex
 
 	// set this to true to support negentropy
 	Negentropy bool

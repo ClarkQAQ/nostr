@@ -40,8 +40,12 @@ func (rl *Relay) addListener(
 	filter nostr.Filter,
 	cancel context.CancelCauseFunc,
 ) {
-	rl.clientsMutex.Lock()
-	defer rl.clientsMutex.Unlock()
+	select {
+	case <-rl.clientsMutex.C():
+		defer rl.clientsMutex.Unlock()
+	case <-ws.Context.Done():
+		return
+	}
 
 	if specs, ok := rl.clients[ws]; ok /* this will always be true unless client has disconnected very rapidly */ {
 		idx := len(subrelay.listeners)
