@@ -9,6 +9,7 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/slicestore"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBasicRelayFunctionality(t *testing.T) {
@@ -46,15 +47,11 @@ func TestBasicRelayFunctionality(t *testing.T) {
 	// connect two test clients
 	url := "ws" + server.URL[4:]
 	client1, err := nostr.RelayConnect(t.Context(), url, nostr.RelayOptions{})
-	if err != nil {
-		t.Fatalf("failed to connect client1: %v", err)
-	}
+	require.NoError(t, err, "failed to connect client1")
 	defer client1.Close()
 
 	client2, err := nostr.RelayConnect(t.Context(), url, nostr.RelayOptions{})
-	if err != nil {
-		t.Fatalf("failed to connect client2: %v", err)
-	}
+	require.NoError(t, err, "failed to connect client2")
 	defer client2.Close()
 
 	// test 1: store and query events
@@ -64,18 +61,14 @@ func TestBasicRelayFunctionality(t *testing.T) {
 
 		evt1 := createEvent(sk1, 1, "hello world", nil)
 		err := client1.Publish(ctx, evt1)
-		if err != nil {
-			t.Fatalf("failed to publish event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish event")
 
 		// Query the event back
 		sub, err := client2.Subscribe(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pk1},
 			Kinds:   []nostr.Kind{1},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
+		require.NoError(t, err, "failed to subscribe")
 		defer sub.Unsub()
 
 		// Wait for event
@@ -85,7 +78,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 				t.Errorf("got wrong event: %v", env.ID)
 			}
 		case <-ctx.Done():
-			t.Fatal("timeout waiting for event")
+			require.FailNow(t, "timeout waiting for event")
 		}
 	})
 
@@ -99,17 +92,13 @@ func TestBasicRelayFunctionality(t *testing.T) {
 			Authors: []nostr.PubKey{pk2},
 			Kinds:   []nostr.Kind{1},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
+		require.NoError(t, err, "failed to subscribe")
 		defer sub.Unsub()
 
 		// Publish event from client2
 		evt2 := createEvent(sk2, 1, "testing live events", nil)
 		err = client2.Publish(ctx, evt2)
-		if err != nil {
-			t.Fatalf("failed to publish event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish event")
 
 		// Wait for event on subscription
 		select {
@@ -118,7 +107,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 				t.Errorf("got wrong event: %v", env.ID)
 			}
 		case <-ctx.Done():
-			t.Fatal("timeout waiting for live event")
+			require.FailNow(t, "timeout waiting for live event")
 		}
 	})
 
@@ -130,24 +119,18 @@ func TestBasicRelayFunctionality(t *testing.T) {
 		// Create an event to be deleted
 		evt3 := createEvent(sk1, 1, "delete me", nil)
 		err = client1.Publish(ctx, evt3)
-		if err != nil {
-			t.Fatalf("failed to publish event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish event")
 
 		// Create deletion event
 		delEvent := createEvent(sk1, 5, "deleting", nostr.Tags{{"e", evt3.ID.Hex()}})
 		err = client1.Publish(ctx, delEvent)
-		if err != nil {
-			t.Fatalf("failed to publish deletion event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish deletion event")
 
 		// Try to query the deleted event
 		sub, err := client2.Subscribe(ctx, nostr.Filter{
 			IDs: []nostr.ID{evt3.ID},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
+		require.NoError(t, err, "failed to subscribe")
 		defer sub.Unsub()
 
 		// Should get EOSE without receiving the deleted event
@@ -162,7 +145,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 				}
 				goto checkDeleteStored
 			case <-ctx.Done():
-				t.Fatal("timeout waiting for EOSE")
+				require.FailNow(t, "timeout waiting for EOSE")
 			}
 		}
 
@@ -171,9 +154,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 		subDelete, err := client2.Subscribe(ctx, nostr.Filter{
 			IDs: []nostr.ID{delEvent.ID},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe to delete event: %v", err)
-		}
+		require.NoError(t, err, "failed to subscribe to delete event")
 		defer subDelete.Unsub()
 
 		gotDeleteEvent := false
@@ -189,7 +170,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 				}
 				return
 			case <-ctx.Done():
-				t.Fatal("timeout waiting for EOSE on delete event")
+				require.FailNow(t, "timeout waiting for EOSE on delete event")
 			}
 		}
 	})
@@ -204,36 +185,28 @@ func TestBasicRelayFunctionality(t *testing.T) {
 		evt1.CreatedAt = 1000 // Set specific timestamp for testing
 		evt1.Sign(sk1)
 		err = client1.Publish(ctx, evt1)
-		if err != nil {
-			t.Fatalf("failed to publish initial event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish initial event")
 
 		// create newer event that should replace the first
 		evt2 := createEvent(sk1, 0, `{"name":"newer"}`, nil)
 		evt2.CreatedAt = 2004 // Newer timestamp
 		evt2.Sign(sk1)
 		err = client1.Publish(ctx, evt2)
-		if err != nil {
-			t.Fatalf("failed to publish newer event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish newer event")
 
 		// create older event that should not replace the current one
 		evt3 := createEvent(sk1, 0, `{"name":"older"}`, nil)
 		evt3.CreatedAt = 1500 // Older than evt2
 		evt3.Sign(sk1)
 		err = client1.Publish(ctx, evt3)
-		if err != nil {
-			t.Fatalf("failed to publish older event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish older event")
 
 		// query to verify only the newest event exists
 		sub, err := client2.Subscribe(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pk1},
 			Kinds:   []nostr.Kind{0},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
+		require.NoError(t, err, "failed to subscribe")
 		defer sub.Unsub()
 
 		// should only get one event back (the newest one)
@@ -251,7 +224,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 				}
 				return
 			case <-ctx.Done():
-				t.Fatal("timeout waiting for events")
+				require.FailNow(t, "timeout waiting for events")
 			}
 		}
 	})
@@ -281,26 +254,20 @@ func TestBasicRelayFunctionality(t *testing.T) {
 		// connect test client
 		url := "ws" + server.URL[4:]
 		client, err := nostr.RelayConnect(t.Context(), url, nostr.RelayOptions{})
-		if err != nil {
-			t.Fatalf("failed to connect client: %v", err)
-		}
+		require.NoError(t, err, "failed to connect client")
 		defer client.Close()
 
 		// create event that expires in 2 seconds
 		expiration := strconv.FormatInt(int64(nostr.Now()+2), 10)
 		evt := createEvent(sk1, 1, "i will expire soon", nostr.Tags{{"expiration", expiration}})
 		err = client.Publish(ctx, evt)
-		if err != nil {
-			t.Fatalf("failed to publish event: %v", err)
-		}
+		require.NoError(t, err, "failed to publish event")
 
 		// verify event exists initially
 		sub, err := client.Subscribe(ctx, nostr.Filter{
 			IDs: []nostr.ID{evt.ID},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
+		require.NoError(t, err, "failed to subscribe")
 
 		// should get the event
 		select {
@@ -309,7 +276,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 				t.Error("got wrong event")
 			}
 		case <-ctx.Done():
-			t.Fatal("timeout waiting for event")
+			require.FailNow(t, "timeout waiting for event")
 		}
 		sub.Unsub()
 
@@ -320,9 +287,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 		sub, err = client.Subscribe(ctx, nostr.Filter{
 			IDs: []nostr.ID{evt.ID},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
+		require.NoError(t, err, "failed to subscribe")
 		defer sub.Unsub()
 
 		// should get EOSE without receiving the expired event
@@ -337,7 +302,7 @@ func TestBasicRelayFunctionality(t *testing.T) {
 				}
 				return
 			case <-ctx.Done():
-				t.Fatal("timeout waiting for EOSE")
+				require.FailNow(t, "timeout waiting for EOSE")
 			}
 		}
 	})
@@ -350,33 +315,26 @@ func TestBasicRelayFunctionality(t *testing.T) {
 		// create an event from client1
 		evt4 := createEvent(sk1, 1, "try to delete me", nil)
 		err = client1.Publish(ctx, evt4)
-		if err != nil {
-			t.Fatalf("failed to publish event: %v", err)
-		}
+		require.NoError(t, err)
 
-		// Try to delete it with client2
+		// try to delete it with client2
 		delEvent := createEvent(sk2, 5, "trying to delete", nostr.Tags{{"e", evt4.ID.Hex()}})
 		err = client2.Publish(ctx, delEvent)
-		if err == nil {
-			t.Fatalf("should have failed to publish deletion event: %v", err)
-		}
+		require.Error(t, err)
 
-		// Verify event still exists
+		// verify event still exists
 		sub, err := client1.Subscribe(ctx, nostr.Filter{
 			IDs: []nostr.ID{evt4.ID},
 		}, nostr.SubscriptionOptions{})
-		if err != nil {
-			t.Fatalf("failed to subscribe: %v", err)
-		}
+		require.NoError(t, err)
 		defer sub.Unsub()
 
 		select {
-		case env := <-sub.Events:
-			if env.ID != evt4.ID {
-				t.Error("got wrong event")
-			}
+		case env, more := <-sub.Events:
+			require.True(t, more, "should get an event, got nothing")
+			require.Equal(t, env.ID, evt4.ID, "got wrong event")
 		case <-ctx.Done():
-			t.Fatal("event should still exist")
+			require.FailNow(t, "event should still exist")
 		}
 	})
 }

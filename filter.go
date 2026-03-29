@@ -44,6 +44,7 @@ func (ef Filter) Matches(event Event) bool {
 	return true
 }
 
+//go:inline
 func (ef Filter) MatchesIgnoringTimestampConstraints(event Event) bool {
 	if ef.IDs != nil && !slices.Contains(ef.IDs, event.ID) {
 		return false

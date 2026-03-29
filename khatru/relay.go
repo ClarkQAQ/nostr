@@ -42,7 +42,7 @@ func NewRelay() *Relay {
 		clients:      make(map[*WebSocket][]listenerSpec, 100),
 		clientsMutex: channelmutex.New(),
 
-		listeners: make([]listener, 0, 100),
+		dispatcher: newDispatcher(),
 
 		serveMux: &http.ServeMux{},
 
@@ -87,11 +87,6 @@ type Relay struct {
 	// this can be ignored unless you know what you're doing
 	ChallengePrefix string
 
-	// these are used when this relays acts as a router
-	routes                []Route
-	getSubRelayFromEvent  func(*nostr.Event) *Relay // used for handling EVENTs
-	getSubRelayFromFilter func(nostr.Filter) *Relay // used for handling REQs
-
 	// setting up handlers here will enable these methods
 	ManagementAPI RelayManagementAPI
 
@@ -108,7 +103,7 @@ type Relay struct {
 	// keep a connection reference to all connected clients for Server.Shutdown
 	// also used for keeping track of who is listening to what
 	clients      map[*WebSocket][]listenerSpec
-	listeners    []listener
+	dispatcher   dispatcher
 	clientsMutex *channelmutex.Mutex
 
 	// set this to true to support negentropy

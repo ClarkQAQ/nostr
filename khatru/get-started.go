@@ -61,5 +61,5 @@ func (rl *Relay) Shutdown(ctx context.Context) {
 		ws.conn.Close()
 	}
 	clear(rl.clients)
-	rl.listeners = rl.listeners[:0]
+	rl.dispatcher = newDispatcher()
 }
