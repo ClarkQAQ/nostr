@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -50,7 +51,7 @@ func (b *MultiMmapManager) String() string {
 }
 
 const (
-	MMAP_INFINITE_SIZE = 1 << 40
+	MMAP_INFINITE_SIZE = math.MaxInt
 	maxuint16          = 65535
 	maxuint32          = 4294967295
 )
@@ -84,7 +85,7 @@ func (b *MultiMmapManager) Init() error {
 	if err != nil {
 		return fmt.Errorf("failed to open events file at %s: %w", b.mmapfPath, err)
 	}
-	mmapf, err := syscall.Mmap(int(file.Fd()), 0, MMAP_INFINITE_SIZE,
+	mmapf, err := syscall.Mmap(int(file.Fd()), 0, int(MMAP_INFINITE_SIZE),
 		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		return fmt.Errorf("failed to mmap events file at %s: %w", b.mmapfPath, err)

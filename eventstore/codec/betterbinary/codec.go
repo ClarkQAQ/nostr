@@ -40,12 +40,12 @@ func Marshal(evt nostr.Event, buf []byte) error {
 	buf[0] = 0
 
 	if evt.Kind > MaxKind {
-		return fmt.Errorf("kind is too big: %d, max is %d", evt.Kind, MaxKind)
+		return fmt.Errorf("kind is too big: %d, max is %d", evt.Kind, uint16(MaxKind))
 	}
 	binary.LittleEndian.PutUint16(buf[1:3], uint16(evt.Kind))
 
 	if evt.CreatedAt > MaxCreatedAt {
-		return fmt.Errorf("created_at is too big: %d, max is %d", evt.CreatedAt, MaxCreatedAt)
+		return fmt.Errorf("created_at is too big: %d, max is %d", evt.CreatedAt, uint32(MaxCreatedAt))
 	}
 	binary.LittleEndian.PutUint32(buf[3:7], uint32(evt.CreatedAt))
 
@@ -58,7 +58,7 @@ func Marshal(evt nostr.Event, buf []byte) error {
 
 	ntags := len(evt.Tags)
 	if ntags > MaxTagCount {
-		return fmt.Errorf("can't encode too many tags: %d, max is %d", ntags, MaxTagCount)
+		return fmt.Errorf("can't encode too many tags: %d, max is %d", ntags, uint16(MaxTagCount))
 	}
 	binary.LittleEndian.PutUint16(buf[137:139], uint16(ntags))
 
@@ -68,7 +68,7 @@ func Marshal(evt nostr.Event, buf []byte) error {
 
 		itemCount := len(tag)
 		if itemCount > MaxTagItemCount {
-			return fmt.Errorf("can't encode a tag with so many items: %d, max is %d", itemCount, MaxTagItemCount)
+			return fmt.Errorf("can't encode a tag with so many items: %d, max is %d", itemCount, uint8(MaxTagItemCount))
 		}
 		buf[tagBase+tagOffset] = uint8(itemCount)
 
@@ -76,7 +76,7 @@ func Marshal(evt nostr.Event, buf []byte) error {
 		for _, item := range tag {
 			itemSize := len(item)
 			if itemSize > MaxTagItemSize {
-				return fmt.Errorf("tag item is too large: %d, max is %d", itemSize, MaxTagItemSize)
+				return fmt.Errorf("tag item is too large: %d, max is %d", itemSize, uint16(MaxTagItemSize))
 			}
 
 			binary.LittleEndian.PutUint16(buf[tagBase+tagOffset+itemOffset:], uint16(itemSize))
@@ -91,7 +91,7 @@ func Marshal(evt nostr.Event, buf []byte) error {
 
 	// content
 	if contentLength := len(evt.Content); contentLength > MaxContentSize {
-		return fmt.Errorf("content is too large: %d, max is %d", contentLength, MaxContentSize)
+		return fmt.Errorf("content is too large: %d, max is %d", contentLength, uint16(MaxContentSize))
 	} else {
 		binary.LittleEndian.PutUint16(buf[tagBase+tagsSectionLength:], uint16(contentLength))
 	}
