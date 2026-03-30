@@ -190,3 +190,15 @@ func (rl *Relay) getBaseURL(r *http.Request) string {
 
 	return proto + "://" + host + r.URL.Path
 }
+
+// Stats returns the current number of connected clients and open listeners.
+func (rl *Relay) Stats() (clients, listeners int) {
+	rl.clientsMutex.Lock()
+	defer rl.clientsMutex.Unlock()
+
+	for _, specs := range rl.clients {
+		listeners += len(specs)
+	}
+
+	return len(rl.clients), listeners
+}
