@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -51,7 +50,7 @@ func (b *MultiMmapManager) String() string {
 }
 
 const (
-	MMAP_INFINITE_SIZE = math.MaxInt
+	MMAP_INFINITE_SIZE = 100_000_000_000
 	maxuint16          = 65535
 	maxuint32          = 4294967295
 )
@@ -106,7 +105,7 @@ func (b *MultiMmapManager) Init() error {
 
 	env.SetMaxDBs(3)
 	env.SetMaxReaders(1000)
-	env.SetMapSize(1 << 38) // ~273GB
+	env.SetMapSize(MMAP_INFINITE_SIZE)
 
 	err = env.Open(dbpath, lmdb.NoTLS, 0644)
 	if err != nil {

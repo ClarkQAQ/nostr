@@ -61,7 +61,7 @@ func (il *IndexingLayer) Init() error {
 
 	env.SetMaxDBs(9)
 	env.SetMaxReaders(1000)
-	env.SetMapSize(1 << 38) // ~273GB
+	env.SetMapSize(MMAP_INFINITE_SIZE)
 
 	// create directory if it doesn't exist and open it
 	if err := os.MkdirAll(path, 0755); err != nil {
