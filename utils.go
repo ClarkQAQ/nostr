@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"cmp"
 	"net/url"
-	"slices"
 	"unsafe"
 
 	"github.com/templexxx/xhex"
@@ -89,14 +88,17 @@ func CompareRelayEventReverse(b, a RelayEvent) int {
 
 // AppendUnique adds items to an array only if they don't already exist in the array.
 // Returns the modified array.
-func AppendUnique[I comparable](arr []I, item ...I) []I {
-	for _, item := range item {
-		if slices.Contains(arr, item) {
-			return arr
+func AppendUnique[I comparable](list []I, newEls ...I) []I {
+ex:
+	for _, newEl := range newEls {
+		for _, el := range list {
+			if el == newEl {
+				continue ex
+			}
 		}
-		arr = append(arr, item)
+		list = append(list, newEl)
 	}
-	return arr
+	return list
 }
 
 func IsOlder(previous, next Event) bool {
