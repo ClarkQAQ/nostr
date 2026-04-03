@@ -156,12 +156,12 @@ func (b *MultiMmapManager) Init() (err error) {
 			}
 
 			logOp := b.Logger.Debug()
+			count := 0
 			for _, pos := range b.freeRangesLarge {
-				if pos.size > 20 {
-					logOp = logOp.Uint32(fmt.Sprintf("%d", pos.start), pos.size)
-				}
+				logOp = logOp.Uint32(fmt.Sprintf("%d", pos.start), pos.size)
+				count++
 			}
-			logOp.Msg("calculated free ranges from index scan")
+			logOp.Int("count", count).Msg("calculated free ranges from index scan")
 		}
 
 		return nil
