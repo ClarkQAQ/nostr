@@ -202,3 +202,11 @@ func (rl *Relay) Stats() (clients, listeners int) {
 
 	return len(rl.clients), listeners
 }
+
+func (rl *Relay) Router() *http.ServeMux {
+	return rl.serveMux
+}
+
+func (rl *Relay) SetRouter(mux *http.ServeMux) {
+	rl.serveMux = mux
+}
