@@ -66,13 +66,13 @@ func (bw *BoundWriter) WriteTimestamp(w *bytes.Buffer, timestamp nostr.Timestamp
 	bw.lastTimestampOut = timestamp
 
 	// add 1 to prevent zeroes from being read as infinites
-	WriteVarInt(w, int(delta+1))
+	WriteVarInt(w, uint64(delta)+1)
 	return
 }
 
 func (bw *BoundWriter) WriteBound(w *bytes.Buffer, bound Bound) {
 	bw.WriteTimestamp(w, bound.Timestamp)
-	WriteVarInt(w, len(bound.IDPrefix))
+	WriteVarInt(w, uint64(len(bound.IDPrefix)))
 	w.Write(bound.IDPrefix)
 }
 
@@ -111,33 +111,25 @@ func ReadVarInt(reader *bytes.Reader) (int, error) {
 	return res, nil
 }
 
-func WriteVarInt(w *bytes.Buffer, n int) {
+func WriteVarInt(w *bytes.Buffer, n uint64) {
 	if n == 0 {
 		w.WriteByte(0)
 		return
 	}
 
-	w.Write(EncodeVarInt(n))
-}
-
-func EncodeVarInt(n int) []byte {
-	if n == 0 {
-		return []byte{0}
-	}
-
-	result := make([]byte, 8)
-	idx := 7
+	var buf [10]byte
+	idx := 9
 
 	for n != 0 {
-		result[idx] = byte(n & 0x7F)
+		buf[idx] = byte(n & 0x7F)
 		n >>= 7
 		idx--
 	}
 
-	result = result[idx+1:]
+	result := buf[idx+1:]
 	for i := 0; i < len(result)-1; i++ {
 		result[i] |= 0x80
 	}
 
-	return result
+	w.Write(result)
 }
