@@ -30,47 +30,83 @@ import (
 // default they're set to in-memory stores, but ideally persisteable
 // implementations should be given (some alternatives are provided in subpackages).
 type System struct {
-	KVStore                   kvstore.KVStore
-	metadataCacheOnce         sync.Once
-	MetadataCache             cache.Cache32[ProfileMetadata]
-	relayListCacheOnce        sync.Once
-	RelayListCache            cache.Cache32[GenericList[string, Relay]]
-	followListCacheOnce       sync.Once
-	FollowListCache           cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
-	muteListCacheOnce         sync.Once
-	MuteListCache             cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
-	bookmarkListCacheOnce     sync.Once
-	BookmarkListCache         cache.Cache32[GenericList[string, EventRef]]
-	pinListCacheOnce          sync.Once
-	PinListCache              cache.Cache32[GenericList[string, EventRef]]
-	blockedRelayListCacheOnce sync.Once
-	BlockedRelayListCache     cache.Cache32[GenericList[string, RelayURL]]
-	searchRelayListCacheOnce  sync.Once
-	SearchRelayListCache      cache.Cache32[GenericList[string, RelayURL]]
-	topicListCacheOnce        sync.Once
-	TopicListCache            cache.Cache32[GenericList[string, Topic]]
-	relaySetsCacheOnce        sync.Once
-	RelaySetsCache            cache.Cache32[GenericSets[string, RelayURL]]
-	followSetsCacheOnce       sync.Once
-	FollowSetsCache           cache.Cache32[GenericSets[nostr.PubKey, ProfileRef]]
-	topicSetsCacheOnce        sync.Once
-	TopicSetsCache            cache.Cache32[GenericSets[string, Topic]]
-	zapProviderCacheOnce      sync.Once
-	ZapProviderCache          cache.Cache32[nostr.PubKey]
-	mintKeysCacheOnce         sync.Once
-	MintKeysCache             cache.Cache32[map[uint64]*btcec.PublicKey]
-	nutZapInfoCacheOnce       sync.Once
-	NutZapInfoCache           cache.Cache32[NutZapInfo]
-	Hints                     hints.HintsDB
-	Pool                      *nostr.Pool
-	RelayListRelays           *RelayStream
-	FollowListRelays          *RelayStream
-	MetadataRelays            *RelayStream
-	FallbackRelays            *RelayStream
-	JustIDRelays              *RelayStream
-	UserSearchRelays          *RelayStream
-	NoteSearchRelays          *RelayStream
-	Store                     eventstore.Store
+	KVStore                       kvstore.KVStore
+	metadataCacheOnce             sync.Once
+	MetadataCache                 cache.Cache32[ProfileMetadata]
+	relayListCacheOnce            sync.Once
+	RelayListCache                cache.Cache32[GenericList[string, Relay]]
+	followListCacheOnce           sync.Once
+	FollowListCache               cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	muteListCacheOnce             sync.Once
+	MuteListCache                 cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	bookmarkListCacheOnce         sync.Once
+	BookmarkListCache             cache.Cache32[GenericList[string, EventRef]]
+	pinListCacheOnce              sync.Once
+	PinListCache                  cache.Cache32[GenericList[string, EventRef]]
+	profileBadgesListCacheOnce    sync.Once
+	ProfileBadgesListCache        cache.Cache32[GenericList[string, EventRef]]
+	gitRepositoryListCacheOnce    sync.Once
+	GitRepositoryListCache        cache.Cache32[GenericList[string, EventRef]]
+	blockedRelayListCacheOnce     sync.Once
+	BlockedRelayListCache         cache.Cache32[GenericList[string, RelayURL]]
+	searchRelayListCacheOnce      sync.Once
+	SearchRelayListCache          cache.Cache32[GenericList[string, RelayURL]]
+	dmRelayListCacheOnce          sync.Once
+	DMRelayListCache              cache.Cache32[GenericList[string, RelayURL]]
+	goodWikiRelayListCacheOnce    sync.Once
+	GoodWikiRelayListCache        cache.Cache32[GenericList[string, RelayURL]]
+	topicListCacheOnce            sync.Once
+	TopicListCache                cache.Cache32[GenericList[string, Topic]]
+	mediaFollowListCacheOnce      sync.Once
+	MediaFollowListCache          cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	goodWikiAuthorListCacheOnce   sync.Once
+	GoodWikiAuthorListCache       cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	gitAuthorListCacheOnce        sync.Once
+	GitAuthorListCache            cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	relaySetsCacheOnce            sync.Once
+	RelaySetsCache                cache.Cache32[GenericSets[string, RelayURL]]
+	followSetsCacheOnce           sync.Once
+	FollowSetsCache               cache.Cache32[GenericSets[nostr.PubKey, ProfileRef]]
+	topicSetsCacheOnce            sync.Once
+	TopicSetsCache                cache.Cache32[GenericSets[string, Topic]]
+	bookmarkSetsCacheOnce         sync.Once
+	BookmarkSetsCache             cache.Cache32[GenericSets[string, EventRef]]
+	curationSetsCacheOnce         sync.Once
+	CurationSetsCache             cache.Cache32[GenericSets[string, EventRef]]
+	videoCurationSetsCacheOnce    sync.Once
+	VideoCurationSetsCache        cache.Cache32[GenericSets[string, EventRef]]
+	pictureCurationSetsCacheOnce  sync.Once
+	PictureCurationSetsCache      cache.Cache32[GenericSets[string, EventRef]]
+	kindMuteSetsCacheOnce         sync.Once
+	KindMuteSetsCache             cache.Cache32[GenericSets[nostr.PubKey, ProfileRef]]
+	badgeSetsCacheOnce            sync.Once
+	BadgeSetsCache                cache.Cache32[GenericSets[string, EventRef]]
+	releaseArtifactSetsCacheOnce  sync.Once
+	ReleaseArtifactSetsCache      cache.Cache32[GenericSets[string, EventRef]]
+	appCurationSetsCacheOnce      sync.Once
+	AppCurationSetsCache          cache.Cache32[GenericSets[string, EventRef]]
+	calendarSetsCacheOnce         sync.Once
+	CalendarSetsCache             cache.Cache32[GenericSets[string, EventRef]]
+	starterPackSetsCacheOnce      sync.Once
+	StarterPackSetsCache          cache.Cache32[GenericSets[nostr.PubKey, ProfileRef]]
+	mediaStarterPackSetsCacheOnce sync.Once
+	MediaStarterPackSetsCache     cache.Cache32[GenericSets[nostr.PubKey, ProfileRef]]
+	zapProviderCacheOnce          sync.Once
+	ZapProviderCache              cache.Cache32[nostr.PubKey]
+	mintKeysCacheOnce             sync.Once
+	MintKeysCache                 cache.Cache32[map[uint64]*btcec.PublicKey]
+	nutZapInfoCacheOnce           sync.Once
+	NutZapInfoCache               cache.Cache32[NutZapInfo]
+	Hints                         hints.HintsDB
+	Pool                          *nostr.Pool
+	RelayListRelays               *RelayStream
+	FollowListRelays              *RelayStream
+	MetadataRelays                *RelayStream
+	FallbackRelays                *RelayStream
+	JustIDRelays                  *RelayStream
+	UserSearchRelays              *RelayStream
+	NoteSearchRelays              *RelayStream
+	Store                         eventstore.Store
 
 	Publisher nostr.Publisher
 

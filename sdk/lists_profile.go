@@ -39,6 +39,39 @@ func (sys *System) FetchMuteList(ctx context.Context, pubkey nostr.PubKey) Gener
 	return ml
 }
 
+func (sys *System) FetchMediaFollowList(ctx context.Context, pubkey nostr.PubKey) GenericList[nostr.PubKey, ProfileRef] {
+	sys.mediaFollowListCacheOnce.Do(func() {
+		if sys.MediaFollowListCache == nil {
+			sys.MediaFollowListCache = cache_memory.New[GenericList[nostr.PubKey, ProfileRef]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericList(sys, ctx, pubkey, 10020, kind_10020, parseProfileRef, sys.MediaFollowListCache)
+	return ml
+}
+
+func (sys *System) FetchGoodWikiAuthorList(ctx context.Context, pubkey nostr.PubKey) GenericList[nostr.PubKey, ProfileRef] {
+	sys.goodWikiAuthorListCacheOnce.Do(func() {
+		if sys.GoodWikiAuthorListCache == nil {
+			sys.GoodWikiAuthorListCache = cache_memory.New[GenericList[nostr.PubKey, ProfileRef]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericList(sys, ctx, pubkey, 10101, kind_10101, parseProfileRef, sys.GoodWikiAuthorListCache)
+	return ml
+}
+
+func (sys *System) FetchGitAuthorList(ctx context.Context, pubkey nostr.PubKey) GenericList[nostr.PubKey, ProfileRef] {
+	sys.gitAuthorListCacheOnce.Do(func() {
+		if sys.GitAuthorListCache == nil {
+			sys.GitAuthorListCache = cache_memory.New[GenericList[nostr.PubKey, ProfileRef]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericList(sys, ctx, pubkey, 10017, kind_10017, parseProfileRef, sys.GitAuthorListCache)
+	return ml
+}
+
 func (sys *System) FetchFollowSets(ctx context.Context, pubkey nostr.PubKey) GenericSets[nostr.PubKey, ProfileRef] {
 	sys.followSetsCacheOnce.Do(func() {
 		if sys.FollowSetsCache == nil {
