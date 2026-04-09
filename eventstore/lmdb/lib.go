@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
-	"sync/atomic"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
@@ -34,8 +33,6 @@ type LMDBBackend struct {
 
 	hllCache          lmdb.DBI
 	EnableHLLCacheFor func(kind nostr.Kind) (useCache bool, skipSavingActualEvent bool)
-
-	lastId atomic.Uint32
 }
 
 func (b *LMDBBackend) Init() error {
@@ -181,29 +178,6 @@ func (b *LMDBBackend) initialize() error {
 		} else {
 			b.hllCache = dbi
 		}
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	// get lastId
-	if err := b.lmdbEnv.View(func(txn *lmdb.Txn) error {
-		txn.RawRead = true
-		cursor, err := txn.OpenCursor(b.rawEventStore)
-		if err != nil {
-			return err
-		}
-		defer cursor.Close()
-		k, _, err := cursor.Get(nil, nil, lmdb.Last)
-		if lmdb.IsNotFound(err) {
-			// nothing found, so we're at zero
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		b.lastId.Store(binary.BigEndian.Uint32(k))
-
 		return nil
 	}); err != nil {
 		return err
