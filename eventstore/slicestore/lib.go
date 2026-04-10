@@ -122,7 +122,7 @@ func (b *SliceStore) delete(id nostr.ID) error {
 	return nil
 }
 
-func (b *SliceStore) ReplaceEvent(evt nostr.Event) error {
+func (b *SliceStore) ReplaceEvent(evt nostr.Event) (deleted []nostr.Event, err error) {
 	b.Lock()
 	defer b.Unlock()
 
@@ -135,8 +135,9 @@ func (b *SliceStore) ReplaceEvent(evt nostr.Event) error {
 	for previous := range b.QueryEvents(filter, 1) {
 		if nostr.IsOlder(previous, evt) {
 			if err := b.delete(previous.ID); err != nil {
-				return fmt.Errorf("failed to delete event for replacing: %w", err)
+				return nil, fmt.Errorf("failed to delete event for replacing: %w", err)
 			}
+			deleted = append(deleted, previous)
 		} else {
 			shouldStore = false
 		}
@@ -144,11 +145,11 @@ func (b *SliceStore) ReplaceEvent(evt nostr.Event) error {
 
 	if shouldStore {
 		if err := b.save(evt); err != nil && err != eventstore.ErrDupEvent {
-			return fmt.Errorf("failed to save: %w", err)
+			return nil, fmt.Errorf("failed to save: %w", err)
 		}
 	}
 
-	return nil
+	return deleted, nil
 }
 
 func eventTimestampComparator(e nostr.Event, t nostr.Timestamp) int {

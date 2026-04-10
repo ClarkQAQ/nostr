@@ -29,8 +29,8 @@ func (b NullStore) SaveEvent(evt nostr.Event) error {
 	return nil
 }
 
-func (b NullStore) ReplaceEvent(evt nostr.Event) error {
-	return nil
+func (b NullStore) ReplaceEvent(evt nostr.Event) ([]nostr.Event, error) {
+	return nil, nil
 }
 
 func (b NullStore) CountEvents(filter nostr.Filter) (uint32, error) {

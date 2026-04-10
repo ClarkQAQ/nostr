@@ -36,5 +36,6 @@ func (w DynamicPublisher) Publish(ctx context.Context, evt nostr.Event) error {
 		}
 	}
 
-	return w.GetStore().ReplaceEvent(evt)
+	_, err := w.GetStore().ReplaceEvent(evt)
+	return err
 }

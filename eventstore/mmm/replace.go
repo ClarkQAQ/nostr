@@ -9,9 +9,9 @@ import (
 	"github.com/PowerDNS/lmdb-go/lmdb"
 )
 
-func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) error {
+func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) (deleted []nostr.Event, err error) {
 	if il.mmmm.ReadOnly {
-		return ReadOnly
+		return nil, ReadOnly
 	}
 
 	il.mmmm.writeMutex.Lock()
@@ -29,7 +29,7 @@ func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) error {
 	// prepare transactions
 	mmmtxn, err := il.mmmm.lmdbEnv.BeginTxn(nil, 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		// defer abort but only if we haven't committed (we'll set it to nil after committing)
@@ -41,7 +41,7 @@ func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) error {
 
 	iltxn, err := il.lmdbEnv.BeginTxn(nil, 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() {
 		// defer abort but only if we haven't committed (we'll set it to nil after committing)
@@ -54,33 +54,35 @@ func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) error {
 	// check if we already have this id
 	_, existsErr := mmmtxn.Get(il.mmmm.indexId, evt.ID[0:8])
 	if existsErr == nil {
-		return nil
+		return nil, nil
 	}
 	if !lmdb.IsNotFound(existsErr) {
-		return fmt.Errorf("error checking existence: %w", existsErr)
+		return nil, fmt.Errorf("error checking existence: %w", existsErr)
 	}
 
 	// now we fetch the past events, whatever they are, delete them and then save the new
+	var qerr error
 	var results iter.Seq[nostr.Event] = func(yield func(nostr.Event) bool) {
-		err = il.query(iltxn, filter, 10 /* in theory limit could be just 1 and this should work */, yield)
+		qerr = il.query(iltxn, filter, 10 /* in theory limit could be just 1 and this should work */, yield)
 	}
-	if err != nil {
-		return fmt.Errorf("failed to query past events with %s: %w", filter, err)
+	if qerr != nil {
+		return nil, fmt.Errorf("failed to query past events with %s: %w", filter, qerr)
 	}
 
 	var acquiredFreeRangeFromDelete *position
 	shouldStore := true
 	for previous := range results {
 		if nostr.IsOlder(previous, evt) {
-			if pos, shouldPurge, err := il.delete(mmmtxn, iltxn, previous.ID); err != nil {
-				return fmt.Errorf("failed to delete event %s for replacing: %w", previous.ID, err)
+			if pos, shouldPurge, derr := il.delete(mmmtxn, iltxn, previous.ID); derr != nil {
+				return nil, fmt.Errorf("failed to delete event %s for replacing: %w", previous.ID, derr)
 			} else if shouldPurge {
 				// purge
 				if err := mmmtxn.Del(il.mmmm.indexId, previous.ID[0:8], nil); err != nil {
-					return err
+					return nil, err
 				}
 				acquiredFreeRangeFromDelete = &pos
 			}
+			deleted = append(deleted, previous)
 		} else {
 			// there is a newer event already stored, so we won't store this
 			shouldStore = false
@@ -90,17 +92,17 @@ func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) error {
 	if shouldStore {
 		_, err := il.mmmm.storeOn(mmmtxn, iltxn, il, evt)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// commit in this order to minimize problematic inconsistencies
 	if err := mmmtxn.Commit(); err != nil {
-		return fmt.Errorf("can't commit mmmtxn: %w", err)
+		return nil, fmt.Errorf("can't commit mmmtxn: %w", err)
 	}
 	mmmtxn = nil
 	if err := iltxn.Commit(); err != nil {
-		return fmt.Errorf("can't commit iltxn: %w", err)
+		return nil, fmt.Errorf("can't commit iltxn: %w", err)
 	}
 	iltxn = nil
 
@@ -110,5 +112,5 @@ func (il *IndexingLayer) ReplaceEvent(evt nostr.Event) error {
 		il.mmmm.mergeNewFreeRange(*acquiredFreeRangeFromDelete)
 	}
 
-	return nil
+	return deleted, nil
 }

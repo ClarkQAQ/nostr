@@ -26,7 +26,7 @@ type Store interface {
 
 	// ReplaceEvent atomically replaces a replaceable or addressable event.
 	// Conceptually it is like a Query->Delete->Save, but streamlined.
-	ReplaceEvent(nostr.Event) error
+	ReplaceEvent(nostr.Event) (deleted []nostr.Event, err error)
 
 	// CountEvents counts all events that match a given filter
 	CountEvents(nostr.Filter) (uint32, error)

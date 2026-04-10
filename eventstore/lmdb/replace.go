@@ -8,8 +8,8 @@ import (
 	"github.com/PowerDNS/lmdb-go/lmdb"
 )
 
-func (b *LMDBBackend) ReplaceEvent(evt nostr.Event) error {
-	return b.lmdbEnv.Update(func(txn *lmdb.Txn) error {
+func (b *LMDBBackend) ReplaceEvent(evt nostr.Event) (deleted []nostr.Event, err error) {
+	err = b.lmdbEnv.Update(func(txn *lmdb.Txn) error {
 		// check if we already have this id
 		_, existsErr := txn.Get(b.indexId, evt.ID[0:8])
 		if existsErr == nil {
@@ -26,20 +26,21 @@ func (b *LMDBBackend) ReplaceEvent(evt nostr.Event) error {
 		}
 
 		// now we fetch the past events, whatever they are, delete them and then save the new
-		var err error
+		var qerr error
 		var results iter.Seq[nostr.Event] = func(yield func(nostr.Event) bool) {
-			err = b.query(txn, filter, 10 /* in theory limit could be just 1 and this should work */, yield)
+			qerr = b.query(txn, filter, 10 /* in theory limit could be just 1 and this should work */, yield)
 		}
-		if err != nil {
-			return fmt.Errorf("failed to query past events with %s: %w", filter, err)
+		if qerr != nil {
+			return fmt.Errorf("failed to query past events with %s: %w", filter, qerr)
 		}
 
 		shouldStore := true
 		for previous := range results {
 			if nostr.IsOlder(previous, evt) {
-				if err := b.delete(txn, previous.ID); err != nil {
-					return fmt.Errorf("failed to delete event %s for replacing: %w", previous.ID, err)
+				if qerr := b.delete(txn, previous.ID); qerr != nil {
+					return fmt.Errorf("failed to delete event %s for replacing: %w", previous.ID, qerr)
 				}
+				deleted = append(deleted, previous)
 			} else {
 				// there is a newer event already stored, so we won't store this
 				shouldStore = false
@@ -51,4 +52,6 @@ func (b *LMDBBackend) ReplaceEvent(evt nostr.Event) error {
 
 		return nil
 	})
+
+	return deleted, err
 }

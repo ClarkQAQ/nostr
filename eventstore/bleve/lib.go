@@ -103,13 +103,13 @@ func (b *BleveBackend) Init() error {
 	if b.RawEventStore == nil {
 		return fmt.Errorf("missing RawEventStore")
 	}
+	if len(b.Languages) == 0 {
+		return fmt.Errorf("missing Languages")
+	}
 	if len(b.IndexableKinds) == 0 {
 		b.IndexableKinds = []nostr.Kind{0, 1, 6, 11, 16, 20, 21, 22, 24, 1111, 9802, 30023, 30818}
 	}
 
-	if len(b.Languages) == 0 {
-		b.Languages = SupportedLanguages
-	}
 	validLanguages := make([]lingua.Language, 0, len(b.Languages))
 	b.languageCodes = make([]string, 0, len(b.Languages))
 	for _, lang := range b.Languages {

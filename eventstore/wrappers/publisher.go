@@ -39,5 +39,6 @@ func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {
 	}
 
 	// others are replaced
-	return w.Store.ReplaceEvent(evt)
+	_, err := w.Store.ReplaceEvent(evt)
+	return err
 }
