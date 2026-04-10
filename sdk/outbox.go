@@ -55,7 +55,7 @@ func (sys *System) FetchOutboxRelays(ctx context.Context, pubkey nostr.PubKey, n
 func (sys *System) FetchInboxRelays(ctx context.Context, pubkey nostr.PubKey, n int) []string {
 	rl := sys.FetchRelayList(ctx, pubkey)
 	if len(rl.Items) == 0 || len(rl.Items) > 10 {
-		return []string{"wss://relay.damus.io", "wss://nos.lol"}
+		return []string{"wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"}
 	}
 
 	relays := make([]string, 0, n)
