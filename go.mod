@@ -43,6 +43,7 @@ require (
 	fiatjaf.com/lib v0.3.6
 	github.com/dgraph-io/ristretto/v2 v2.3.0
 	github.com/go-git/go-git/v5 v5.16.3
+	github.com/pemistahl/lingua-go v1.4.0
 	github.com/sivukhin/godjot v1.0.6
 	github.com/templexxx/cpu v0.0.1
 	github.com/templexxx/xhex v0.0.0-20200614015412-aed53437177b
@@ -64,6 +65,7 @@ require (
 	github.com/blevesearch/scorch_segment_api/v2 v2.2.16 // indirect
 	github.com/blevesearch/segment v0.9.1 // indirect
 	github.com/blevesearch/snowballstem v0.9.0 // indirect
+	github.com/blevesearch/stempel v0.2.0 // indirect
 	github.com/blevesearch/upsidedown_store_api v1.0.2 // indirect
 	github.com/blevesearch/vellum v1.0.11 // indirect
 	github.com/blevesearch/zapx/v11 v11.3.10 // indirect
@@ -94,6 +96,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 // indirect
+	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

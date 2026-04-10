@@ -7,6 +7,7 @@ import (
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/lmdb"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBleveFlow(t *testing.T) {
@@ -21,7 +22,9 @@ func TestBleveFlow(t *testing.T) {
 		Path:          "/tmp/blevetest-bleve",
 		RawEventStore: bb,
 	}
-	bl.Init()
+	err := bl.Init()
+	require.NoError(t, err, "init")
+
 	defer bl.Close()
 
 	willDelete := make([]nostr.Event, 0, 3)
