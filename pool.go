@@ -528,7 +528,7 @@ func (pool *Pool) subMany(
 
 		eosed := atomic.Bool{}
 
-		go func(nm string) {
+		go func(nm string, filter Filter) {
 			defer func() {
 				if eosed.CompareAndSwap(false, true) {
 					eoseWg.Done()
@@ -668,7 +668,7 @@ func (pool *Pool) subMany(
 				time.Sleep(interval)
 				interval = min(10*time.Minute, interval*17/10) // the next time we try we will wait longer
 			}
-		}(url)
+		}(url, filter)
 	}
 
 	return events
