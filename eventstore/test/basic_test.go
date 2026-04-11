@@ -241,7 +241,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		originalProfile.Sign(sk3)
 
-		err = db.ReplaceEvent(originalProfile)
+		_, err = db.ReplaceEvent(originalProfile)
 		require.NoError(t, err)
 
 		// verify
@@ -262,7 +262,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		newProfile.Sign(sk3)
 
 		// replace with newer event
-		err = db.ReplaceEvent(newProfile)
+		_, err = db.ReplaceEvent(newProfile)
 		require.NoError(t, err)
 
 		// verify only the newer event exists
@@ -282,7 +282,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		olderProfile.Sign(sk3)
 
-		err = db.ReplaceEvent(olderProfile)
+		_, err = db.ReplaceEvent(olderProfile)
 		require.NoError(t, err)
 
 		// verify the newer event is still there
@@ -302,7 +302,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		articleV1.Sign(sk3)
 
-		err = db.ReplaceEvent(articleV1)
+		_, err = db.ReplaceEvent(articleV1)
 		require.NoError(t, err)
 
 		// verify article was saved
@@ -323,7 +323,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		articleV2.Sign(sk3)
 
-		err = db.ReplaceEvent(articleV2)
+		_, err = db.ReplaceEvent(articleV2)
 		require.NoError(t, err)
 
 		// verify only the newer version exists
@@ -345,7 +345,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		differentArticle.Sign(sk3)
 
-		err = db.ReplaceEvent(differentArticle)
+		_, err = db.ReplaceEvent(differentArticle)
 		require.NoError(t, err)
 
 		// verify both articles exist (different d tags)
