@@ -109,7 +109,7 @@ func (b *LMDBBackend) initialize() error {
 		env.SetMapSize(b.MapSize)
 	}
 
-	if err := env.Open(b.Path, lmdb.NoTLS|lmdb.WriteMap|b.extraFlags, 0644); err != nil {
+	if err := env.Open(b.Path, lmdb.NoTLS|b.extraFlags, 0644); err != nil {
 		return err
 	}
 	b.lmdbEnv = env

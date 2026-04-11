@@ -54,7 +54,6 @@ func (b *LMDBBackend) queryByIds(txn *lmdb.Txn, ids []nostr.ID, yield func(nostr
 			continue
 		}
 
-		txn.Get(b.rawEventStore, idx)
 		bin, err := txn.Get(b.rawEventStore, idx)
 		if err != nil {
 			continue
