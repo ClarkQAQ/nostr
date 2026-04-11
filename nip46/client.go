@@ -112,7 +112,7 @@ func NewBunker(
 	onAuth func(string),
 ) *BunkerClient {
 	if pool == nil {
-		pool = nostr.NewPool(nostr.PoolOptions{})
+		pool = nostr.NewPool()
 	}
 
 	clientPublicKey := nostr.GetPublicKey(clientSecretKey)

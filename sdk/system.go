@@ -177,12 +177,11 @@ func NewSystem() *System {
 		Hints: memoryh.NewHintDB(),
 	}
 
-	sys.Pool = nostr.NewPool(nostr.PoolOptions{
-		AuthorKindQueryMiddleware: sys.TrackQueryAttempts,
-		EventMiddleware:           sys.TrackEventHintsAndRelays,
-		DuplicateMiddleware:       sys.TrackEventRelaysD,
-		PenaltyBox:                true,
-	})
+	sys.Pool = nostr.NewPool()
+	sys.Pool.QueryMiddleware = sys.TrackQueryAttempts
+	sys.Pool.EventMiddleware = sys.TrackEventHintsAndRelays
+	sys.Pool.DuplicateMiddleware = sys.TrackEventRelaysD
+	sys.Pool.StartPenaltyBox()
 
 	sys.metadataCacheOnce.Do(func() {
 		if sys.MetadataCache == nil {

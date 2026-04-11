@@ -27,10 +27,10 @@ type Pool struct {
 	authRequiredHandler func(context.Context, *Event) error
 	cancel              context.CancelCauseFunc
 
-	eventMiddleware     func(RelayEvent)
-	duplicateMiddleware func(relay string, id ID)
-	queryMiddleware     func(relay string, pubkey PubKey, kind Kind)
-	relayOptions        RelayOptions
+	EventMiddleware     func(RelayEvent)
+	DuplicateMiddleware func(relay string, id ID)
+	QueryMiddleware     func(relay string, pubkey PubKey, kind Kind)
+	RelayOptions        RelayOptions
 
 	// custom things not often used
 	penaltyBox *xsync.MapOf[string, [2]float64]
@@ -49,27 +49,15 @@ func (df DirectedFilter) String() string {
 func (ie RelayEvent) String() string { return fmt.Sprintf("[%s] >> %s", ie.Relay.URL, ie.Event) }
 
 // NewPool creates a new Pool with the given context and options.
-func NewPool(opts PoolOptions) *Pool {
+func NewPool() *Pool {
 	ctx, cancel := context.WithCancelCause(context.Background())
 
-	pool := &Pool{
+	return &Pool{
 		Relays: xsync.NewMapOf[string, *Relay](),
 
 		Context: ctx,
 		cancel:  cancel,
-
-		authRequiredHandler: opts.AuthRequiredHandler,
-		eventMiddleware:     opts.EventMiddleware,
-		duplicateMiddleware: opts.DuplicateMiddleware,
-		queryMiddleware:     opts.AuthorKindQueryMiddleware,
-		relayOptions:        opts.RelayOptions,
 	}
-
-	if opts.PenaltyBox {
-		go pool.startPenaltyBox()
-	}
-
-	return pool
 }
 
 type PoolOptions struct {
@@ -97,31 +85,35 @@ type PoolOptions struct {
 	RelayOptions RelayOptions
 }
 
-func (pool *Pool) startPenaltyBox() {
+func (pool *Pool) StartPenaltyBox() {
 	pool.penaltyBox = xsync.NewMapOf[string, [2]float64]()
 
 	go func() {
 		sleep := 30.0
 		for {
-			time.Sleep(time.Duration(sleep) * time.Second)
+			select {
+			case <-pool.Context.Done():
+				return
+			case <-time.After(time.Duration(sleep) * time.Second):
 
-			nextSleep := 300.0
-			for url, v := range pool.penaltyBox.Range {
-				remainingSeconds := v[1]
-				remainingSeconds -= sleep
-				if remainingSeconds <= 0 {
-					pool.penaltyBox.Store(url, [2]float64{v[0], 0})
-					continue
-				} else {
-					pool.penaltyBox.Store(url, [2]float64{v[0], remainingSeconds})
+				nextSleep := 300.0
+				for url, v := range pool.penaltyBox.Range {
+					remainingSeconds := v[1]
+					remainingSeconds -= sleep
+					if remainingSeconds <= 0 {
+						pool.penaltyBox.Store(url, [2]float64{v[0], 0})
+						continue
+					} else {
+						pool.penaltyBox.Store(url, [2]float64{v[0], remainingSeconds})
+					}
+
+					if remainingSeconds < nextSleep {
+						nextSleep = remainingSeconds
+					}
 				}
 
-				if remainingSeconds < nextSleep {
-					nextSleep = remainingSeconds
-				}
+				sleep = nextSleep
 			}
-
-			sleep = nextSleep
 		}
 	}()
 }
@@ -145,7 +137,7 @@ func (pool *Pool) EnsureRelay(url string) (*Relay, error) {
 		return relay, nil
 	}
 
-	relay = NewRelay(pool.Context, url, pool.relayOptions)
+	relay = NewRelay(pool.Context, url, pool.RelayOptions)
 	// try to connect
 	// we use this ctx here so when the pool dies everything dies
 	if err := relay.Connect(pool.Context); err != nil {
@@ -277,8 +269,8 @@ func (pool *Pool) fetchMany(
 	if opts.CheckDuplicate == nil {
 		opts.CheckDuplicate = func(id ID, relay string) bool {
 			_, exists := seenAlready.LoadOrStore(id, struct{}{})
-			if exists && pool.duplicateMiddleware != nil {
-				pool.duplicateMiddleware(relay, id)
+			if exists && pool.DuplicateMiddleware != nil {
+				pool.DuplicateMiddleware(relay, id)
 			}
 			return exists
 		}
@@ -359,7 +351,7 @@ func (pool *Pool) FetchManyReplaceable(
 		go func(nm string) {
 			defer wg.Done()
 
-			if mh := pool.queryMiddleware; mh != nil {
+			if mh := pool.QueryMiddleware; mh != nil {
 				if filter.Kinds != nil && filter.Authors != nil {
 					for _, kind := range filter.Kinds {
 						for _, author := range filter.Authors {
@@ -407,7 +399,7 @@ func (pool *Pool) FetchManyReplaceable(
 					}
 
 					ie := RelayEvent{Event: evt, Relay: relay}
-					if mh := pool.eventMiddleware; mh != nil {
+					if mh := pool.EventMiddleware; mh != nil {
 						mh(ie)
 					}
 
@@ -450,8 +442,8 @@ func (pool *Pool) subMany(
 	if opts.CheckDuplicate == nil {
 		opts.CheckDuplicate = func(id ID, relay string) bool {
 			_, exists := seenAlready.LoadOrStore(id, Now())
-			if exists && pool.duplicateMiddleware != nil {
-				pool.duplicateMiddleware(relay, id)
+			if exists && pool.DuplicateMiddleware != nil {
+				pool.DuplicateMiddleware(relay, id)
 			}
 			return exists
 		}
@@ -498,7 +490,7 @@ func (pool *Pool) subMany(
 
 				var sub *Subscription
 
-				if mh := pool.queryMiddleware; mh != nil {
+				if mh := pool.QueryMiddleware; mh != nil {
 					if filter.Kinds != nil && filter.Authors != nil {
 						for _, kind := range filter.Kinds {
 							for _, author := range filter.Authors {
@@ -548,7 +540,7 @@ func (pool *Pool) subMany(
 						}
 
 						ie := RelayEvent{Event: evt, Relay: relay}
-						if mh := pool.eventMiddleware; mh != nil {
+						if mh := pool.EventMiddleware; mh != nil {
 							mh(ie)
 						}
 
@@ -642,7 +634,7 @@ func (pool *Pool) subManyEose(
 		go func(nm string) {
 			defer wg.Done()
 
-			if mh := pool.queryMiddleware; mh != nil {
+			if mh := pool.QueryMiddleware; mh != nil {
 				if filter.Kinds != nil && filter.Authors != nil {
 					for _, kind := range filter.Kinds {
 						for _, author := range filter.Authors {
@@ -709,7 +701,7 @@ func (pool *Pool) subManyEose(
 					}
 
 					ie := RelayEvent{Event: evt, Relay: relay}
-					if mh := pool.eventMiddleware; mh != nil {
+					if mh := pool.EventMiddleware; mh != nil {
 						mh(ie)
 					}
 
@@ -808,8 +800,8 @@ func (pool *Pool) batchedQueryMany(
 
 	opts.CheckDuplicate = func(id ID, relay string) bool {
 		_, exists := seenAlready.LoadOrStore(id, struct{}{})
-		if exists && pool.duplicateMiddleware != nil {
-			pool.duplicateMiddleware(relay, id)
+		if exists && pool.DuplicateMiddleware != nil {
+			pool.DuplicateMiddleware(relay, id)
 		}
 		return exists
 	}
@@ -897,8 +889,8 @@ func (pool *Pool) batchedSubscribeMany(
 
 	opts.CheckDuplicate = func(id ID, relay string) bool {
 		_, exists := seenAlready.LoadOrStore(id, struct{}{})
-		if exists && pool.duplicateMiddleware != nil {
-			pool.duplicateMiddleware(relay, id)
+		if exists && pool.DuplicateMiddleware != nil {
+			pool.DuplicateMiddleware(relay, id)
 		}
 		return exists
 	}

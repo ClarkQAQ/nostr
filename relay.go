@@ -364,7 +364,6 @@ func (r *Relay) handleMessage(message string) {
 
 	switch env := envelope.(type) {
 	case *NoticeEnvelope:
-		// see WithNoticeHandler
 		if r.noticeHandler != nil {
 			r.noticeHandler(r, string(*env))
 		} else {

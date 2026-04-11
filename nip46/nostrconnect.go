@@ -67,7 +67,7 @@ func NewBunkerFromNostrConnect(
 	pool *nostr.Pool,
 ) (*BunkerClient, error) {
 	if pool == nil {
-		pool = nostr.NewPool(nostr.PoolOptions{})
+		pool = nostr.NewPool()
 	}
 
 	if len(relayURLs) == 0 {
