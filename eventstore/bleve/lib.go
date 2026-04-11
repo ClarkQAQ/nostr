@@ -84,9 +84,11 @@ var SupportedLanguages = []lingua.Language{
 
 type BleveBackend struct {
 	sync.Mutex
-	Path           string
-	RawEventStore  eventstore.Store
-	ReadOnly       bool
+	Path          string
+	RawEventStore eventstore.Store
+	ReadOnly      bool
+	OpenTimeout   time.Duration
+
 	IndexableKinds []nostr.Kind
 
 	Languages     []lingua.Language
@@ -131,9 +133,14 @@ func (b *BleveBackend) Init() error {
 	}
 	b.Languages = validLanguages
 
-	index, err := bleve.OpenUsing(b.Path, map[string]any{
+	opts := map[string]any{
 		"read_only": b.ReadOnly,
-	})
+	}
+	if b.OpenTimeout != 0 {
+		opts["bolt_timeout"] = b.OpenTimeout.String()
+	}
+
+	index, err := bleve.OpenUsing(b.Path, opts)
 	if err == bleve.ErrorIndexPathDoesNotExist {
 		mapping := bleveMapping.NewIndexMapping()
 		mapping.DefaultMapping.Dynamic = false
