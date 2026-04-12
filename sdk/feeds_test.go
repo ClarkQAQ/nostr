@@ -2,54 +2,39 @@ package sdk
 
 import (
 	"context"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 	"fiatjaf.com/nostr/khatru"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStreamLiveFeed(t *testing.T) {
 	ctx := context.Background()
 
-	// start 3 local relays
+	// start 3 local relays using httptest
 	relay1 := khatru.NewRelay()
 	relay2 := khatru.NewRelay()
 	relay3 := khatru.NewRelay()
 
-	for _, r := range []*khatru.Relay{relay1, relay2, relay3} {
-		db := &slicestore.SliceStore{}
-		db.Init()
-		r.UseEventstore(db, 4000)
-		defer db.Close()
+	dbs := make([]*slicestore.SliceStore, 3)
+	for i, r := range []*khatru.Relay{relay1, relay2, relay3} {
+		dbs[i] = &slicestore.SliceStore{}
+		dbs[i].Init()
+		r.UseEventstore(dbs[i], 4000)
 	}
 
-	s1 := make(chan bool)
-	s2 := make(chan bool)
-	s3 := make(chan bool)
-
-	go func() {
-		err := relay1.Start("127.0.0.1", 48481, s1)
-		require.NoError(t, err)
-	}()
-	go func() {
-		err := relay2.Start("127.0.0.1", 48482, s2)
-		require.NoError(t, err)
-	}()
-	go func() {
-		err := relay3.Start("127.0.0.1", 48483, s3)
-		require.NoError(t, err)
-	}()
-
-	defer relay1.Shutdown(ctx)
-	defer relay2.Shutdown(ctx)
-	defer relay3.Shutdown(ctx)
-
-	<-s1
-	<-s2
-	<-s3
+	server1 := httptest.NewServer(relay1)
+	server2 := httptest.NewServer(relay2)
+	server3 := httptest.NewServer(relay3)
+	defer server1.Close()
+	defer server2.Close()
+	defer server3.Close()
+	for _, db := range dbs {
+		defer db.Close()
+	}
 
 	// generate two random keypairs for testing
 	sk1 := nostr.Generate()
@@ -60,14 +45,18 @@ func TestStreamLiveFeed(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	url1 := "ws" + server1.URL[4:]
+	url2 := "ws" + server2.URL[4:]
+	url3 := "ws" + server3.URL[4:]
+
 	// first publish relay lists to relay1 for both users
 	relayListEvt1 := nostr.Event{
 		PubKey:    pk1,
 		CreatedAt: nostr.Now(),
 		Kind:      10002,
 		Tags: nostr.Tags{
-			{"r", "ws://localhost:48482", "write"},
-			{"r", "ws://localhost:48483", "write"},
+			{"r", url2, "write"},
+			{"r", url3, "write"},
 		},
 		Content: "",
 	}
@@ -78,15 +67,15 @@ func TestStreamLiveFeed(t *testing.T) {
 		CreatedAt: nostr.Now(),
 		Kind:      10002,
 		Tags: nostr.Tags{
-			{"r", "ws://localhost:48482", "write"},
-			{"r", "ws://localhost:48483", "write"},
+			{"r", url2, "write"},
+			{"r", url3, "write"},
 		},
 		Content: "",
 	}
 	relayListEvt2.Sign(sk2)
 
 	// publish relay lists to relay1
-	relay, err := nostr.RelayConnect(ctx, "ws://localhost:48481", nostr.RelayOptions{})
+	relay, err := nostr.RelayConnect(ctx, url1, nostr.RelayOptions{})
 	if err != nil {
 		t.Fatalf("failed to connect to relay1: %v", err)
 	}
@@ -100,7 +89,7 @@ func TestStreamLiveFeed(t *testing.T) {
 
 	// create a new system instance pointing only to relay1 as the "indexer"
 	sys := NewSystem()
-	sys.RelayListRelays = NewRelayStream("ws://localhost:48481")
+	sys.RelayListRelays = NewRelayStream(url1)
 	defer sys.Close()
 
 	// prepublish some events
@@ -123,8 +112,8 @@ func TestStreamLiveFeed(t *testing.T) {
 	evt2.Sign(sk2)
 
 	// publish events concurrently to relays 2 and 3
-	go sys.Pool.PublishMany(ctx, []string{"ws://localhost:48482", "ws://localhost:48483"}, evt1)
-	go sys.Pool.PublishMany(ctx, []string{"ws://localhost:48482", "ws://localhost:48483"}, evt2)
+	go sys.Pool.PublishMany(ctx, []string{url2, url3}, evt1)
+	go sys.Pool.PublishMany(ctx, []string{url2, url3}, evt2)
 
 	// start streaming events for both pubkeys
 	events, err := sys.StreamLiveFeed(ctx, []nostr.PubKey{pk1, pk2}, []nostr.Kind{1})
@@ -174,8 +163,8 @@ func TestStreamLiveFeed(t *testing.T) {
 		evt2.Sign(sk2)
 
 		// publish events concurrently to relays 2 and 3
-		go sys.Pool.PublishMany(ctx, []string{"ws://localhost:48482", "ws://localhost:48483"}, evt1)
-		go sys.Pool.PublishMany(ctx, []string{"ws://localhost:48482", "ws://localhost:48483"}, evt2)
+		go sys.Pool.PublishMany(ctx, []string{url2, url3}, evt1)
+		go sys.Pool.PublishMany(ctx, []string{url2, url3}, evt2)
 
 		// wait for events
 		receivedEvt1 := false
