@@ -118,6 +118,17 @@ func (pool *Pool) StartPenaltyBox() {
 	}()
 }
 
+// AddToPenaltyBox manually adds a relay to the penalty box for the specified duration.
+// This prevents EnsureRelay from attempting to connect to the relay until the duration expires.
+func (pool *Pool) AddToPenaltyBox(url string, duration time.Duration) {
+	if pool.penaltyBox == nil {
+		return
+	}
+	nm := NormalizeURL(url)
+	pool.penaltyBox.Store(nm, [2]float64{0, duration.Seconds()})
+	pool.Relays.Store(nm, nil) // mark as explicitly disconnected for penalty box detection
+}
+
 // EnsureRelay ensures that a relay connection exists and is active.
 // If the relay is not connected, it attempts to connect.
 func (pool *Pool) EnsureRelay(url string) (*Relay, error) {
