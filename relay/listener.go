@@ -3,10 +3,11 @@ package relay
 import (
 	"context"
 	"errors"
-	"slices"
-	"unicode/utf8"
+	"iter"
 
+	"fiatjaf.com/lib/set"
 	"fiatjaf.com/nostr"
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
 var (
@@ -16,10 +17,9 @@ var (
 )
 
 type listenerSpec struct {
-	id       string // kept here so we can easily match against it removeListenerId
-	cancel   context.CancelCauseFunc
-	index    int
-	subrelay *Relay // this is important when we're dealing with routing, otherwise it will be always the same
+	ssid   int    // internal numeric id for a listener
+	sid    string // client-provided subscription id
+	cancel context.CancelCauseFunc
 }
 
 type listener struct {
@@ -28,10 +28,199 @@ type listener struct {
 	ws     *WebSocket
 }
 
+type subscription struct {
+	id     string
+	filter nostr.Filter
+	ws     *WebSocket
+}
+
+type dispatcher struct {
+	serial        int
+	subscriptions *xsync.MapOf[int, subscription]
+	byAuthor      map[nostr.PubKey]set.Set[int]
+	byKind        map[nostr.Kind]set.Set[int]
+	fallback      set.Set[int]
+}
+
+func newDispatcher() dispatcher {
+	return dispatcher{
+		subscriptions: xsync.NewMapOf[int, subscription](),
+		byAuthor:      make(map[nostr.PubKey]set.Set[int]),
+		byKind:        make(map[nostr.Kind]set.Set[int]),
+		fallback:      set.NewSliceSet[int](),
+	}
+}
+
+func (d *dispatcher) addSubscription(sub subscription) int {
+	d.serial++
+	ssid := d.serial
+
+	d.subscriptions.Store(ssid, sub)
+
+	indexed := false
+	if sub.filter.Authors != nil {
+		indexed = true
+		for _, author := range sub.filter.Authors {
+			s, ok := d.byAuthor[author]
+			if !ok {
+				s = set.NewSliceSet[int]()
+				d.byAuthor[author] = s
+			}
+			s.Add(ssid)
+		}
+	}
+
+	if sub.filter.Kinds != nil {
+		indexed = true
+		for _, kind := range sub.filter.Kinds {
+			s, ok := d.byKind[kind]
+			if !ok {
+				s = set.NewSliceSet[int]()
+				d.byKind[kind] = s
+			}
+			s.Add(ssid)
+		}
+	}
+
+	if !indexed {
+		d.fallback.Add(ssid)
+	}
+
+	return ssid
+}
+
+func (d *dispatcher) removeSubscription(ssid int) {
+	sub, ok := d.subscriptions.LoadAndDelete(ssid)
+	if !ok {
+		return
+	}
+
+	indexed := false
+	if sub.filter.Authors != nil {
+		indexed = true
+		for _, author := range sub.filter.Authors {
+			s, ok := d.byAuthor[author]
+			if !ok {
+				return
+			}
+			s.Remove(ssid)
+			if s.Len() == 0 {
+				delete(d.byAuthor, author)
+			}
+		}
+	}
+
+	if sub.filter.Kinds != nil {
+		indexed = true
+		for _, kind := range sub.filter.Kinds {
+			s, ok := d.byKind[kind]
+			if !ok {
+				return
+			}
+			s.Remove(ssid)
+			if s.Len() == 0 {
+				delete(d.byKind, kind)
+			}
+		}
+	}
+
+	if !indexed {
+		d.fallback.Remove(ssid)
+	}
+}
+
+func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
+	return func(yield func(subscription) bool) {
+		authorSubs, hasAuthorSubs := d.byAuthor[event.PubKey]
+		kindSubs, hasKindSubs := d.byKind[event.Kind]
+
+		if hasAuthorSubs && hasKindSubs {
+			for _, ssid := range authorSubs.Slice() {
+				sub, _ := d.subscriptions.Load(ssid)
+
+				if kindSubs.Has(ssid) {
+					if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+						if !yield(sub) {
+							return
+						}
+					}
+				} else {
+					// matched author but not tags, so this event doesn't qualify for any filter
+					continue
+				}
+			}
+		} else if hasAuthorSubs {
+			for _, ssid := range authorSubs.Slice() {
+				sub, _ := d.subscriptions.Load(ssid)
+
+				if sub.filter.Kinds != nil {
+					// if there are any kinds in the filter we already know this doesn't qualify
+					continue
+				}
+
+				if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+					if !yield(sub) {
+						return
+					}
+				}
+			}
+		} else if hasKindSubs {
+			for _, ssid := range kindSubs.Slice() {
+				sub, _ := d.subscriptions.Load(ssid)
+
+				if sub.filter.Authors != nil {
+					// if there are any authors in the filter we already know this doesn't qualify
+					continue
+				}
+
+				if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+					if !yield(sub) {
+						return
+					}
+				}
+			}
+		}
+
+		for _, ssid := range d.fallback.Slice() {
+			sub, _ := d.subscriptions.Load(ssid)
+
+			if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+				if !yield(sub) {
+					return
+				}
+			}
+		}
+	}
+}
+
+//go:inline
+func filterMatchesTimestampConstraintsAndTags(filter nostr.Filter, event nostr.Event) bool {
+	if filter.Since != 0 && event.CreatedAt < filter.Since {
+		return false
+	}
+
+	if filter.Until != 0 && event.CreatedAt > filter.Until {
+		return false
+	}
+
+	for f, v := range filter.Tags {
+		if !event.Tags.ContainsAny(f, v) {
+			return false
+		}
+	}
+
+	return true
+}
+
+//go:inline
+func tagKeyValueKey(tagKey, tagValue string) string {
+	return tagKey + "\x00" + tagValue
+}
+
 func (rl *Relay) GetListeningFilters() []nostr.Filter {
-	respfilters := make([]nostr.Filter, len(rl.listeners))
-	for i, l := range rl.listeners {
-		respfilters[i] = l.filter
+	respfilters := make([]nostr.Filter, 0, rl.dispatcher.subscriptions.Size())
+	for _, sub := range rl.dispatcher.subscriptions.Range {
+		respfilters = append(respfilters, sub.filter)
 	}
 	return respfilters
 }
@@ -41,38 +230,28 @@ func (rl *Relay) GetListeningFilters() []nostr.Filter {
 func (rl *Relay) addListener(
 	ws *WebSocket,
 	id string,
-	subrelay *Relay,
 	filter nostr.Filter,
 	cancel context.CancelCauseFunc,
-) error {
-	if rl.MaxSubidLength > 0 && utf8.RuneCountInString(id) > rl.MaxSubidLength {
-		return ErrSubscriptionIdTooLong
+) {
+	select {
+	case <-rl.clientsMutex.C():
+		defer rl.clientsMutex.Unlock()
+	case <-ws.Context.Done():
+		return
 	}
 
-	rl.clientsMutex.Lock()
-	defer rl.clientsMutex.Unlock()
-
 	if specs, ok := rl.clients[ws]; ok /* this will always be true unless client has disconnected very rapidly */ {
-		idx := len(subrelay.listeners)
-
-		if rl.MaxSubscriptionsPerClient > 0 && len(specs) >= rl.MaxSubscriptionsPerClient {
-			return ErrTooManySubscriptions
-		}
-
-		rl.clients[ws] = append(specs, listenerSpec{
-			id:       id,
-			cancel:   cancel,
-			subrelay: subrelay,
-			index:    idx,
-		})
-		subrelay.listeners = append(subrelay.listeners, listener{
+		ssid := rl.dispatcher.addSubscription(subscription{
 			ws:     ws,
 			id:     id,
 			filter: filter,
 		})
+		rl.clients[ws] = append(specs, listenerSpec{
+			ssid:   ssid,
+			cancel: cancel,
+			sid:    id,
+		})
 	}
-
-	return nil
 }
 
 // remove a specific subscription id from listeners for a given ws client
@@ -82,35 +261,16 @@ func (rl *Relay) removeListenerId(ws *WebSocket, id string) {
 	defer rl.clientsMutex.Unlock()
 
 	if specs, ok := rl.clients[ws]; ok {
-		// swap delete specs that match this id
-		for s := len(specs) - 1; s >= 0; s-- {
-			spec := specs[s]
-			if spec.id == id {
+		kept := specs[:0]
+		for _, spec := range specs {
+			if spec.sid == id {
 				spec.cancel(ErrSubscriptionClosedByClient)
-				specs[s] = specs[len(specs)-1]
-				specs = specs[0 : len(specs)-1]
-				rl.clients[ws] = specs
-
-				// swap delete listeners one at a time, as they may be each in a different subrelay
-				srl := spec.subrelay // == rl in normal cases, but different when this came from a route
-
-				if spec.index != len(srl.listeners)-1 {
-					movedFromIndex := len(srl.listeners) - 1
-					moved := srl.listeners[movedFromIndex] // this wasn't removed, but will be moved
-					srl.listeners[spec.index] = moved
-
-					// now we must update the the listener we just moved
-					// so its .index reflects its new position on srl.listeners
-					movedSpecs := rl.clients[moved.ws]
-					idx := slices.IndexFunc(movedSpecs, func(ls listenerSpec) bool {
-						return ls.index == movedFromIndex && ls.subrelay == srl
-					})
-					movedSpecs[idx].index = spec.index
-					rl.clients[moved.ws] = movedSpecs
-				}
-				srl.listeners = srl.listeners[0 : len(srl.listeners)-1] // finally reduce the slice length
+				rl.dispatcher.removeSubscription(spec.ssid)
+				continue
 			}
+			kept = append(kept, spec)
 		}
+		rl.clients[ws] = kept
 	}
 }
 
@@ -118,31 +278,9 @@ func (rl *Relay) removeClientAndListeners(ws *WebSocket) {
 	rl.clientsMutex.Lock()
 	defer rl.clientsMutex.Unlock()
 	if specs, ok := rl.clients[ws]; ok {
-		// swap delete listeners and delete client (all specs will be deleted)
-		for s, spec := range specs {
+		for _, spec := range specs {
 			// no need to cancel contexts since they inherit from the main connection context
-			// just delete the listeners (swap-delete)
-			srl := spec.subrelay
-
-			if spec.index != len(srl.listeners)-1 {
-				movedFromIndex := len(srl.listeners) - 1
-				moved := srl.listeners[movedFromIndex] // this wasn't removed, but will be moved
-				srl.listeners[spec.index] = moved
-
-				// temporarily update the spec of the listener being removed to have index == -1
-				// (since it was removed) so it doesn't match in the search below
-				rl.clients[ws][s].index = -1
-
-				// now we must update the the listener we just moved
-				// so its .index reflects its new position on srl.listeners
-				movedSpecs := rl.clients[moved.ws]
-				idx := slices.IndexFunc(movedSpecs, func(ls listenerSpec) bool {
-					return ls.index == movedFromIndex && ls.subrelay == srl
-				})
-				movedSpecs[idx].index = spec.index
-				rl.clients[moved.ws] = movedSpecs
-			}
-			srl.listeners = srl.listeners[0 : len(srl.listeners)-1] // finally reduce the slice length
+			rl.dispatcher.removeSubscription(spec.ssid)
 		}
 	}
 	delete(rl.clients, ws)
@@ -152,16 +290,14 @@ func (rl *Relay) removeClientAndListeners(ws *WebSocket) {
 func (rl *Relay) notifyListeners(event nostr.Event, skipPrevent bool) int {
 	count := 0
 listenersloop:
-	for _, listener := range rl.listeners {
-		if listener.filter.Matches(event) {
-			if !skipPrevent && nil != rl.PreventBroadcast {
-				if rl.PreventBroadcast(listener.ws, listener.filter, event) {
-					continue listenersloop
-				}
+	for sub := range rl.dispatcher.candidates(event) {
+		if !skipPrevent && nil != rl.PreventBroadcast {
+			if rl.PreventBroadcast(sub.ws, sub.filter, event) {
+				continue listenersloop
 			}
-			listener.ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &listener.id, Event: event})
-			count++
 		}
+		sub.ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &sub.id, Event: event})
+		count++
 	}
 	return count
 }

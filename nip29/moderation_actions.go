@@ -3,6 +3,7 @@ package nip29
 import (
 	"fmt"
 	"slices"
+	"strconv"
 
 	"fiatjaf.com/nostr"
 )
@@ -81,59 +82,95 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 		y := true
 		n := false
 
+		hasName := false
+
+		// DEPRECATED: remove all the fields not tagged with Replace = true eventually
+		// edit-metadata to become a PUT rather than a PATCH
+
 		for _, tag := range evt.Tags {
 			if len(tag) >= 1 {
 				switch tag[0] {
 				case "name":
 					if len(tag) >= 2 {
 						edit.NameValue = &tag[1]
+						if ok {
+							edit.Replace = true
+						}
 						ok = true
+						hasName = true
 					}
 				case "picture":
 					if len(tag) >= 2 {
 						edit.PictureValue = &tag[1]
+						if hasName {
+							edit.Replace = true
+						}
 						ok = true
 					}
 				case "about":
 					if len(tag) >= 2 {
 						edit.AboutValue = &tag[1]
+						if hasName {
+							edit.Replace = true
+						}
 						ok = true
 					}
+				case "supported_kinds":
+					kinds := make([]nostr.Kind, 0, len(tag)-1)
+					for _, kstr := range tag[1:] {
+						if kind, err := strconv.ParseUint(kstr, 10, 16); err != nil {
+							return nil, fmt.Errorf("invalid kind: %w", err)
+						} else {
+							kinds = append(kinds, nostr.Kind(kind))
+						}
+					}
+					edit.SupportedKindsValue = &kinds
+					edit.Replace = true
 				case "closed":
 					edit.ClosedValue = &y
+					if hasName {
+						edit.Replace = true
+					}
 					ok = true
 				case "open":
 					edit.ClosedValue = &n
 					ok = true
 				case "restricted":
 					edit.RestrictedValue = &y
+					if hasName {
+						edit.Replace = true
+					}
 					ok = true
 				case "unrestricted":
 					edit.RestrictedValue = &n
 					ok = true
 				case "hidden":
 					edit.HiddenValue = &y
+					if hasName {
+						edit.Replace = true
+					}
 					ok = true
 				case "visible":
 					edit.HiddenValue = &n
 					ok = true
 				case "private":
 					edit.PrivateValue = &y
+					if hasName {
+						edit.Replace = true
+					}
 					ok = true
 				case "public":
 					edit.PrivateValue = &n
 					ok = true
-				case "no-text":
-					edit.NoTextValue = &y
-					ok = true
-				case "text":
-					edit.NoTextValue = &n
-					ok = true
 				case "livekit":
-					edit.LivekitValue = &y
+					edit.LiveKitValue = &y
+					edit.Replace = true
 					ok = true
 				case "no-livekit":
-					edit.LivekitValue = &n
+					edit.LiveKitValue = &n
+					ok = true
+				case "no-text":
+					edit.SupportedKindsValue = nil
 					ok = true
 				}
 			}
@@ -251,21 +288,36 @@ func (a RemoveUser) Apply(group *Group) {
 }
 
 type EditMetadata struct {
-	NameValue       *string
-	PictureValue    *string
-	AboutValue      *string
-	RestrictedValue *bool
-	ClosedValue     *bool
-	HiddenValue     *bool
-	PrivateValue    *bool
-	NoTextValue     *bool
-	LivekitValue    *bool
-	When            nostr.Timestamp
+	NameValue           *string
+	PictureValue        *string
+	AboutValue          *string
+	RestrictedValue     *bool
+	ClosedValue         *bool
+	HiddenValue         *bool
+	PrivateValue        *bool
+	LiveKitValue        *bool
+	SupportedKindsValue *[]nostr.Kind
+
+	Replace bool
+	When    nostr.Timestamp
 }
 
 func (_ EditMetadata) Name() string { return "edit-metadata" }
 func (a EditMetadata) Apply(group *Group) {
 	group.LastMetadataUpdate = a.When
+
+	if a.Replace {
+		group.Name = ""
+		group.Picture = ""
+		group.About = ""
+		group.Restricted = false
+		group.Closed = false
+		group.Hidden = false
+		group.Private = false
+		group.LiveKit = false
+		group.SupportedKinds = nil
+	}
+
 	if a.NameValue != nil {
 		group.Name = *a.NameValue
 	}
@@ -287,11 +339,11 @@ func (a EditMetadata) Apply(group *Group) {
 	if a.PrivateValue != nil {
 		group.Private = *a.PrivateValue
 	}
-	if a.NoTextValue != nil {
-		group.NoText = *a.NoTextValue
+	if a.LiveKitValue != nil {
+		group.LiveKit = *a.LiveKitValue
 	}
-	if a.LivekitValue != nil {
-		group.Livekit = *a.LivekitValue
+	if a.SupportedKindsValue != nil {
+		group.SupportedKinds = *a.SupportedKindsValue
 	}
 }
 
@@ -305,6 +357,7 @@ func (a CreateGroup) Apply(group *Group) {
 	group.LastMetadataUpdate = a.When
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
+	group.LastLiveKitParticipantsUpdate = a.When
 }
 
 type DeleteGroup struct {
@@ -314,18 +367,19 @@ type DeleteGroup struct {
 func (_ DeleteGroup) Name() string { return "delete-group" }
 func (a DeleteGroup) Apply(group *Group) {
 	group.Members = make(map[nostr.PubKey][]*Role)
+	group.LiveKitParticipants = make([]nostr.PubKey, 0)
 	group.Closed = true
 	group.Private = true
 	group.Restricted = true
 	group.Hidden = true
-	group.NoText = true
 	group.Name = "[deleted]"
 	group.About = ""
 	group.Picture = ""
-	group.Livekit = false
+	group.LiveKit = false
 	group.LastMetadataUpdate = a.When
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
+	group.LastLiveKitParticipantsUpdate = a.When
 }
 
 type CreateInvite struct {

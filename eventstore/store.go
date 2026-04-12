@@ -27,7 +27,7 @@ type Store interface {
 
 	// ReplaceEvent atomically replaces a replaceable or addressable event.
 	// Conceptually it is like a Query->Delete->Save, but streamlined.
-	ReplaceEvent(context.Context, nostr.Event) error
+	ReplaceEvent(context.Context, nostr.Event) (deleted []nostr.Event, e error)
 
 	// CountEvents counts all events that match a given filter
 	CountEvents(context.Context, nostr.Filter) (uint32, error)

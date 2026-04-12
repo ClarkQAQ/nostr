@@ -22,32 +22,42 @@ const (
 	kind_10001 replaceableIndex = 3
 	kind_10002 replaceableIndex = 4
 	kind_10003 replaceableIndex = 5
-	kind_10004 replaceableIndex = 6
-	kind_10005 replaceableIndex = 7
-	kind_10006 replaceableIndex = 8
-	kind_10007 replaceableIndex = 9
-	kind_10015 replaceableIndex = 10
-	kind_10019 replaceableIndex = 11
-	kind_10030 replaceableIndex = 12
+	kind_10006 replaceableIndex = 6
+	kind_10007 replaceableIndex = 7
+	kind_10015 replaceableIndex = 8
+	kind_10019 replaceableIndex = 9
+	kind_10030 replaceableIndex = 10
+	kind_10008 replaceableIndex = 11
+	kind_10017 replaceableIndex = 12
+	kind_10018 replaceableIndex = 13
+	kind_10020 replaceableIndex = 14
+	kind_10050 replaceableIndex = 15
+	kind_10101 replaceableIndex = 16
+	kind_10102 replaceableIndex = 17
 )
 
 type EventResult dataloader.Result[*nostr.Event]
 
 func (sys *System) initializeReplaceableDataloaders() {
-	sys.replaceableLoaders = make([]*dataloader.Loader[nostr.PubKey, nostr.Event], 13)
+	sys.replaceableLoaders = make([]*dataloader.Loader[nostr.PubKey, nostr.Event], 18)
 	sys.replaceableLoaders[kind_0] = sys.createReplaceableDataloader(0)
 	sys.replaceableLoaders[kind_3] = sys.createReplaceableDataloader(3)
 	sys.replaceableLoaders[kind_10000] = sys.createReplaceableDataloader(10000)
 	sys.replaceableLoaders[kind_10001] = sys.createReplaceableDataloader(10001)
 	sys.replaceableLoaders[kind_10002] = sys.createReplaceableDataloader(10002)
 	sys.replaceableLoaders[kind_10003] = sys.createReplaceableDataloader(10003)
-	sys.replaceableLoaders[kind_10004] = sys.createReplaceableDataloader(10004)
-	sys.replaceableLoaders[kind_10005] = sys.createReplaceableDataloader(10005)
 	sys.replaceableLoaders[kind_10006] = sys.createReplaceableDataloader(10006)
 	sys.replaceableLoaders[kind_10007] = sys.createReplaceableDataloader(10007)
 	sys.replaceableLoaders[kind_10015] = sys.createReplaceableDataloader(10015)
 	sys.replaceableLoaders[kind_10019] = sys.createReplaceableDataloader(10019)
 	sys.replaceableLoaders[kind_10030] = sys.createReplaceableDataloader(10030)
+	sys.replaceableLoaders[kind_10008] = sys.createReplaceableDataloader(10008)
+	sys.replaceableLoaders[kind_10017] = sys.createReplaceableDataloader(10017)
+	sys.replaceableLoaders[kind_10018] = sys.createReplaceableDataloader(10018)
+	sys.replaceableLoaders[kind_10020] = sys.createReplaceableDataloader(10020)
+	sys.replaceableLoaders[kind_10050] = sys.createReplaceableDataloader(10050)
+	sys.replaceableLoaders[kind_10101] = sys.createReplaceableDataloader(10101)
+	sys.replaceableLoaders[kind_10102] = sys.createReplaceableDataloader(10102)
 }
 
 func (sys *System) createReplaceableDataloader(kind nostr.Kind) *dataloader.Loader[nostr.PubKey, nostr.Event] {

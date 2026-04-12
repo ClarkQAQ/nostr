@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 
@@ -41,8 +42,8 @@ func (acc *Accumulator) AddBytes(other []byte) {
 }
 
 func (acc *Accumulator) GetFingerprint(n int) [negentropy.FingerprintSize]byte {
-	input := acc.Buf[:32]
-	input = append(input, negentropy.EncodeVarInt(n)...)
-	hash := sha256.Sum256(input)
+	input := bytes.NewBuffer(acc.Buf[:32])
+	negentropy.WriteVarInt(input, uint64(n))
+	hash := sha256.Sum256(input.Bytes())
 	return [negentropy.FingerprintSize]byte(hash[:negentropy.FingerprintSize])
 }

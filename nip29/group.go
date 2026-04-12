@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"fiatjaf.com/nostr"
@@ -38,10 +39,11 @@ func ParseGroupAddress(raw string) (GroupAddress, error) {
 type Group struct {
 	Address GroupAddress
 
-	Name    string
-	Picture string
-	About   string
-	Members map[nostr.PubKey][]*Role
+	Name                string
+	Picture             string
+	About               string
+	Members             map[nostr.PubKey][]*Role
+	LiveKitParticipants []nostr.PubKey
 
 	// indicates that only members can read group messages
 	Private bool
@@ -55,19 +57,20 @@ type Group struct {
 	// indicates that relays should hide group metadata from non-members
 	Hidden bool
 
-	// indicates that text messages are not allowed in the group
-	NoText bool
-
 	// indicates that the group supports audio/video live chat
-	Livekit bool
+	LiveKit bool
+
+	// indicates which event kinds this group supports
+	SupportedKinds []nostr.Kind
 
 	Roles       []*Role
 	InviteCodes []string
 
-	LastMetadataUpdate nostr.Timestamp
-	LastAdminsUpdate   nostr.Timestamp
-	LastMembersUpdate  nostr.Timestamp
-	LastRolesUpdate    nostr.Timestamp
+	LastMetadataUpdate            nostr.Timestamp
+	LastAdminsUpdate              nostr.Timestamp
+	LastMembersUpdate             nostr.Timestamp
+	LastRolesUpdate               nostr.Timestamp
+	LastLiveKitParticipantsUpdate nostr.Timestamp
 }
 
 func (group Group) String() string {
@@ -75,7 +78,6 @@ func (group Group) String() string {
 	maybeRestricted := ""
 	maybeHidden := ""
 	maybeClosed := ""
-	maybeNoText := ""
 
 	if group.Private {
 		maybePrivate = " private"
@@ -89,13 +91,10 @@ func (group Group) String() string {
 	if group.Closed {
 		maybeClosed = " closed"
 	}
-	if group.NoText {
-		maybeNoText = " no-text"
-	}
 
-	maybeLivekit := ""
-	if group.Livekit {
-		maybeLivekit = " livekit"
+	maybeLiveKit := ""
+	if group.LiveKit {
+		maybeLiveKit = " livekit"
 	}
 
 	members := make([]string, len(group.Members))
@@ -116,15 +115,14 @@ func (group Group) String() string {
 		i++
 	}
 
-	return fmt.Sprintf(`<Group %s name="%s"%s%s%s%s%s%s picture="%s" about="%s" members=[%v]>`,
+	return fmt.Sprintf(`<Group %s name="%s"%s%s%s%s%s picture="%s" about="%s" members=[%v]>`,
 		group.Address,
 		group.Name,
 		maybePrivate,
 		maybeRestricted,
 		maybeHidden,
 		maybeClosed,
-		maybeNoText,
-		maybeLivekit,
+		maybeLiveKit,
 		group.Picture,
 		group.About,
 		strings.Join(members, " "),
@@ -139,9 +137,10 @@ func NewGroup(gadstr string) (Group, error) {
 	}
 
 	return Group{
-		Address: gad,
-		Name:    gad.ID,
-		Members: make(map[nostr.PubKey][]*Role),
+		Address:             gad,
+		Name:                gad.ID,
+		Members:             make(map[nostr.PubKey][]*Role),
+		LiveKitParticipants: make([]nostr.PubKey, 0),
 	}, nil
 }
 
@@ -151,8 +150,9 @@ func NewGroupFromMetadataEvent(relayURL string, evt *nostr.Event) (Group, error)
 			Relay: relayURL,
 			ID:    evt.Tags.GetD(),
 		},
-		Name:    evt.Tags.GetD(),
-		Members: make(map[nostr.PubKey][]*Role),
+		Name:                evt.Tags.GetD(),
+		Members:             make(map[nostr.PubKey][]*Role),
+		LiveKitParticipants: make([]nostr.PubKey, 0),
 	}
 
 	err := g.MergeInMetadataEvent(evt)
@@ -190,12 +190,17 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	if group.Closed {
 		evt.Tags = append(evt.Tags, nostr.Tag{"closed"})
 	}
-	if group.NoText {
-		evt.Tags = append(evt.Tags, nostr.Tag{"no-text"})
+	if group.LiveKit {
+		evt.Tags = append(evt.Tags, nostr.Tag{"livekit"})
 	}
 
-	if group.Livekit {
-		evt.Tags = append(evt.Tags, nostr.Tag{"livekit"})
+	if group.SupportedKinds != nil {
+		tag := make(nostr.Tag, 1, 1+len(group.SupportedKinds))
+		tag[0] = "supported_kinds"
+		for _, kind := range group.SupportedKinds {
+			tag = append(tag, strconv.Itoa(int(kind)))
+		}
+		evt.Tags = append(evt.Tags, tag)
 	}
 
 	return evt
@@ -260,6 +265,22 @@ func (group Group) ToRolesEvent() nostr.Event {
 	return evt
 }
 
+func (group Group) ToLiveKitParticipantsEvent() nostr.Event {
+	evt := nostr.Event{
+		Kind:      nostr.KindSimpleGroupLiveKitParticipants,
+		CreatedAt: group.LastLiveKitParticipantsUpdate,
+		Tags:      make(nostr.Tags, 1, 1+len(group.LiveKitParticipants)),
+	}
+	evt.Tags[0] = nostr.Tag{"d", group.Address.ID}
+
+	for _, member := range group.LiveKitParticipants {
+		tag := nostr.Tag{"participant", member.Hex()}
+		evt.Tags = append(evt.Tags, tag)
+	}
+
+	return evt
+}
+
 func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 	if evt.Kind != nostr.KindSimpleGroupMetadata {
 		return fmt.Errorf("expected kind %d, got %d", nostr.KindSimpleGroupMetadata, evt.Kind)
@@ -282,10 +303,18 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 				group.Closed = true
 			case "hidden":
 				group.Hidden = true
-			case "no-text":
-				group.NoText = true
 			case "livekit":
-				group.Livekit = true
+				group.LiveKit = true
+			case "supported_kinds":
+				kinds := make([]nostr.Kind, 0, len(tag)-1)
+				for _, raw := range tag[1:] {
+					kind, err := strconv.Atoi(raw)
+					if err != nil {
+						continue
+					}
+					kinds = append(kinds, nostr.Kind(kind))
+				}
+				group.SupportedKinds = kinds
 			default:
 				if len(tag) >= 2 {
 					switch tag[0] {
@@ -395,6 +424,37 @@ func (group *Group) MergeInRolesEvent(evt *nostr.Event) error {
 			// add new role
 			group.Roles = append(group.Roles, &Role{Name: roleName, Description: roleDescription})
 		}
+	}
+
+	return nil
+}
+
+func (group *Group) MergeInLiveKitParticipantsEvent(evt *nostr.Event) error {
+	if evt.Kind != nostr.KindSimpleGroupLiveKitParticipants {
+		return fmt.Errorf("expected kind %d, got %d", nostr.KindSimpleGroupLiveKitParticipants, evt.Kind)
+	}
+	if evt.CreatedAt < group.LastLiveKitParticipantsUpdate {
+		return fmt.Errorf("event is older than our last update (%d vs %d)", evt.CreatedAt, group.LastLiveKitParticipantsUpdate)
+	}
+
+	group.LastLiveKitParticipantsUpdate = evt.CreatedAt
+	group.LiveKitParticipants = make([]nostr.PubKey, 0, len(evt.Tags))
+	for _, tag := range evt.Tags {
+		if len(tag) < 2 {
+			continue
+		}
+		if tag[0] != "participant" {
+			continue
+		}
+
+		member, err := nostr.PubKeyFromHex(tag[1])
+		if err != nil {
+			continue
+		}
+		if slices.Contains(group.LiveKitParticipants, member) {
+			continue
+		}
+		group.LiveKitParticipants = append(group.LiveKitParticipants, member)
 	}
 
 	return nil

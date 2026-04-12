@@ -193,35 +193,30 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					srl := rl
-					if rl.getSubRelayFromEvent != nil {
-						srl = rl.getSubRelayFromEvent(&env.Event)
-					}
-
 					var ok bool
 					var writeErr error
 					var skipBroadcast bool
 
 					if env.Event.Kind == nostr.KindDeletion {
 						// store the delete event first
-						skipBroadcast, writeErr = srl.handleNormal(ctx, env.Event)
+						skipBroadcast, writeErr = rl.handleNormal(ctx, env.Event)
 						if writeErr == nil {
 							// this always returns "blocked: " whenever it returns an error
-							writeErr = srl.handleDeleteRequest(ctx, env.Event)
+							writeErr = rl.handleDeleteRequest(ctx, env.Event)
 						}
 					} else if env.Event.Kind.IsEphemeral() {
 						// this will also always return a prefixed reason
-						writeErr = srl.handleEphemeral(ctx, env.Event)
+						writeErr = rl.handleEphemeral(ctx, env.Event)
 					} else {
 						// this will also always return a prefixed reason
-						skipBroadcast, writeErr = srl.handleNormal(ctx, env.Event)
+						skipBroadcast, writeErr = rl.handleNormal(ctx, env.Event)
 					}
 
 					var reason string
 					if writeErr == nil {
 						ok = true
 						if !skipBroadcast {
-							n := srl.notifyListeners(env.Event, false)
+							n := rl.notifyListeners(env.Event, false)
 
 							// the number of notified listeners matters in ephemeral events
 							if env.Event.Kind.IsEphemeral() {
@@ -254,15 +249,10 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					var total uint32
 					var hll *hyperloglog.HyperLogLog
 
-					srl := rl
-					if rl.getSubRelayFromFilter != nil {
-						srl = rl.getSubRelayFromFilter(env.Filter)
-					}
-
 					if offset := nip45.HyperLogLogEventPubkeyOffsetForFilter(env.Filter); offset != -1 {
-						total, hll = srl.handleCountRequestWithHLL(ctx, ws, env.Filter, offset)
+						total, hll = rl.handleCountRequestWithHLL(ctx, ws, env.Filter, offset)
 					} else {
-						total = srl.handleCountRequest(ctx, ws, env.Filter)
+						total = rl.handleCountRequest(ctx, ws, env.Filter)
 					}
 
 					resp := nostr.CountEnvelope{
@@ -288,11 +278,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					// handle each filter separately -- dispatching events as they're loaded from databases
 					for _, filter := range env.Filters {
-						srl := rl
-						if rl.getSubRelayFromFilter != nil {
-							srl = rl.getSubRelayFromFilter(filter)
-						}
-						err := srl.handleRequest(reqCtx, env.SubscriptionID, &eose, ws, filter)
+						err := rl.handleRequest(reqCtx, env.SubscriptionID, &eose, ws, filter)
 						if err != nil {
 							// fail everything if any filter is rejected
 							reason := err.Error()
@@ -302,12 +288,11 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 							_ = ws.WriteJSON(nostr.ClosedEnvelope{SubscriptionID: env.SubscriptionID, Reason: reason})
 							cancelReqCtx(errors.New("filter rejected"))
 							return
-						} else {
-							if e := rl.addListener(ws, env.SubscriptionID, srl, filter, cancelReqCtx); e != nil {
-								_ = ws.WriteJSON(nostr.ClosedEnvelope{SubscriptionID: env.SubscriptionID, Reason: e.Error()})
-								cancelReqCtx(e)
-								return
-							}
+						} else if filter.IDs == nil {
+							// a query that is just a bunch of "ids": [...] will not add listeners.
+							// is this a bug? maybe, but I don't think anyone is listening for an ID
+							// that hasn't been published yet anywhere -- if yes we can change later
+							rl.addListener(ws, env.SubscriptionID, filter, cancelReqCtx)
 						}
 					}
 
@@ -344,15 +329,11 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "error: failed to authenticate: " + err.Error()})
 					}
 				case *nip77.OpenEnvelope:
-					srl := rl
-					if rl.getSubRelayFromFilter != nil {
-						srl = rl.getSubRelayFromFilter(env.Filter)
-						if !srl.Negentropy {
-							// ignore
-							return
-						}
+					if !rl.Negentropy {
+						// ignore
+						return
 					}
-					vec, err := srl.startNegentropySession(ctx, env.Filter)
+					vec, err := rl.startNegentropySession(ctx, env.Filter)
 					if err != nil {
 						// fail everything if any filter is rejected
 						reason := err.Error()

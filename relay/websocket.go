@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -31,6 +32,9 @@ type WebSocket struct {
 }
 
 func (ws *WebSocket) WriteJSON(any any) error {
+	if ws == nil {
+		return fmt.Errorf("connection doesn't exist")
+	}
 	ws.mutex.Lock()
 	err := ws.conn.WriteJSON(any)
 	ws.mutex.Unlock()

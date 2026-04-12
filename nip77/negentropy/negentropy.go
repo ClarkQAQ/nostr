@@ -230,7 +230,7 @@ func (n *Negentropy) reconcileAux(reader *bytes.Reader) ([]byte, error) {
 				finishSkip()
 
 				responseIds := make([]byte, 0, 32*100)
-				responses := 0
+				var responses uint64 = 0
 
 				endBound := currBound
 
@@ -284,7 +284,7 @@ func (n *Negentropy) SplitRange(lower, upper int, upperBound Bound, output *byte
 		// we just send the full ids here
 		n.WriteBound(output, upperBound)
 		output.WriteByte(byte(IdListMode))
-		WriteVarInt(output, numElems)
+		WriteVarInt(output, uint64(numElems))
 
 		for _, item := range n.storage.Range(lower, upper) {
 			output.Write(item.ID[:])

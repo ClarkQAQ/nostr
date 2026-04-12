@@ -13,11 +13,11 @@ import (
 	"net/http"
 	"net/textproto"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"fiatjaf.com/lib/channelmutex"
 	ws "github.com/coder/websocket"
 	"github.com/puzpuzpuz/xsync/v3"
 )
@@ -48,16 +48,13 @@ func (c closeCause) Error() string {
 
 // Relay represents a connection to a Nostr relay.
 type Relay struct {
-	closeMutex *channelmutex.Mutex
-
 	URL           string
 	requestHeader http.Header // e.g. for origin header
 
 	// websocket connection
-	conn         *ws.Conn
-	writeQueue   chan writeRequest
-	closed       *atomic.Bool
-	closedNotify chan struct{}
+	conn       *ws.Conn
+	writeQueue chan writeRequest
+	closed     *atomic.Bool
 
 	Subscriptions *xsync.MapOf[int64, *Subscription]
 
@@ -65,7 +62,10 @@ type Relay struct {
 	connectionContext       context.Context // will be canceled when the connection closes
 	connectionContextCancel context.CancelCauseFunc
 
-	challenge                     string // NIP-42 challenge, we only keep the last
+	challenge   string // NIP-42 challenge, we only keep the last
+	performAuth sync.Once
+	authed      bool
+
 	authHandler                   func(context.Context, *Relay, *Event) error
 	noticeHandler                 func(*Relay, string) // NIP-01 NOTICEs
 	customHandler                 func(string)         // nonstandard unparseable messages
@@ -92,9 +92,7 @@ func NewRelay(ctx context.Context, url string, opts RelayOptions) *Relay {
 		customHandler:                 opts.CustomHandler,
 		noticeHandler:                 opts.NoticeHandler,
 		authHandler:                   opts.AuthHandler,
-		closeMutex:                    channelmutex.New(),
 		closed:                        &atomic.Bool{},
-		closedNotify:                  make(chan struct{}),
 	}
 
 	go func() {
@@ -103,8 +101,6 @@ func NewRelay(ctx context.Context, url string, opts RelayOptions) *Relay {
 		if wasClosed := r.closed.Swap(true); wasClosed {
 			return
 		}
-
-		r.closeMutex.Invalidate()
 
 		if r.conn != nil {
 			cause := context.Cause(ctx)
@@ -119,14 +115,6 @@ func NewRelay(ctx context.Context, url string, opts RelayOptions) *Relay {
 			}
 
 			_ = r.conn.Close(code, reason)
-		}
-		if r.closeMutex != nil {
-			r.closeMutex.Lock()
-			if r.closedNotify != nil {
-				close(r.closedNotify)
-			}
-			r.conn = nil
-			r.closeMutex.Unlock()
 		}
 	}()
 
@@ -254,12 +242,11 @@ func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) erro
 	ticker := time.NewTicker(19 * time.Second)
 
 	// main websocket loop
-	readQueue := make(chan string)
+	readQueue := make(chan string, 64 /* add some buffer to account for processing/IO mismatches */)
 
 	r.conn = c
-	r.writeQueue = make(chan writeRequest)
+	r.writeQueue = make(chan writeRequest, 64 /* idem */)
 	r.closed = &atomic.Bool{}
-	r.closedNotify = make(chan struct{})
 
 	connCtx := r.connectionContext
 	go func() {
@@ -268,8 +255,6 @@ func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) erro
 		for {
 			select {
 			case <-connCtx.Done():
-				return
-			case <-r.closedNotify:
 				return
 			case <-ticker.C:
 				debugLogf("{%s} pinging\n", r.URL)
@@ -335,7 +320,11 @@ func (r *Relay) newConnection(ctx context.Context, httpClient *http.Client) erro
 			}
 
 			msg := string(buf.Bytes())
-			readQueue <- msg
+			select {
+			case readQueue <- msg:
+			case <-connCtx.Done():
+				return
+			}
 		}
 	}()
 
@@ -375,7 +364,6 @@ func (r *Relay) handleMessage(message string) {
 
 	switch env := envelope.(type) {
 	case *NoticeEnvelope:
-		// see WithNoticeHandler
 		if r.noticeHandler != nil {
 			r.noticeHandler(r, string(*env))
 		} else {
@@ -385,7 +373,10 @@ func (r *Relay) handleMessage(message string) {
 		if env.Challenge == nil {
 			return
 		}
+
+		r.performAuth = sync.Once{} // this ensures we can try to auth again
 		r.challenge = *env.Challenge
+
 		if r.authHandler != nil {
 			go func() {
 				r.Auth(r.Context(), func(ctx context.Context, evt *Event) error {
@@ -442,16 +433,6 @@ func (r *Relay) handleMessage(message string) {
 // Write queues an arbitrary message to be sent to the relay.
 func (r *Relay) Write(msg []byte) {
 	select {
-	case <-r.closeMutex.C(): // this locks the mutex
-	case <-r.closedNotify:
-		return
-	case <-r.connectionContext.Done():
-		return
-	}
-
-	defer r.closeMutex.Unlock()
-
-	select {
 	case <-r.connectionContext.Done():
 	case r.writeQueue <- writeRequest{msg: msg, answer: nil}:
 	}
@@ -459,17 +440,7 @@ func (r *Relay) Write(msg []byte) {
 
 // WriteWithError is like Write, but returns an error if the write fails (and the connection gets closed).
 func (r *Relay) WriteWithError(msg []byte) error {
-	ch := make(chan error)
-
-	select {
-	case <-r.closeMutex.C(): // this locks the channel/mutex
-	case <-r.closedNotify:
-		return fmt.Errorf("failed to write to %s: <closed>", r.URL)
-	case <-r.connectionContext.Done():
-		return fmt.Errorf("failed to write to %s: <closed>", r.URL)
-	}
-
-	defer r.closeMutex.Unlock()
+	ch := make(chan error, 1)
 
 	if r.writeQueue == nil {
 		return nil
@@ -480,7 +451,13 @@ func (r *Relay) WriteWithError(msg []byte) error {
 		return fmt.Errorf("failed to write to %s: %w", r.URL, context.Cause(r.connectionContext))
 	case r.writeQueue <- writeRequest{msg: msg, answer: ch}:
 	}
-	return <-ch
+
+	select {
+	case err := <-ch:
+		return err
+	case <-r.connectionContext.Done():
+		return fmt.Errorf("failed to write to %s: %w", r.URL, context.Cause(r.connectionContext))
+	}
 }
 
 // Publish sends an "EVENT" command to the relay r as in NIP-01 and waits for an OK response.
@@ -493,20 +470,38 @@ func (r *Relay) Publish(ctx context.Context, event Event) error {
 // You don't have to build the AUTH event yourself, this function takes a function to which the
 // event that must be signed will be passed, so it's only necessary to sign that.
 func (r *Relay) Auth(ctx context.Context, sign func(context.Context, *Event) error) error {
-	authEvent := Event{
-		CreatedAt: Now(),
-		Kind:      KindClientAuthentication,
-		Tags: Tags{
-			Tag{"relay", r.URL},
-			Tag{"challenge", r.challenge},
-		},
-		Content: "",
-	}
-	if err := sign(ctx, &authEvent); err != nil {
-		return fmt.Errorf("error signing auth event: %w", err)
+	if r.authed {
+		return nil
 	}
 
-	return r.publish(ctx, authEvent.ID, &AuthEnvelope{Event: authEvent})
+	if r.challenge == "" {
+		return fmt.Errorf("no challenge, can't AUTH")
+	}
+
+	var err error
+
+	r.performAuth.Do(func() {
+		authEvent := Event{
+			CreatedAt: Now(),
+			Kind:      KindClientAuthentication,
+			Tags: Tags{
+				Tag{"relay", r.URL},
+				Tag{"challenge", r.challenge},
+			},
+			Content: "",
+		}
+		if err := sign(ctx, &authEvent); err != nil {
+			err = fmt.Errorf("error signing auth event: %w", err)
+		}
+
+		err = r.publish(ctx, authEvent.ID, &AuthEnvelope{Event: authEvent})
+	})
+
+	if err == nil {
+		r.authed = true
+	}
+
+	return err
 }
 
 // publish can be used both for EVENT and for AUTH
@@ -600,12 +595,8 @@ func (r *Relay) Subscribe(ctx context.Context, filter Filter, opts SubscriptionO
 	}
 
 	go func() {
-		select {
-		case <-r.closedNotify:
-			sub.cancel(ErrDisconnected)
-		case <-ctx.Done():
-			sub.cancel(nil)
-		}
+		<-ctx.Done()
+		sub.cancel(nil)
 	}()
 
 	return sub, nil
@@ -659,6 +650,16 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 		}()
 	}
 
+	// if the relay connection dies, cancel this subscription
+	go func() {
+		select {
+		case <-sub.Context.Done():
+			return
+		case <-r.connectionContext.Done():
+			sub.cancel(context.Cause(r.connectionContext))
+		}
+	}()
+
 	// start handling events, eose, unsub etc:
 	go func() {
 		<-sub.Context.Done()
@@ -678,6 +679,9 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 		// do this so we don't have the possibility of closing the Events channel and then trying to send to it
 		sub.mu.Lock()
 		close(sub.Events)
+		if sub.countResult != nil {
+			close(sub.countResult)
+		}
 		sub.mu.Unlock()
 	}()
 
@@ -714,28 +718,24 @@ func (r *Relay) QueryEvents(filter Filter) iter.Seq[Event] {
 }
 
 // Count sends a "COUNT" command to the relay and returns the count of events matching the filters.
-func (r *Relay) Count(
-	ctx context.Context,
-	filter Filter,
-	opts SubscriptionOptions,
-) (uint32, []byte, error) {
+// If opts.AutoAuth is set, it will handle "auth-required:" CLOSEs using RelayOptions.AuthHandler.
+func (r *Relay) Count(ctx context.Context, filter Filter, opts SubscriptionOptions) (uint32, []byte, error) {
 	v, err := r.countInternal(ctx, filter, opts)
 	if err != nil {
 		return 0, nil, err
+	}
+
+	if v.Count == nil {
+		return 0, nil, errors.New("count subscription ended without result")
 	}
 
 	return *v.Count, v.HyperLogLog, nil
 }
 
 func (r *Relay) countInternal(ctx context.Context, filter Filter, opts SubscriptionOptions) (CountEnvelope, error) {
-	sub := r.PrepareSubscription(ctx, filter, opts)
-	sub.countResult = make(chan CountEnvelope)
-
-	if err := sub.Fire(); err != nil {
-		return CountEnvelope{}, err
+	if !r.IsConnected() {
+		return CountEnvelope{}, ErrDisconnected
 	}
-
-	defer sub.cancel(errors.New("countInternal() ended"))
 
 	if _, ok := ctx.Deadline(); !ok {
 		// if no timeout is set, force it to 7 seconds
@@ -744,13 +744,54 @@ func (r *Relay) countInternal(ctx context.Context, filter Filter, opts Subscript
 		defer cancel()
 	}
 
+	hasAuthed := false
+
 	for {
-		select {
-		case count := <-sub.countResult:
-			return count, nil
-		case <-ctx.Done():
-			return CountEnvelope{}, ctx.Err()
+		sub := r.PrepareSubscription(ctx, filter, opts)
+		sub.countResult = make(chan CountEnvelope, 1)
+
+		if err := sub.Fire(); err != nil {
+			sub.cancel(ErrFireFailed)
+			return CountEnvelope{}, fmt.Errorf("couldn't count %v at %s: %w", filter, r.URL, err)
 		}
+
+		go func() {
+			<-ctx.Done()
+			sub.cancel(nil)
+		}()
+
+		for {
+			select {
+			case count, ok := <-sub.countResult:
+				sub.cancel(errors.New("countInternal() ended"))
+				if !ok || count.Count == nil {
+					return CountEnvelope{}, errors.New("count subscription ended without result")
+				}
+				return count, nil
+			case reason := <-sub.ClosedReason:
+				sub.cancel(errors.New("countInternal() ended"))
+				if strings.HasPrefix(reason, "auth-required:") && r.authHandler != nil && !hasAuthed {
+					authErr := r.Auth(ctx, func(authCtx context.Context, evt *Event) error {
+						return r.authHandler(authCtx, r, evt)
+					})
+					if authErr == nil {
+						hasAuthed = true
+						goto resubscribe
+					}
+					return CountEnvelope{}, fmt.Errorf("failed to auth: %w", authErr)
+				}
+				return CountEnvelope{}, fmt.Errorf("count: CLOSED received: %s", reason)
+			case <-sub.Context.Done():
+				sub.cancel(errors.New("countInternal() ended"))
+				return CountEnvelope{}, context.Cause(sub.Context)
+			case <-ctx.Done():
+				sub.cancel(errors.New("countInternal() ended"))
+				return CountEnvelope{}, ctx.Err()
+			}
+		}
+
+	resubscribe:
+		continue
 	}
 }
 

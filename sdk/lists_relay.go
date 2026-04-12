@@ -46,6 +46,28 @@ func (sys *System) FetchSearchRelayList(ctx context.Context, pubkey nostr.PubKey
 	return ml
 }
 
+func (sys *System) FetchDMRelayList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, RelayURL] {
+	sys.dmRelayListCacheOnce.Do(func() {
+		if sys.DMRelayListCache == nil {
+			sys.DMRelayListCache = cache_memory.New[GenericList[string, RelayURL]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericList(sys, ctx, pubkey, 10050, kind_10050, parseRelayURL, sys.DMRelayListCache)
+	return ml
+}
+
+func (sys *System) FetchGoodWikiRelayList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, RelayURL] {
+	sys.goodWikiRelayListCacheOnce.Do(func() {
+		if sys.GoodWikiRelayListCache == nil {
+			sys.GoodWikiRelayListCache = cache_memory.New[GenericList[string, RelayURL]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericList(sys, ctx, pubkey, 10102, kind_10102, parseRelayURL, sys.GoodWikiRelayListCache)
+	return ml
+}
+
 func (sys *System) FetchRelaySets(ctx context.Context, pubkey nostr.PubKey) GenericSets[string, RelayURL] {
 	sys.relaySetsCacheOnce.Do(func() {
 		if sys.RelaySetsCache == nil {

@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
+	"fiatjaf.com/lib/channelmutex"
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/nip11"
@@ -37,8 +37,10 @@ func NewRelay() *Relay {
 			CheckOrigin:     func(r *http.Request) bool { return true },
 		},
 
-		clients:   make(map[*WebSocket][]listenerSpec, 100),
-		listeners: make([]listener, 0, 100),
+		clients:      make(map[*WebSocket][]listenerSpec, 100),
+		clientsMutex: channelmutex.New(),
+
+		dispatcher: newDispatcher(),
 
 		serveMux: &http.ServeMux{},
 
@@ -60,7 +62,7 @@ type Relay struct {
 	// hooks that will be called at various times
 	OnEvent                   func(ctx context.Context, event nostr.Event) (reject bool, msg string)
 	StoreEvent                func(ctx context.Context, event nostr.Event) error
-	ReplaceEvent              func(ctx context.Context, event nostr.Event) error
+	ReplaceEvent              func(ctx context.Context, event nostr.Event) ([]nostr.Event, error)
 	DeleteEvent               func(ctx context.Context, id nostr.ID) error
 	OnEventSaved              func(ctx context.Context, event nostr.Event)
 	OnEventDeleted            func(ctx context.Context, deleted nostr.Event)
@@ -79,11 +81,6 @@ type Relay struct {
 	// this can be ignored unless you know what you're doing
 	ChallengePrefix string
 
-	// these are used when this relays acts as a router
-	routes                []Route
-	getSubRelayFromEvent  func(*nostr.Event) *Relay // used for handling EVENTs
-	getSubRelayFromFilter func(nostr.Filter) *Relay // used for handling REQs
-
 	// setting up handlers here will enable these methods
 	ManagementAPI RelayManagementAPI
 
@@ -100,8 +97,8 @@ type Relay struct {
 	// keep a connection reference to all connected clients for Server.Shutdown
 	// also used for keeping track of who is listening to what
 	clients      map[*WebSocket][]listenerSpec
-	listeners    []listener
-	clientsMutex sync.Mutex
+	dispatcher   dispatcher
+	clientsMutex *channelmutex.Mutex
 
 	// set this to true to support negentropy
 	Negentropy bool
@@ -144,7 +141,7 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 	rl.StoreEvent = func(ctx context.Context, event nostr.Event) error {
 		return store.SaveEvent(ctx, event)
 	}
-	rl.ReplaceEvent = func(ctx context.Context, event nostr.Event) error {
+	rl.ReplaceEvent = func(ctx context.Context, event nostr.Event) ([]nostr.Event, error) {
 		return store.ReplaceEvent(ctx, event)
 	}
 	rl.DeleteEvent = func(ctx context.Context, id nostr.ID) error {
@@ -161,4 +158,24 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 			rl.OnEventDeleted(ctx, evt)
 		}
 	})
+}
+
+// Stats returns the current number of connected clients and open listeners.
+func (rl *Relay) Stats() (clients, listeners int) {
+	rl.clientsMutex.Lock()
+	defer rl.clientsMutex.Unlock()
+
+	for _, specs := range rl.clients {
+		listeners += len(specs)
+	}
+
+	return len(rl.clients), listeners
+}
+
+func (rl *Relay) Router() *http.ServeMux {
+	return rl.serveMux
+}
+
+func (rl *Relay) SetRouter(mux *http.ServeMux) {
+	rl.serveMux = mux
 }

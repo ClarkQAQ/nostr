@@ -30,8 +30,8 @@ func (b NullStore) SaveEvent(ctx context.Context, evt nostr.Event) error {
 	return nil
 }
 
-func (b NullStore) ReplaceEvent(ctx context.Context, evt nostr.Event) error {
-	return nil
+func (b NullStore) ReplaceEvent(ctx context.Context, evt nostr.Event) ([]nostr.Event, error) {
+	return nil, nil
 }
 
 func (b NullStore) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {

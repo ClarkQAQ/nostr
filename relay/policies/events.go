@@ -124,6 +124,9 @@ var nostrReferencesPrefix = regexp.MustCompile(`\b(nevent1|npub1|nprofile1|note1
 
 func RejectUnprefixedNostrReferences(ctx context.Context, event nostr.Event) (bool, string) {
 	content := sdk.GetMainContent(event)
+	if content == "" {
+		content = event.Content
+	}
 
 	// only do it for stuff that wasn't parsed as blocks already
 	// (since those are already good references or URLs)

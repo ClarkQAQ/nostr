@@ -26,8 +26,8 @@ func idFromSeq(seq int, min, max int) string {
 func TestListenerSetupAndRemoveOnce(t *testing.T) {
 	rl := NewRelay()
 
-	ws1 := &WebSocket{}
-	ws2 := &WebSocket{}
+	ws1 := &WebSocket{Context: rl.ctx}
+	ws2 := &WebSocket{Context: rl.ctx}
 
 	f1 := nostr.Filter{Kinds: []nostr.Kind{1}}
 	f2 := nostr.Filter{Kinds: []nostr.Kind{2}}
@@ -39,28 +39,21 @@ func TestListenerSetupAndRemoveOnce(t *testing.T) {
 	var cancel func(cause error) = nil
 
 	t.Run("adding listeners", func(t *testing.T) {
-		_ = rl.addListener(ws1, "1a", rl, f1, cancel)
-		_ = rl.addListener(ws1, "1b", rl, f2, cancel)
-		_ = rl.addListener(ws2, "2a", rl, f3, cancel)
-		_ = rl.addListener(ws1, "1c", rl, f3, cancel)
+		rl.addListener(ws1, "1a", f1, cancel)
+		rl.addListener(ws1, "1b", f2, cancel)
+		rl.addListener(ws2, "2a", f3, cancel)
+		rl.addListener(ws1, "1c", f3, cancel)
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"1a", cancel, 0, rl},
-				{"1b", cancel, 1, rl},
-				{"1c", cancel, 3, rl},
+				{1, "1a", cancel},
+				{2, "1b", cancel},
+				{4, "1c", cancel},
 			},
 			ws2: {
-				{"2a", cancel, 2, rl},
+				{3, "2a", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"1a", f1, ws1},
-			{"1b", f2, ws1},
-			{"2a", f3, ws2},
-			{"1c", f3, ws1},
-		}, rl.listeners)
 	})
 
 	t.Run("removing a client", func(t *testing.T) {
@@ -68,23 +61,19 @@ func TestListenerSetupAndRemoveOnce(t *testing.T) {
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws2: {
-				{"2a", cancel, 0, rl},
+				{3, "2a", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"2a", f3, ws2},
-		}, rl.listeners)
 	})
 }
 
 func TestListenerMoreConvolutedCase(t *testing.T) {
 	rl := NewRelay()
 
-	ws1 := &WebSocket{}
-	ws2 := &WebSocket{}
-	ws3 := &WebSocket{}
-	ws4 := &WebSocket{}
+	ws1 := &WebSocket{Context: rl.ctx}
+	ws2 := &WebSocket{Context: rl.ctx}
+	ws3 := &WebSocket{Context: rl.ctx}
+	ws4 := &WebSocket{Context: rl.ctx}
 
 	f1 := nostr.Filter{Kinds: []nostr.Kind{1}}
 	f2 := nostr.Filter{Kinds: []nostr.Kind{2}}
@@ -98,35 +87,27 @@ func TestListenerMoreConvolutedCase(t *testing.T) {
 	var cancel func(cause error) = nil
 
 	t.Run("adding listeners", func(t *testing.T) {
-		_ = rl.addListener(ws1, "c", rl, f1, cancel)
-		_ = rl.addListener(ws2, "b", rl, f2, cancel)
-		_ = rl.addListener(ws3, "a", rl, f3, cancel)
-		_ = rl.addListener(ws4, "d", rl, f3, cancel)
-		_ = rl.addListener(ws2, "b", rl, f1, cancel)
+		rl.addListener(ws1, "c", f1, cancel)
+		rl.addListener(ws2, "b", f2, cancel)
+		rl.addListener(ws3, "a", f3, cancel)
+		rl.addListener(ws4, "d", f3, cancel)
+		rl.addListener(ws2, "b", f1, cancel)
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 0, rl},
+				{1, "c", cancel},
 			},
 			ws2: {
-				{"b", cancel, 1, rl},
-				{"b", cancel, 4, rl},
+				{2, "b", cancel},
+				{5, "b", cancel},
 			},
 			ws3: {
-				{"a", cancel, 2, rl},
+				{3, "a", cancel},
 			},
 			ws4: {
-				{"d", cancel, 3, rl},
+				{4, "d", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"c", f1, ws1},
-			{"b", f2, ws2},
-			{"a", f3, ws3},
-			{"d", f3, ws4},
-			{"b", f1, ws2},
-		}, rl.listeners)
 	})
 
 	t.Run("removing a client", func(t *testing.T) {
@@ -134,84 +115,61 @@ func TestListenerMoreConvolutedCase(t *testing.T) {
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 0, rl},
+				{1, "c", cancel},
 			},
 			ws3: {
-				{"a", cancel, 2, rl},
+				{3, "a", cancel},
 			},
 			ws4: {
-				{"d", cancel, 1, rl},
+				{4, "d", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"c", f1, ws1},
-			{"d", f3, ws4},
-			{"a", f3, ws3},
-		}, rl.listeners)
 	})
 
 	t.Run("reorganize the first case differently and then remove again", func(t *testing.T) {
 		rl.clients = map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 1, rl},
+				{2, "c", cancel},
 			},
 			ws2: {
-				{"b", cancel, 2, rl},
-				{"b", cancel, 4, rl},
+				{3, "b", cancel},
+				{5, "b", cancel},
 			},
 			ws3: {
-				{"a", cancel, 0, rl},
+				{1, "a", cancel},
 			},
 			ws4: {
-				{"d", cancel, 3, rl},
+				{4, "d", cancel},
 			},
-		}
-		rl.listeners = []listener{
-			{"a", f3, ws3},
-			{"c", f1, ws1},
-			{"b", f2, ws2},
-			{"d", f3, ws4},
-			{"b", f1, ws2},
 		}
 
 		rl.removeClientAndListeners(ws2)
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 1, rl},
+				{2, "c", cancel},
 			},
 			ws3: {
-				{"a", cancel, 0, rl},
+				{1, "a", cancel},
 			},
 			ws4: {
-				{"d", cancel, 2, rl},
+				{4, "d", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"a", f3, ws3},
-			{"c", f1, ws1},
-			{"d", f3, ws4},
-		}, rl.listeners)
 	})
 }
 
 func TestListenerMoreStuffWithMultipleRelays(t *testing.T) {
 	rl := NewRelay()
 
-	ws1 := &WebSocket{}
-	ws2 := &WebSocket{}
-	ws3 := &WebSocket{}
-	ws4 := &WebSocket{}
+	ws1 := &WebSocket{Context: rl.ctx}
+	ws2 := &WebSocket{Context: rl.ctx}
+	ws3 := &WebSocket{Context: rl.ctx}
+	ws4 := &WebSocket{Context: rl.ctx}
 
 	f1 := nostr.Filter{Kinds: []nostr.Kind{1}}
 	f2 := nostr.Filter{Kinds: []nostr.Kind{2}}
 	f3 := nostr.Filter{Kinds: []nostr.Kind{3}}
-
-	rlx := NewRelay()
-	rly := NewRelay()
-	rlz := NewRelay()
 
 	rl.clients[ws1] = nil
 	rl.clients[ws2] = nil
@@ -221,56 +179,37 @@ func TestListenerMoreStuffWithMultipleRelays(t *testing.T) {
 	var cancel func(cause error) = nil
 
 	t.Run("adding listeners", func(t *testing.T) {
-		_ = rl.addListener(ws1, "c", rlx, f1, cancel)
-		_ = rl.addListener(ws2, "b", rly, f2, cancel)
-		_ = rl.addListener(ws3, "a", rlz, f3, cancel)
-		_ = rl.addListener(ws4, "d", rlx, f3, cancel)
-		_ = rl.addListener(ws4, "e", rlx, f3, cancel)
-		_ = rl.addListener(ws3, "a", rlx, f3, cancel)
-		_ = rl.addListener(ws4, "e", rly, f3, cancel)
-		_ = rl.addListener(ws3, "f", rly, f3, cancel)
-		_ = rl.addListener(ws1, "g", rlz, f1, cancel)
-		_ = rl.addListener(ws2, "g", rlz, f2, cancel)
+		rl.addListener(ws1, "c", f1, cancel)
+		rl.addListener(ws2, "b", f2, cancel)
+		rl.addListener(ws3, "a", f3, cancel)
+		rl.addListener(ws4, "d", f3, cancel)
+		rl.addListener(ws4, "e", f3, cancel)
+		rl.addListener(ws3, "a", f3, cancel)
+		rl.addListener(ws4, "e", f3, cancel)
+		rl.addListener(ws3, "f", f3, cancel)
+		rl.addListener(ws1, "g", f1, cancel)
+		rl.addListener(ws2, "g", f2, cancel)
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 0, rlx},
-				{"g", cancel, 1, rlz},
+				{1, "c", cancel},
+				{9, "g", cancel},
 			},
 			ws2: {
-				{"b", cancel, 0, rly},
-				{"g", cancel, 2, rlz},
+				{2, "b", cancel},
+				{10, "g", cancel},
 			},
 			ws3: {
-				{"a", cancel, 0, rlz},
-				{"a", cancel, 3, rlx},
-				{"f", cancel, 2, rly},
+				{3, "a", cancel},
+				{6, "a", cancel},
+				{8, "f", cancel},
 			},
 			ws4: {
-				{"d", cancel, 1, rlx},
-				{"e", cancel, 2, rlx},
-				{"e", cancel, 1, rly},
+				{4, "d", cancel},
+				{5, "e", cancel},
+				{7, "e", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"c", f1, ws1},
-			{"d", f3, ws4},
-			{"e", f3, ws4},
-			{"a", f3, ws3},
-		}, rlx.listeners)
-
-		require.Equal(t, []listener{
-			{"b", f2, ws2},
-			{"e", f3, ws4},
-			{"f", f3, ws3},
-		}, rly.listeners)
-
-		require.Equal(t, []listener{
-			{"a", f3, ws3},
-			{"g", f1, ws1},
-			{"g", f2, ws2},
-		}, rlz.listeners)
 	})
 
 	t.Run("removing a subscription id", func(t *testing.T) {
@@ -280,41 +219,23 @@ func TestListenerMoreStuffWithMultipleRelays(t *testing.T) {
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 0, rlx},
-				{"g", cancel, 1, rlz},
+				{1, "c", cancel},
+				{9, "g", cancel},
 			},
 			ws2: {
-				{"b", cancel, 0, rly},
-				{"g", cancel, 2, rlz},
+				{2, "b", cancel},
+				{10, "g", cancel},
 			},
 			ws3: {
-				{"a", cancel, 0, rlz},
-				{"a", cancel, 1, rlx},
-				{"f", cancel, 2, rly},
+				{3, "a", cancel},
+				{6, "a", cancel},
+				{8, "f", cancel},
 			},
 			ws4: {
-				{"e", cancel, 1, rly},
-				{"e", cancel, 2, rlx},
+				{5, "e", cancel},
+				{7, "e", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"c", f1, ws1},
-			{"a", f3, ws3},
-			{"e", f3, ws4},
-		}, rlx.listeners)
-
-		require.Equal(t, []listener{
-			{"b", f2, ws2},
-			{"e", f3, ws4},
-			{"f", f3, ws3},
-		}, rly.listeners)
-
-		require.Equal(t, []listener{
-			{"a", f3, ws3},
-			{"g", f1, ws1},
-			{"g", f2, ws2},
-		}, rlz.listeners)
 	})
 
 	t.Run("removing another subscription id", func(t *testing.T) {
@@ -325,37 +246,21 @@ func TestListenerMoreStuffWithMultipleRelays(t *testing.T) {
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 0, rlx},
-				{"g", cancel, 1, rlz},
+				{1, "c", cancel},
+				{9, "g", cancel},
 			},
 			ws2: {
-				{"b", cancel, 0, rly},
-				{"g", cancel, 0, rlz},
+				{2, "b", cancel},
+				{10, "g", cancel},
 			},
 			ws3: {
-				{"f", cancel, 2, rly},
+				{8, "f", cancel},
 			},
 			ws4: {
-				{"e", cancel, 1, rly},
-				{"e", cancel, 1, rlx},
+				{5, "e", cancel},
+				{7, "e", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"c", f1, ws1},
-			{"e", f3, ws4},
-		}, rlx.listeners)
-
-		require.Equal(t, []listener{
-			{"b", f2, ws2},
-			{"e", f3, ws4},
-			{"f", f3, ws3},
-		}, rly.listeners)
-
-		require.Equal(t, []listener{
-			{"g", f2, ws2},
-			{"g", f1, ws1},
-		}, rlz.listeners)
 	})
 
 	t.Run("removing a connection", func(t *testing.T) {
@@ -363,31 +268,17 @@ func TestListenerMoreStuffWithMultipleRelays(t *testing.T) {
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 0, rlx},
-				{"g", cancel, 0, rlz},
+				{1, "c", cancel},
+				{9, "g", cancel},
 			},
 			ws3: {
-				{"f", cancel, 0, rly},
+				{8, "f", cancel},
 			},
 			ws4: {
-				{"e", cancel, 1, rly},
-				{"e", cancel, 1, rlx},
+				{5, "e", cancel},
+				{7, "e", cancel},
 			},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"c", f1, ws1},
-			{"e", f3, ws4},
-		}, rlx.listeners)
-
-		require.Equal(t, []listener{
-			{"f", f3, ws3},
-			{"e", f3, ws4},
-		}, rly.listeners)
-
-		require.Equal(t, []listener{
-			{"g", f1, ws1},
-		}, rlz.listeners)
 	})
 
 	t.Run("removing another subscription id", func(t *testing.T) {
@@ -398,26 +289,14 @@ func TestListenerMoreStuffWithMultipleRelays(t *testing.T) {
 
 		require.Equal(t, map[*WebSocket][]listenerSpec{
 			ws1: {
-				{"c", cancel, 0, rlx},
-				{"g", cancel, 0, rlz},
+				{1, "c", cancel},
+				{9, "g", cancel},
 			},
 			ws3: {
-				{"f", cancel, 0, rly},
+				{8, "f", cancel},
 			},
 			ws4: {},
 		}, rl.clients)
-
-		require.Equal(t, []listener{
-			{"c", f1, ws1},
-		}, rlx.listeners)
-
-		require.Equal(t, []listener{
-			{"f", f3, ws3},
-		}, rly.listeners)
-
-		require.Equal(t, []listener{
-			{"g", f1, ws1},
-		}, rlz.listeners)
 	})
 }
 
@@ -432,7 +311,7 @@ func TestRandomListenerClientRemoving(t *testing.T) {
 	l := 0
 
 	for i := 0; i < 20; i++ {
-		ws := &WebSocket{}
+		ws := &WebSocket{Context: rl.ctx}
 		websockets = append(websockets, ws)
 		rl.clients[ws] = nil
 	}
@@ -444,20 +323,28 @@ func TestRandomListenerClientRemoving(t *testing.T) {
 
 			if rand.Intn(2) < 1 {
 				l++
-				_ = rl.addListener(ws, w+":"+idFromSeqLower(j), rl, f, cancel)
+				rl.addListener(ws, w+":"+idFromSeqLower(j), f, cancel)
 			}
 		}
 	}
 
 	require.Len(t, rl.clients, 20)
-	require.Len(t, rl.listeners, l)
+	ssidCount := 0
+	for _, specs := range rl.clients {
+		ssidCount += len(specs)
+	}
+	require.Equal(t, l, ssidCount)
 
 	for ws := range rl.clients {
 		rl.removeClientAndListeners(ws)
 	}
 
 	require.Len(t, rl.clients, 0)
-	require.Len(t, rl.listeners, 0)
+	ssidCount = 0
+	for _, specs := range rl.clients {
+		ssidCount += len(specs)
+	}
+	require.Equal(t, 0, ssidCount)
 }
 
 func TestRandomListenerIdRemoving(t *testing.T) {
@@ -477,7 +364,7 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 	extra := 0
 
 	for i := 0; i < 20; i++ {
-		ws := &WebSocket{}
+		ws := &WebSocket{Context: rl.ctx}
 		websockets = append(websockets, ws)
 		rl.clients[ws] = nil
 	}
@@ -489,11 +376,11 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 
 			if rand.Intn(2) < 1 {
 				id := w + ":" + idFromSeqLower(j)
-				_ = rl.addListener(ws, id, rl, f, cancel)
+				rl.addListener(ws, id, f, cancel)
 				subs = append(subs, wsid{ws, id})
 
 				if rand.Intn(5) < 1 {
-					_ = rl.addListener(ws, id, rl, f, cancel)
+					rl.addListener(ws, id, f, cancel)
 					extra++
 				}
 			}
@@ -501,7 +388,11 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 	}
 
 	require.Len(t, rl.clients, 20)
-	require.Len(t, rl.listeners, len(subs)+extra)
+	ssidCount := 0
+	for _, specs := range rl.clients {
+		ssidCount += len(specs)
+	}
+	require.Equal(t, len(subs)+extra, ssidCount)
 
 	rand.Shuffle(len(subs), func(i, j int) {
 		subs[i], subs[j] = subs[j], subs[i]
@@ -510,7 +401,11 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 		rl.removeListenerId(wsidToRemove.ws, wsidToRemove.id)
 	}
 
-	require.Len(t, rl.listeners, 0)
+	ssidCount = 0
+	for _, specs := range rl.clients {
+		ssidCount += len(specs)
+	}
+	require.Equal(t, 0, ssidCount)
 	require.Len(t, rl.clients, 20)
 	for _, specs := range rl.clients {
 		require.Len(t, specs, 0)
@@ -520,12 +415,9 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 func TestRouterListenersPabloCrash(t *testing.T) {
 	rl := NewRelay()
 
-	rla := NewRelay()
-	rlb := NewRelay()
-
-	ws1 := &WebSocket{}
-	ws2 := &WebSocket{}
-	ws3 := &WebSocket{}
+	ws1 := &WebSocket{Context: rl.ctx}
+	ws2 := &WebSocket{Context: rl.ctx}
+	ws3 := &WebSocket{Context: rl.ctx}
 
 	rl.clients[ws1] = nil
 	rl.clients[ws2] = nil
@@ -534,11 +426,11 @@ func TestRouterListenersPabloCrash(t *testing.T) {
 	f := nostr.Filter{Kinds: []nostr.Kind{1}}
 	cancel := func(cause error) {}
 
-	_ = rl.addListener(ws1, ":1", rla, f, cancel)
-	_ = rl.addListener(ws2, ":1", rlb, f, cancel)
-	_ = rl.addListener(ws3, "a", rlb, f, cancel)
-	_ = rl.addListener(ws3, "b", rla, f, cancel)
-	_ = rl.addListener(ws3, "c", rlb, f, cancel)
+	rl.addListener(ws1, ":1", f, cancel)
+	rl.addListener(ws2, ":1", f, cancel)
+	rl.addListener(ws3, "a", f, cancel)
+	rl.addListener(ws3, "b", f, cancel)
+	rl.addListener(ws3, "c", f, cancel)
 
 	rl.removeClientAndListeners(ws1)
 	rl.removeClientAndListeners(ws3)

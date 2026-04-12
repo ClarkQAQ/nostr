@@ -28,6 +28,7 @@ var MetadataEventKinds = KindRange{
 	nostr.KindSimpleGroupAdmins,
 	nostr.KindSimpleGroupMembers,
 	nostr.KindSimpleGroupRoles,
+	nostr.KindSimpleGroupLiveKitParticipants,
 }
 
 func (kr KindRange) Includes(kind nostr.Kind) bool {

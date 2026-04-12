@@ -129,6 +129,24 @@ func basicTest(t *testing.T, db eventstore.Store) {
 			require.Len(t, results, 1)
 			require.Equal(t, events[5].ID, results[0].ID, "author + kind query error")
 		}
+
+		// test 5: until
+		{
+			results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{Until: 102}, 1000))
+			require.NoError(t, err)
+			require.Len(t, results, 3)
+
+			resultsWithTag := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
+				Until: 102,
+				Tags: nostr.TagMap{
+					"e": []string{
+						"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					},
+				},
+			}, 1000))
+			require.NoError(t, err)
+			require.Len(t, resultsWithTag, 1)
+		}
 	}
 
 	// from another-basic-test.patch
@@ -224,7 +242,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = originalProfile.Sign(sk3)
 
-		err = db.ReplaceEvent(context.Background(), originalProfile)
+		_, err = db.ReplaceEvent(context.Background(), originalProfile)
 		require.NoError(t, err)
 
 		// verify
@@ -245,7 +263,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		_ = newProfile.Sign(sk3)
 
 		// replace with newer event
-		err = db.ReplaceEvent(context.Background(), newProfile)
+		_, err = db.ReplaceEvent(context.Background(), newProfile)
 		require.NoError(t, err)
 
 		// verify only the newer event exists
@@ -265,7 +283,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = olderProfile.Sign(sk3)
 
-		err = db.ReplaceEvent(context.Background(), olderProfile)
+		_, err = db.ReplaceEvent(context.Background(), olderProfile)
 		require.NoError(t, err)
 
 		// verify the newer event is still there
@@ -285,7 +303,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = articleV1.Sign(sk3)
 
-		err = db.ReplaceEvent(context.Background(), articleV1)
+		_, err = db.ReplaceEvent(context.Background(), articleV1)
 		require.NoError(t, err)
 
 		// verify article was saved
@@ -306,7 +324,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = articleV2.Sign(sk3)
 
-		err = db.ReplaceEvent(context.Background(), articleV2)
+		_, err = db.ReplaceEvent(context.Background(), articleV2)
 		require.NoError(t, err)
 
 		// verify only the newer version exists
@@ -328,7 +346,7 @@ func basicTest(t *testing.T, db eventstore.Store) {
 		}
 		_ = differentArticle.Sign(sk3)
 
-		err = db.ReplaceEvent(context.Background(), differentArticle)
+		_, err = db.ReplaceEvent(context.Background(), differentArticle)
 		require.NoError(t, err)
 
 		// verify both articles exist (different d tags)

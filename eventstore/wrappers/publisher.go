@@ -36,7 +36,7 @@ func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {
 	}
 
 	// others are replaced
-	if e := w.Store.ReplaceEvent(context.Background(), evt); e != nil {
+	if _, e := w.Store.ReplaceEvent(context.Background(), evt); e != nil {
 		return fmt.Errorf("failed to replace: %w", e)
 	}
 

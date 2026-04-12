@@ -13,7 +13,7 @@ import (
 // ReplaceEvent atomically replaces a replaceable or addressable event.
 // For replaceable events: replaces any existing event with same (author, kind).
 // For addressable events: replaces any existing event with same (author, kind, d-tag).
-func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error {
+func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) ([]nostr.Event, error) {
 	// Use a snapshot for consistent reads during the replace operation
 	snap := b.DB.NewSnapshot()
 	defer snap.Close()
@@ -41,7 +41,7 @@ func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error
 		UpperBound: incrementPrefix(prefix),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create iterator: %w", err)
+		return nil, fmt.Errorf("failed to create iterator: %w", err)
 	}
 	defer iter.Close()
 
@@ -56,7 +56,7 @@ func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error
 			if err == pebble.ErrNotFound {
 				continue
 			}
-			return fmt.Errorf("failed to get event %s: %w", id, err)
+			return nil, fmt.Errorf("failed to get event %s: %w", id, err)
 		}
 
 		// Copy before closing
@@ -88,7 +88,7 @@ func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error
 	}
 
 	if err := iter.Error(); err != nil {
-		return fmt.Errorf("iterator error: %w", err)
+		return nil, fmt.Errorf("iterator error: %w", err)
 	}
 
 	// Now perform the replace operation using a batch
@@ -99,11 +99,11 @@ func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error
 	for _, old := range eventsToDelete {
 		rawKey := makeRawKey(old.ID)
 		if err := batch.Delete(rawKey, nil); err != nil {
-			return fmt.Errorf("failed to delete old event %s: %w", old.ID, err)
+			return nil, fmt.Errorf("failed to delete old event %s: %w", old.ID, err)
 		}
 		for idx := range getIndexKeysForEvent(old) {
 			if err := batch.Delete(idx.fullKey, nil); err != nil {
-				return fmt.Errorf("failed to delete index for old event %s: %w", old.ID, err)
+				return nil, fmt.Errorf("failed to delete index for old event %s: %w", old.ID, err)
 			}
 		}
 	}
@@ -113,24 +113,24 @@ func (b *PebbleBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) error
 		// Encode event to binary
 		bin := make([]byte, betterbinary.Measure(evt))
 		if err := betterbinary.Marshal(evt, bin); err != nil {
-			return err
+			return nil, err
 		}
 
 		// Store raw event
 		rawKey := makeRawKey(evt.ID)
 		if err := batch.Set(rawKey, bin, nil); err != nil {
-			return err
+			return nil, err
 		}
 
 		// Store all index keys
 		for idx := range getIndexKeysForEvent(evt) {
 			if err := batch.Set(idx.fullKey, nil, nil); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 
-	return batch.Commit(b.writeOpts)
+	return eventsToDelete, batch.Commit(b.writeOpts)
 }
 
 // incrementPrefix returns a prefix that is lexicographically just past the given prefix.

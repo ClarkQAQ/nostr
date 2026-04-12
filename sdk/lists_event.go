@@ -22,6 +22,17 @@ func (sys *System) FetchBookmarkList(ctx context.Context, pubkey nostr.PubKey) G
 	return ml
 }
 
+func (sys *System) FetchProfileBadgesList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, EventRef] {
+	sys.profileBadgesListCacheOnce.Do(func() {
+		if sys.ProfileBadgesListCache == nil {
+			sys.ProfileBadgesListCache = cache_memory.New[GenericList[string, EventRef]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericList(sys, ctx, pubkey, 10008, kind_10008, parseEventRef, sys.ProfileBadgesListCache)
+	return ml
+}
+
 func (sys *System) FetchPinList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, EventRef] {
 	sys.pinListCacheOnce.Do(func() {
 		if sys.PinListCache == nil {
@@ -30,6 +41,17 @@ func (sys *System) FetchPinList(ctx context.Context, pubkey nostr.PubKey) Generi
 	})
 
 	ml, _ := fetchGenericList(sys, ctx, pubkey, 10001, kind_10001, parseEventRef, sys.PinListCache)
+	return ml
+}
+
+func (sys *System) FetchGitRepositoryList(ctx context.Context, pubkey nostr.PubKey) GenericList[string, EventRef] {
+	sys.gitRepositoryListCacheOnce.Do(func() {
+		if sys.GitRepositoryListCache == nil {
+			sys.GitRepositoryListCache = cache_memory.New[GenericList[string, EventRef]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericList(sys, ctx, pubkey, 10018, kind_10018, parseEventRef, sys.GitRepositoryListCache)
 	return ml
 }
 
@@ -54,5 +76,5 @@ func parseEventRef(tag nostr.Tag) (evr EventRef, ok bool) {
 		return evr, false
 	}
 
-	return evr, false
+	return evr, true
 }

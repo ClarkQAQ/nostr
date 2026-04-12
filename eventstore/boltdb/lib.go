@@ -29,6 +29,8 @@ type BoltBackend struct {
 	MapSize int64
 	DB      *bbolt.DB
 
+	ReadOnly bool
+
 	EnableHLLCacheFor func(kind nostr.Kind) (useCache bool, skipSavingActualEvent bool)
 }
 
@@ -37,6 +39,7 @@ func (b *BoltBackend) Init(ctx context.Context) error {
 		Timeout:         2 * time.Second,
 		PreLoadFreelist: true,
 		FreelistType:    bbolt.FreelistMapType,
+		ReadOnly:        b.ReadOnly,
 	})
 	if err != nil {
 		return err

@@ -25,7 +25,7 @@ func FuzzRandomListenerClientRemoving(f *testing.F) {
 		l := 0
 
 		for i := 0; i < totalWebsockets; i++ {
-			ws := &WebSocket{}
+			ws := &WebSocket{Context: rl.ctx}
 			websockets = append(websockets, ws)
 			rl.clients[ws] = nil
 		}
@@ -38,7 +38,7 @@ func FuzzRandomListenerClientRemoving(f *testing.F) {
 
 				if s%addListenerFreq == 0 {
 					l++
-					_ = rl.addListener(ws, w+":"+idFromSeqLower(j), rl, f, cancel)
+					rl.addListener(ws, w+":"+idFromSeqLower(j), f, cancel)
 				}
 
 				s++
@@ -46,14 +46,22 @@ func FuzzRandomListenerClientRemoving(f *testing.F) {
 		}
 
 		require.Len(t, rl.clients, totalWebsockets)
-		require.Len(t, rl.listeners, l)
+		ssidCount := 0
+		for _, specs := range rl.clients {
+			ssidCount += len(specs)
+		}
+		require.Equal(t, l, ssidCount)
 
 		for ws := range rl.clients {
 			rl.removeClientAndListeners(ws)
 		}
 
 		require.Len(t, rl.clients, 0)
-		require.Len(t, rl.listeners, 0)
+		ssidCount = 0
+		for _, specs := range rl.clients {
+			ssidCount += len(specs)
+		}
+		require.Equal(t, 0, ssidCount)
 	})
 }
 
@@ -84,7 +92,7 @@ func FuzzRandomListenerIdRemoving(f *testing.F) {
 		extra := 0
 
 		for i := 0; i < totalWebsockets; i++ {
-			ws := &WebSocket{}
+			ws := &WebSocket{Context: rl.ctx}
 			websockets = append(websockets, ws)
 			rl.clients[ws] = nil
 		}
@@ -97,11 +105,11 @@ func FuzzRandomListenerIdRemoving(f *testing.F) {
 
 				if s%addListenerFreq == 0 {
 					id := w + ":" + idFromSeqLower(j)
-					_ = rl.addListener(ws, id, rl, f, cancel)
+					rl.addListener(ws, id, f, cancel)
 					subs = append(subs, wsid{ws, id})
 
 					if s%addExtraListenerFreq == 0 {
-						_ = rl.addListener(ws, id, rl, f, cancel)
+						rl.addListener(ws, id, f, cancel)
 						extra++
 					}
 				}
@@ -111,7 +119,11 @@ func FuzzRandomListenerIdRemoving(f *testing.F) {
 		}
 
 		require.Len(t, rl.clients, totalWebsockets)
-		require.Len(t, rl.listeners, len(subs)+extra)
+		ssidCount := 0
+		for _, specs := range rl.clients {
+			ssidCount += len(specs)
+		}
+		require.Equal(t, len(subs)+extra, ssidCount)
 
 		rand.Shuffle(len(subs), func(i, j int) {
 			subs[i], subs[j] = subs[j], subs[i]
@@ -120,7 +132,11 @@ func FuzzRandomListenerIdRemoving(f *testing.F) {
 			rl.removeListenerId(wsidToRemove.ws, wsidToRemove.id)
 		}
 
-		require.Len(t, rl.listeners, 0)
+		ssidCount = 0
+		for _, specs := range rl.clients {
+			ssidCount += len(specs)
+		}
+		require.Equal(t, 0, ssidCount)
 		require.Len(t, rl.clients, totalWebsockets)
 		for _, specs := range rl.clients {
 			require.Len(t, specs, 0)
@@ -129,23 +145,17 @@ func FuzzRandomListenerIdRemoving(f *testing.F) {
 }
 
 func FuzzRouterListenersPabloCrash(f *testing.F) {
-	f.Add(uint(3), uint(6), uint(2), uint(20))
-	f.Fuzz(func(t *testing.T, totalRelays uint, totalConns uint, subFreq uint, subIterations uint) {
-		totalRelays++
+	f.Add(uint(6), uint(2), uint(20))
+	f.Fuzz(func(t *testing.T, totalConns uint, subFreq uint, subIterations uint) {
 		totalConns++
 		subFreq++
 		subIterations++
 
 		rl := NewRelay()
 
-		relays := make([]*Relay, int(totalRelays))
-		for i := 0; i < int(totalRelays); i++ {
-			relays[i] = NewRelay()
-		}
-
 		conns := make([]*WebSocket, int(totalConns))
 		for i := 0; i < int(totalConns); i++ {
-			ws := &WebSocket{}
+			ws := &WebSocket{Context: rl.ctx}
 			conns[i] = ws
 			rl.clients[ws] = make([]listenerSpec, 0, subIterations)
 		}
@@ -159,18 +169,16 @@ func FuzzRouterListenersPabloCrash(f *testing.F) {
 		}
 
 		s := 0
-		subs := make([]wsid, 0, subIterations*totalConns*totalRelays)
+		subs := make([]wsid, 0, subIterations*totalConns)
 		for i, conn := range conns {
 			w := idFromSeqUpper(i)
 			for j := 0; j < int(subIterations); j++ {
 				id := w + ":" + idFromSeqLower(j)
-				for _, rlt := range relays {
-					if s%int(subFreq) == 0 {
-						_ = rl.addListener(conn, id, rlt, f, cancel)
-						subs = append(subs, wsid{conn, id})
-					}
-					s++
+				if s%int(subFreq) == 0 {
+					rl.addListener(conn, id, f, cancel)
+					subs = append(subs, wsid{conn, id})
 				}
+				s++
 			}
 		}
 
@@ -180,9 +188,6 @@ func FuzzRouterListenersPabloCrash(f *testing.F) {
 
 		for _, wsid := range subs {
 			require.Len(t, rl.clients[wsid.ws], 0)
-		}
-		for _, rlt := range relays {
-			require.Len(t, rlt.listeners, 0)
 		}
 	})
 }

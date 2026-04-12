@@ -316,10 +316,10 @@ func TestAddressableReplace(t *testing.T) {
 	e2 := makeEvent(30001, k, 2000, nostr.Tags{{"d", dTag}}, "ver2")
 	e3 := makeEvent(30001, k, 3000, nostr.Tags{{"d", "other"}}, "other")
 
-	if e := b.ReplaceEvent(context.Background(), e1); e != nil {
+	if _, e := b.ReplaceEvent(context.Background(), e1); e != nil {
 		t.Errorf("expected nil, got %v", e)
 	}
-	if e := b.ReplaceEvent(context.Background(), e3); e != nil {
+	if _, e := b.ReplaceEvent(context.Background(), e3); e != nil {
 		t.Errorf("expected nil, got %v", e)
 	}
 
@@ -328,7 +328,7 @@ func TestAddressableReplace(t *testing.T) {
 		t.Errorf("expected 2 distinct parameterized events, got %d", count)
 	}
 
-	if e := b.ReplaceEvent(context.Background(), e2); e != nil {
+	if _, e := b.ReplaceEvent(context.Background(), e2); e != nil {
 		t.Errorf("expected nil, got %v", e)
 	}
 
