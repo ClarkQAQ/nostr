@@ -68,7 +68,7 @@ type Relay struct {
 	// hooks that will be called at various times
 	OnEvent                   func(ctx context.Context, event nostr.Event) (reject bool, msg string)
 	StoreEvent                func(ctx context.Context, event nostr.Event) error
-	ReplaceEvent              func(ctx context.Context, event nostr.Event) ([]nostr.Event, error)
+	ReplaceEvent              func(ctx context.Context, event nostr.Event) error
 	DeleteEvent               func(ctx context.Context, id nostr.ID) error
 	OnEventSaved              func(ctx context.Context, event nostr.Event)
 	OnEventDeleted            func(ctx context.Context, deleted nostr.Event)
@@ -145,8 +145,9 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 	rl.StoreEvent = func(ctx context.Context, event nostr.Event) error {
 		return store.SaveEvent(event)
 	}
-	rl.ReplaceEvent = func(ctx context.Context, event nostr.Event) ([]nostr.Event, error) {
-		return store.ReplaceEvent(event)
+	rl.ReplaceEvent = func(ctx context.Context, event nostr.Event) error {
+		_, err := store.ReplaceEvent(event)
+		return err
 	}
 	rl.DeleteEvent = func(ctx context.Context, id nostr.ID) error {
 		return store.DeleteEvent(id)
