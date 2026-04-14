@@ -248,25 +248,25 @@ func (b *BleveBackend) indexEvent(evt nostr.Event) error {
 			evt.Content = pm.Name + "\n" + pm.DisplayName + "\n" + pm.About
 			references = append(references, pm.NIP05)
 		}
-	case 9802:
-		for _, tag := range evt.Tags {
-			if len(tag) < 2 {
-				continue
+	}
+
+	for _, tag := range evt.Tags {
+		if len(tag) < 2 {
+			continue
+		}
+		switch tag[0] {
+		case "comment", "name", "title", "about", "description":
+			evt.Content += "\n\n" + tag[1]
+		case "e":
+			if ptr, err := nostr.EventPointerFromTag(tag); err == nil {
+				references = append(references, ptr.AsTagReference())
 			}
-			switch tag[0] {
-			case "comment":
-				evt.Content += "\n\n" + tag[1]
-			case "e":
-				if ptr, err := nostr.EventPointerFromTag(tag); err == nil {
-					references = append(references, ptr.AsTagReference())
-				}
-			case "a":
-				if ptr, err := nostr.EntityPointerFromTag(tag); err == nil {
-					references = append(references, ptr.AsTagReference())
-				}
-			case "r":
-				references = append(references, tag[1])
+		case "a":
+			if ptr, err := nostr.EntityPointerFromTag(tag); err == nil {
+				references = append(references, ptr.AsTagReference())
 			}
+		case "r":
+			references = append(references, tag[1])
 		}
 	}
 
