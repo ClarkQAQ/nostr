@@ -202,9 +202,12 @@ func (b *BleveBackend) Init() error {
 	}
 
 	b.index = index
-	b.detector = lingua.NewLanguageDetectorBuilder().
-		FromLanguages(b.Languages...).
-		Build()
+
+	if len(b.Languages) >= 2 {
+		b.detector = lingua.NewLanguageDetectorBuilder().
+			FromLanguages(b.Languages...).
+			Build()
+	}
 
 	return nil
 }
@@ -291,9 +294,16 @@ func (b *BleveBackend) indexEvent(evt nostr.Event) error {
 	}
 
 	indexableContent := content.String()
-	lang, ok := b.detector.DetectLanguageOf(indexableContent)
-	if !ok {
-		lang = lingua.English
+
+	var lang lingua.Language
+	if len(b.Languages) == 1 {
+		lang = b.Languages[0]
+	} else {
+		var ok bool
+		lang, ok = b.detector.DetectLanguageOf(indexableContent)
+		if !ok {
+			lang = lingua.English
+		}
 	}
 
 	var analyzerLangCode string
