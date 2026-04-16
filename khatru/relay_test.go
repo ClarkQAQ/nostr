@@ -2,6 +2,9 @@ package khatru
 
 import (
 	"context"
+	"encoding/json"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
@@ -9,8 +12,59 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore/slicestore"
+	"fiatjaf.com/nostr/nip11"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWithServiceURL(t *testing.T) {
+	relay := NewRelay()
+	relay.Info.Icon = "icon.png"
+	relay.Info.Banner = "banner.png"
+	relay.Router().HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		io.WriteString(w, "fallback")
+	})
+
+	handlerA := relay.WithServiceURL("https://a.example/relay")
+	handlerB := relay.WithServiceURL("https://b.example/relay")
+
+	t.Run("uses override for nip11 base url", func(t *testing.T) {
+		for _, tc := range []struct {
+			name         string
+			handler      http.Handler
+			expectedBase string
+		}{
+			{name: "first interface", handler: handlerA, expectedBase: "https://a.example/relay"},
+			{name: "second interface", handler: handlerB, expectedBase: "https://b.example/relay"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				req := httptest.NewRequest(http.MethodGet, "http://internal/relay", nil)
+				req.Header.Set("Accept", "application/nostr+json")
+				rr := httptest.NewRecorder()
+
+				tc.handler.ServeHTTP(rr, req)
+
+				require.Equal(t, http.StatusOK, rr.Code)
+
+				var info nip11.RelayInformationDocument
+				require.NoError(t, json.NewDecoder(rr.Body).Decode(&info))
+				require.Equal(t, tc.expectedBase+"/icon.png", info.Icon)
+				require.Equal(t, tc.expectedBase+"/banner.png", info.Banner)
+			})
+		}
+	})
+
+	t.Run("uses override for relay path matching", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://internal/not-relay", nil)
+		req.Header.Set("Accept", "application/nostr+json")
+		rr := httptest.NewRecorder()
+
+		handlerA.ServeHTTP(rr, req)
+
+		require.Equal(t, http.StatusAccepted, rr.Code)
+		require.Equal(t, "fallback", rr.Body.String())
+	})
+}
 
 func TestBasicRelayFunctionality(t *testing.T) {
 	// setup relay with in-memory store

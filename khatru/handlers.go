@@ -43,8 +43,8 @@ func (rl *Relay) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	})
 
 	relayPathMatches := true
-	if rl.ServiceURL != "" {
-		p, err := url.Parse(rl.ServiceURL)
+	if serviceURL := rl.getServiceURL(r); serviceURL != "" {
+		p, err := url.Parse(serviceURL)
 		if err == nil {
 			relayPathMatches = strings.TrimSuffix(r.URL.Path, "/") == strings.TrimSuffix(p.Path, "/")
 		}

@@ -166,8 +166,8 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 }
 
 func (rl *Relay) getBaseURL(r *http.Request) string {
-	if rl.ServiceURL != "" {
-		return rl.ServiceURL
+	if serviceURL := rl.getServiceURL(r); serviceURL != "" {
+		return serviceURL
 	}
 
 	host := r.Header.Get("X-Forwarded-Host")
@@ -192,6 +192,14 @@ func (rl *Relay) getBaseURL(r *http.Request) string {
 	return proto + "://" + host + r.URL.Path
 }
 
+func (rl *Relay) getServiceURL(r *http.Request) string {
+	if serviceURL, ok := r.Context().Value(serviceURLOverrideKey).(string); ok {
+		return serviceURL
+	}
+
+	return rl.ServiceURL
+}
+
 // Stats returns the current number of connected clients and open listeners.
 func (rl *Relay) Stats() (clients, listeners int) {
 	rl.clientsMutex.Lock()
@@ -210,4 +218,11 @@ func (rl *Relay) Router() *http.ServeMux {
 
 func (rl *Relay) SetRouter(mux *http.ServeMux) {
 	rl.serveMux = mux
+}
+
+func (rl *Relay) WithServiceURL(serviceURL string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), serviceURLOverrideKey, serviceURL)
+		rl.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

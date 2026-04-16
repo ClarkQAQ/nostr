@@ -11,6 +11,7 @@ const (
 	subscriptionIdKey
 	nip86HeaderAuthKey
 	internalCallKey
+	serviceURLOverrideKey
 )
 
 func RequestAuth(ctx context.Context) {
