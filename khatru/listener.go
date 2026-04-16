@@ -33,16 +33,16 @@ type subscription struct {
 type dispatcher struct {
 	serial        int
 	subscriptions *xsync.MapOf[int, subscription]
-	byAuthor      map[nostr.PubKey]set.Set[int]
-	byKind        map[nostr.Kind]set.Set[int]
+	byAuthor      *xsync.MapOf[nostr.PubKey, set.Set[int]]
+	byKind        *xsync.MapOf[nostr.Kind, set.Set[int]]
 	fallback      set.Set[int]
 }
 
 func newDispatcher() dispatcher {
 	return dispatcher{
 		subscriptions: xsync.NewMapOf[int, subscription](),
-		byAuthor:      make(map[nostr.PubKey]set.Set[int]),
-		byKind:        make(map[nostr.Kind]set.Set[int]),
+		byAuthor:      xsync.NewMapOf[nostr.PubKey, set.Set[int]](),
+		byKind:        xsync.NewMapOf[nostr.Kind, set.Set[int]](),
 		fallback:      set.NewSliceSet[int](),
 	}
 }
@@ -57,10 +57,10 @@ func (d *dispatcher) addSubscription(sub subscription) int {
 	if sub.filter.Authors != nil {
 		indexed = true
 		for _, author := range sub.filter.Authors {
-			s, ok := d.byAuthor[author]
+			s, ok := d.byAuthor.Load(author)
 			if !ok {
 				s = set.NewSliceSet[int]()
-				d.byAuthor[author] = s
+				d.byAuthor.Store(author, s)
 			}
 			s.Add(ssid)
 		}
@@ -69,10 +69,10 @@ func (d *dispatcher) addSubscription(sub subscription) int {
 	if sub.filter.Kinds != nil {
 		indexed = true
 		for _, kind := range sub.filter.Kinds {
-			s, ok := d.byKind[kind]
+			s, ok := d.byKind.Load(kind)
 			if !ok {
 				s = set.NewSliceSet[int]()
-				d.byKind[kind] = s
+				d.byKind.Store(kind, s)
 			}
 			s.Add(ssid)
 		}
@@ -95,13 +95,13 @@ func (d *dispatcher) removeSubscription(ssid int) {
 	if sub.filter.Authors != nil {
 		indexed = true
 		for _, author := range sub.filter.Authors {
-			s, ok := d.byAuthor[author]
+			s, ok := d.byAuthor.Load(author)
 			if !ok {
 				return
 			}
 			s.Remove(ssid)
 			if s.Len() == 0 {
-				delete(d.byAuthor, author)
+				d.byAuthor.Delete(author)
 			}
 		}
 	}
@@ -109,13 +109,13 @@ func (d *dispatcher) removeSubscription(ssid int) {
 	if sub.filter.Kinds != nil {
 		indexed = true
 		for _, kind := range sub.filter.Kinds {
-			s, ok := d.byKind[kind]
+			s, ok := d.byKind.Load(kind)
 			if !ok {
 				return
 			}
 			s.Remove(ssid)
 			if s.Len() == 0 {
-				delete(d.byKind, kind)
+				d.byKind.Delete(kind)
 			}
 		}
 	}
@@ -127,8 +127,8 @@ func (d *dispatcher) removeSubscription(ssid int) {
 
 func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 	return func(yield func(subscription) bool) {
-		authorSubs, hasAuthorSubs := d.byAuthor[event.PubKey]
-		kindSubs, hasKindSubs := d.byKind[event.Kind]
+		authorSubs, hasAuthorSubs := d.byAuthor.Load(event.PubKey)
+		kindSubs, hasKindSubs := d.byKind.Load(event.Kind)
 
 		if hasAuthorSubs && hasKindSubs {
 			for _, ssid := range authorSubs.Slice() {
