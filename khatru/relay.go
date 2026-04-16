@@ -2,6 +2,8 @@ package khatru
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"iter"
 	"log"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"fiatjaf.com/lib/channelmutex"
 	"fiatjaf.com/nostr"
@@ -210,6 +213,89 @@ func (rl *Relay) Stats() (clients, listeners int) {
 	}
 
 	return len(rl.clients), listeners
+}
+
+type ClientInfo struct {
+	ID                string
+	IP                string
+	UserAgent         string
+	Origin            string
+	Authenticated     []nostr.PubKey
+	SubscriptionCount int
+}
+
+type SubscriptionInfo struct {
+	ID     string
+	Filter nostr.Filter
+}
+
+type ClientSnapshot struct {
+	ClientInfo
+	Subscriptions []SubscriptionInfo
+}
+
+func (rl *Relay) ListClients() []ClientInfo {
+	rl.clientsMutex.Lock()
+	defer rl.clientsMutex.Unlock()
+
+	clients := make([]ClientInfo, 0, len(rl.clients))
+	for ws, specs := range rl.clients {
+		clients = append(clients, ClientInfo{
+			ID:                ws.GetID(),
+			IP:                GetIPFromRequest(ws.Request),
+			UserAgent:         ws.Request.UserAgent(),
+			Origin:            ws.Request.Header.Get("Origin"),
+			Authenticated:     ws.AuthedPublicKeys,
+			SubscriptionCount: len(specs),
+		})
+	}
+
+	return clients
+}
+
+func (rl *Relay) GetClientSnapshot(id string) (ClientSnapshot, bool) {
+	rl.clientsMutex.Lock()
+	defer rl.clientsMutex.Unlock()
+
+	ptrn, err := base64.RawURLEncoding.DecodeString(id)
+	if err != nil {
+		return ClientSnapshot{}, false
+	}
+	ptr := binary.LittleEndian.Uint64(ptrn)
+
+	// DANGEROUS:
+	// don't try to do anything with this `ws` object before we confirm it exists by checking the rl.clients map
+	ws := (*WebSocket)(unsafe.Pointer(uintptr(ptr)))
+	specs, ok := rl.clients[ws]
+	if !ok {
+		return ClientSnapshot{}, false
+	}
+
+	details := ClientSnapshot{
+		ClientInfo: ClientInfo{
+			ID:                id,
+			IP:                GetIPFromRequest(ws.Request),
+			UserAgent:         ws.Request.UserAgent(),
+			Origin:            ws.Request.Header.Get("Origin"),
+			Authenticated:     ws.AuthedPublicKeys,
+			SubscriptionCount: len(specs),
+		},
+		Subscriptions: make([]SubscriptionInfo, 0, len(specs)),
+	}
+
+	for _, spec := range specs {
+		filter := nostr.Filter{}
+		if sub, ok := rl.dispatcher.subscriptions.Load(spec.ssid); ok {
+			filter = sub.filter
+		}
+
+		details.Subscriptions = append(details.Subscriptions, SubscriptionInfo{
+			ID:     spec.sid,
+			Filter: filter,
+		})
+	}
+
+	return details, true
 }
 
 func (rl *Relay) Router() *http.ServeMux {

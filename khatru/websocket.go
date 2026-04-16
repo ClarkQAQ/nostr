@@ -2,9 +2,12 @@ package khatru
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"net/http"
 	"sync"
+	"unsafe"
 
 	"fiatjaf.com/nostr"
 	"github.com/fasthttp/websocket"
@@ -29,6 +32,13 @@ type WebSocket struct {
 
 	// nip77
 	negentropySessions *xsync.MapOf[string, *NegentropySession]
+}
+
+func (ws *WebSocket) GetID() string {
+	ptr := uintptr(unsafe.Pointer(ws))
+	var id [8]byte
+	binary.LittleEndian.PutUint64(id[:], uint64(ptr))
+	return base64.RawURLEncoding.EncodeToString(id[:])
 }
 
 func (ws *WebSocket) WriteJSON(any any) error {
