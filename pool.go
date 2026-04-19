@@ -24,13 +24,26 @@ type Pool struct {
 	Relays  *xsync.MapOf[string, *Relay]
 	Context context.Context
 
-	authRequiredHandler func(context.Context, *Event) error
-	cancel              context.CancelCauseFunc
+	cancel context.CancelCauseFunc
 
-	EventMiddleware     func(RelayEvent)
+	// AuthRequiredHandler, if given, must be a function that signs the auth event when called.
+	// it will be called whenever any relay in the pool returns a `CLOSED` or `OK` message
+	// with the "auth-required:" prefix, only once for each relay
+	AuthRequiredHandler func(context.Context, *Event) error
+
+	// EventMiddleware is a function that will be called with all events received.
+	EventMiddleware func(RelayEvent)
+
+	// DuplicateMiddleware is a function that will be called with all duplicate ids received.
 	DuplicateMiddleware func(relay string, id ID)
-	QueryMiddleware     func(relay string, pubkey PubKey, kind Kind)
-	RelayOptions        RelayOptions
+
+	// AuthorKindQueryMiddleware is a function that will be called with every combination of
+	// relay+pubkey+kind queried in a .SubscribeMany*() call -- when applicable (i.e. when the query
+	// contains a pubkey and a kind).
+	QueryMiddleware func(relay string, pubkey PubKey, kind Kind)
+
+	// RelayOptions are any options that should be passed to Relays instantiated by this pool
+	RelayOptions RelayOptions
 
 	// custom things not often used
 	penaltyBox *xsync.MapOf[string, [2]float64]
@@ -58,31 +71,6 @@ func NewPool() *Pool {
 		Context: ctx,
 		cancel:  cancel,
 	}
-}
-
-type PoolOptions struct {
-	// AuthRequiredHandler, if given, must be a function that signs the auth event when called.
-	// it will be called whenever any relay in the pool returns a `CLOSED` or `OK` message
-	// with the "auth-required:" prefix, only once for each relay
-	AuthRequiredHandler func(context.Context, *Event) error
-
-	// PenaltyBox just sets the penalty box mechanism so relays that fail to connect
-	// or that disconnect will be ignored for a while and we won't attempt to connect again.
-	PenaltyBox bool
-
-	// EventMiddleware is a function that will be called with all events received.
-	EventMiddleware func(RelayEvent)
-
-	// DuplicateMiddleware is a function that will be called with all duplicate ids received.
-	DuplicateMiddleware func(relay string, id ID)
-
-	// AuthorKindQueryMiddleware is a function that will be called with every combination of
-	// relay+pubkey+kind queried in a .SubscribeMany*() call -- when applicable (i.e. when the query
-	// contains a pubkey and a kind).
-	AuthorKindQueryMiddleware func(relay string, pubkey PubKey, kind Kind)
-
-	// RelayOptions are any options that should be passed to Relays instantiated by this pool
-	RelayOptions RelayOptions
 }
 
 func (pool *Pool) StartPenaltyBox() {
@@ -207,9 +195,9 @@ func (pool *Pool) PublishMany(ctx context.Context, urls []string, evt Event) cha
 				if err := relay.Publish(ctx, evt); err == nil {
 					// success with no auth required
 					ch <- PublishResult{nil, url, relay}
-				} else if strings.HasPrefix(err.Error(), "msg: auth-required:") && pool.authRequiredHandler != nil {
+				} else if strings.HasPrefix(err.Error(), "msg: auth-required:") && pool.AuthRequiredHandler != nil {
 					// try to authenticate if we can
-					if authErr := relay.Auth(ctx, pool.authRequiredHandler); authErr == nil {
+					if authErr := relay.Auth(ctx, pool.AuthRequiredHandler); authErr == nil {
 						if err := relay.Publish(ctx, evt); err == nil {
 							// success after auth
 							ch <- PublishResult{nil, url, relay}
@@ -394,9 +382,9 @@ func (pool *Pool) FetchManyReplaceable(
 				case <-sub.EndOfStoredEvents:
 					return
 				case reason := <-sub.ClosedReason:
-					if strings.HasPrefix(reason, "auth-required:") && pool.authRequiredHandler != nil && !hasAuthed {
+					if strings.HasPrefix(reason, "auth-required:") && pool.AuthRequiredHandler != nil && !hasAuthed {
 						// relay is requesting auth. if we can we will perform auth and try again
-						err := relay.Auth(ctx, pool.authRequiredHandler)
+						err := relay.Auth(ctx, pool.AuthRequiredHandler)
 						if err == nil {
 							hasAuthed = true // so we don't keep doing AUTH again and again
 							goto subscribe
@@ -570,9 +558,9 @@ func (pool *Pool) subMany(
 							}
 						}
 					case reason := <-sub.ClosedReason:
-						if strings.HasPrefix(reason, "auth-required:") && pool.authRequiredHandler != nil && !hasAuthed {
+						if strings.HasPrefix(reason, "auth-required:") && pool.AuthRequiredHandler != nil && !hasAuthed {
 							// relay is requesting auth. if we can we will perform auth and try again
-							err := relay.Auth(ctx, pool.authRequiredHandler)
+							err := relay.Auth(ctx, pool.AuthRequiredHandler)
 							if err == nil {
 								hasAuthed = true // so we don't keep doing AUTH again and again
 								if closedChan != nil {
@@ -677,9 +665,9 @@ func (pool *Pool) subManyEose(
 				case <-sub.EndOfStoredEvents:
 					return
 				case reason := <-sub.ClosedReason:
-					if strings.HasPrefix(reason, "auth-required:") && pool.authRequiredHandler != nil && !hasAuthed {
+					if strings.HasPrefix(reason, "auth-required:") && pool.AuthRequiredHandler != nil && !hasAuthed {
 						// relay is requesting auth. if we can we will perform auth and try again
-						err := relay.Auth(ctx, pool.authRequiredHandler)
+						err := relay.Auth(ctx, pool.AuthRequiredHandler)
 						if err == nil {
 							hasAuthed = true // so we don't keep doing AUTH again and again
 							if closedChan != nil {
