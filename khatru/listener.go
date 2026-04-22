@@ -134,15 +134,26 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 			for _, ssid := range authorSubs.Slice() {
 				sub, _ := d.subscriptions.Load(ssid)
 
-				if kindSubs.Has(ssid) {
+				if kindSubs.Has(ssid) || sub.filter.Kinds == nil {
 					if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
 						if !yield(sub) {
 							return
 						}
 					}
-				} else {
-					// matched author but not tags, so this event doesn't qualify for any filter
+				}
+			}
+
+			for _, ssid := range kindSubs.Slice() {
+				sub, _ := d.subscriptions.Load(ssid)
+
+				if sub.filter.Authors != nil {
 					continue
+				}
+
+				if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+					if !yield(sub) {
+						return
+					}
 				}
 			}
 		} else if hasAuthorSubs {

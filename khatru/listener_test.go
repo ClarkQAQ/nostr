@@ -1,7 +1,6 @@
 package khatru
 
 import (
-	"math/rand"
 	"strings"
 	"testing"
 
@@ -21,6 +20,18 @@ func idFromSeq(seq int, min, max int) string {
 		result.WriteRune(letter)
 	}
 	return result.String()
+}
+
+func moduloOrder[T any](items []T, seed int) []T {
+	remaining := append([]T(nil), items...)
+	ordered := make([]T, 0, len(items))
+	for len(remaining) > 0 {
+		idx := seed % len(remaining)
+		ordered = append(ordered, remaining[idx])
+		remaining = append(remaining[:idx], remaining[idx+1:]...)
+		seed++
+	}
+	return ordered
 }
 
 func TestListenerSetupAndRemoveOnce(t *testing.T) {
@@ -321,7 +332,7 @@ func TestRandomListenerClientRemoving(t *testing.T) {
 			ws := websockets[i]
 			w := idFromSeqUpper(i)
 
-			if rand.Intn(2) < 1 {
+			if (i+j)%2 == 0 {
 				l++
 				rl.addListener(ws, w+":"+idFromSeqLower(j), f, cancel)
 			}
@@ -374,12 +385,12 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 			ws := websockets[i]
 			w := idFromSeqUpper(i)
 
-			if rand.Intn(2) < 1 {
+			if (i+j)%2 == 0 {
 				id := w + ":" + idFromSeqLower(j)
 				rl.addListener(ws, id, f, cancel)
 				subs = append(subs, wsid{ws, id})
 
-				if rand.Intn(5) < 1 {
+				if (i+j)%5 == 0 {
 					rl.addListener(ws, id, f, cancel)
 					extra++
 				}
@@ -394,10 +405,7 @@ func TestRandomListenerIdRemoving(t *testing.T) {
 	}
 	require.Equal(t, len(subs)+extra, ssidCount)
 
-	rand.Shuffle(len(subs), func(i, j int) {
-		subs[i], subs[j] = subs[j], subs[i]
-	})
-	for _, wsidToRemove := range subs {
+	for _, wsidToRemove := range moduloOrder(subs, 20) {
 		rl.removeListenerId(wsidToRemove.ws, wsidToRemove.id)
 	}
 

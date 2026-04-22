@@ -1,7 +1,6 @@
 package khatru
 
 import (
-	"math/rand"
 	"testing"
 
 	"fiatjaf.com/nostr"
@@ -125,10 +124,7 @@ func FuzzRandomListenerIdRemoving(f *testing.F) {
 		}
 		require.Equal(t, len(subs)+extra, ssidCount)
 
-		rand.Shuffle(len(subs), func(i, j int) {
-			subs[i], subs[j] = subs[j], subs[i]
-		})
-		for _, wsidToRemove := range subs {
+		for _, wsidToRemove := range moduloOrder(subs, int(utw+ubs+ualf+ualef)) {
 			rl.removeListenerId(wsidToRemove.ws, wsidToRemove.id)
 		}
 
