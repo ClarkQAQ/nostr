@@ -61,6 +61,8 @@ type System struct {
 	MediaFollowListCache          cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
 	goodWikiAuthorListCacheOnce   sync.Once
 	GoodWikiAuthorListCache       cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	blossomServerListCacheOnce    sync.Once
+	BlossomServerListCache        cache.Cache32[GenericList[string, BlossomURL]]
 	gitAuthorListCacheOnce        sync.Once
 	GitAuthorListCache            cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
 	relaySetsCacheOnce            sync.Once
