@@ -274,6 +274,10 @@ func (kind Kind) Name() string {
 		return "VideoViewEvent"
 	case KindCommunityDefinition:
 		return "CommunityDefinition"
+	case KindNsiteRoot:
+		return "NsiteRoot"
+	case KindNsiteNamed:
+		return "NsiteNamed"
 	}
 	return "unknown"
 }
@@ -360,6 +364,7 @@ const (
 	KindGoodWikiAuthorList             Kind = 10101
 	KindGoodWikiRelayList              Kind = 10102
 	KindNWCWalletInfo                  Kind = 13194
+	KindNsiteRoot                      Kind = 15128
 	KindLightningPubRPC                Kind = 21000
 	KindClientAuthentication           Kind = 22242
 	KindNWCWalletRequest               Kind = 23194
@@ -394,6 +399,7 @@ const (
 	KindDraftClassifiedListing         Kind = 30403
 	KindRepositoryAnnouncement         Kind = 30617
 	KindRepositoryState                Kind = 30618
+	KindNsiteNamed                     Kind = 35128
 	KindSimpleGroupMetadata            Kind = 39000
 	KindSimpleGroupAdmins              Kind = 39001
 	KindSimpleGroupMembers             Kind = 39002
