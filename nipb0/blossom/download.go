@@ -2,6 +2,7 @@ package blossom
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,19 +12,17 @@ import (
 )
 
 // Download downloads a file from the media server by its hash
-func (c *Client) Download(ctx context.Context, hash string) ([]byte, error) {
-	if !nostr.IsValid32ByteHex(hash) {
-		return nil, fmt.Errorf("%s is not a valid 32-byte hex string", hash)
-	}
+func (c *Client) Download(ctx context.Context, hash [32]byte) ([]byte, error) {
+	hhash := hex.EncodeToString(hash[:])
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+"/"+hash, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+"/"+hhash, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	authHeader := c.authorizationHeader(ctx, func(evt *nostr.Event) {
 		evt.Tags = append(evt.Tags, nostr.Tag{"t", "get"})
-		evt.Tags = append(evt.Tags, nostr.Tag{"x", hash})
+		evt.Tags = append(evt.Tags, nostr.Tag{"x", hhash})
 	})
 	req.Header.Add("Authorization", authHeader)
 
@@ -41,19 +40,17 @@ func (c *Client) Download(ctx context.Context, hash string) ([]byte, error) {
 }
 
 // DownloadToFile downloads a file from the media server and saves it to the specified path
-func (c *Client) DownloadToFile(ctx context.Context, hash string, filePath string) error {
-	if !nostr.IsValid32ByteHex(hash) {
-		return fmt.Errorf("%s is not a valid 32-byte hex string", hash)
-	}
+func (c *Client) DownloadToFile(ctx context.Context, hash [32]byte, filePath string) error {
+	hhash := hex.EncodeToString(hash[:])
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+"/"+hash, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+"/"+hhash, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	authHeader := c.authorizationHeader(ctx, func(evt *nostr.Event) {
 		evt.Tags = append(evt.Tags, nostr.Tag{"t", "get"})
-		evt.Tags = append(evt.Tags, nostr.Tag{"x", hash})
+		evt.Tags = append(evt.Tags, nostr.Tag{"x", hhash})
 	})
 	req.Header.Add("Authorization", authHeader)
 

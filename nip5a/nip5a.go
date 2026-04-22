@@ -72,12 +72,16 @@ func ParseSiteManifest(event *nostr.Event) (*SiteManifest, error) {
 		}
 	}
 
+	if len(sm.Paths) == 0 {
+		return sm, fmt.Errorf("nsite has zero paths listed")
+	}
+
 	return sm, nil
 }
 
-func (sm *SiteManifest) ToEvent(pubkey nostr.PubKey) *nostr.Event {
-	event := &nostr.Event{
-		PubKey:    pubkey,
+func (sm SiteManifest) ToEvent() nostr.Event {
+	event := nostr.Event{
+		PubKey:    sm.Pubkey,
 		CreatedAt: nostr.Now(),
 		Tags:      nostr.Tags{},
 	}
