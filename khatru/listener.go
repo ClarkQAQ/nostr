@@ -31,19 +31,21 @@ type subscription struct {
 }
 
 type dispatcher struct {
-	serial        int
-	subscriptions *xsync.MapOf[int, subscription]
-	byAuthor      *xsync.MapOf[nostr.PubKey, set.Set[int]]
-	byKind        *xsync.MapOf[nostr.Kind, set.Set[int]]
-	fallback      set.Set[int]
+	serial          int
+	subscriptions   *xsync.MapOf[int, subscription]
+	byAuthor        *xsync.MapOf[nostr.PubKey, set.Set[int]]
+	byKind          *xsync.MapOf[nostr.Kind, set.Set[int]]
+	fallbackTags    set.Set[int]
+	fallbackNothing set.Set[int]
 }
 
 func newDispatcher() dispatcher {
 	return dispatcher{
-		subscriptions: xsync.NewMapOf[int, subscription](),
-		byAuthor:      xsync.NewMapOf[nostr.PubKey, set.Set[int]](),
-		byKind:        xsync.NewMapOf[nostr.Kind, set.Set[int]](),
-		fallback:      set.NewSliceSet[int](),
+		subscriptions:   xsync.NewMapOf[int, subscription](),
+		byAuthor:        xsync.NewMapOf[nostr.PubKey, set.Set[int]](),
+		byKind:          xsync.NewMapOf[nostr.Kind, set.Set[int]](),
+		fallbackTags:    set.NewSliceSet[int](),
+		fallbackNothing: set.NewSliceSet[int](),
 	}
 }
 
@@ -57,72 +59,80 @@ func (d *dispatcher) addSubscription(sub subscription) int {
 	if sub.filter.Authors != nil {
 		indexed = true
 		for _, author := range sub.filter.Authors {
-			s, ok := d.byAuthor.Load(author)
-			if !ok {
-				s = set.NewSliceSet[int]()
-				d.byAuthor.Store(author, s)
-			}
-			s.Add(ssid)
+			d.byAuthor.Compute(author, func(s set.Set[int], loaded bool) (set.Set[int], bool) {
+				if !loaded {
+					s = set.NewSliceSet[int]()
+				}
+				s.Add(ssid)
+				return s, false
+			})
 		}
 	}
 
 	if sub.filter.Kinds != nil {
 		indexed = true
 		for _, kind := range sub.filter.Kinds {
-			s, ok := d.byKind.Load(kind)
-			if !ok {
-				s = set.NewSliceSet[int]()
-				d.byKind.Store(kind, s)
-			}
-			s.Add(ssid)
+			d.byKind.Compute(kind, func(s set.Set[int], loaded bool) (set.Set[int], bool) {
+				if !loaded {
+					s = set.NewSliceSet[int]()
+				}
+				s.Add(ssid)
+				return s, false
+			})
 		}
 	}
 
 	if !indexed {
-		d.fallback.Add(ssid)
+		if sub.filter.Tags != nil {
+			d.fallbackTags.Add(ssid)
+		} else {
+			d.fallbackNothing.Add(ssid)
+		}
 	}
 
 	return ssid
 }
 
 func (d *dispatcher) removeSubscription(ssid int) {
-	sub, ok := d.subscriptions.LoadAndDelete(ssid)
-	if !ok {
-		return
-	}
+	d.subscriptions.Compute(ssid, func(sub subscription, loaded bool) (subscription, bool) {
+		indexed := false
 
-	indexed := false
-	if sub.filter.Authors != nil {
-		indexed = true
-		for _, author := range sub.filter.Authors {
-			s, ok := d.byAuthor.Load(author)
-			if !ok {
-				return
-			}
-			s.Remove(ssid)
-			if s.Len() == 0 {
-				d.byAuthor.Delete(author)
+		if sub.filter.Authors != nil {
+			indexed = true
+			for _, author := range sub.filter.Authors {
+				d.byAuthor.Compute(author, func(s set.Set[int], loaded bool) (set.Set[int], bool) {
+					if !loaded {
+						return s, true
+					}
+					s.Remove(ssid)
+					return s, s.Len() == 0
+				})
 			}
 		}
-	}
 
-	if sub.filter.Kinds != nil {
-		indexed = true
-		for _, kind := range sub.filter.Kinds {
-			s, ok := d.byKind.Load(kind)
-			if !ok {
-				return
-			}
-			s.Remove(ssid)
-			if s.Len() == 0 {
-				d.byKind.Delete(kind)
+		if sub.filter.Kinds != nil {
+			indexed = true
+			for _, kind := range sub.filter.Kinds {
+				d.byKind.Compute(kind, func(s set.Set[int], loaded bool) (set.Set[int], bool) {
+					if !loaded {
+						return s, true
+					}
+					s.Remove(ssid)
+					return s, s.Len() == 0
+				})
 			}
 		}
-	}
 
-	if !indexed {
-		d.fallback.Remove(ssid)
-	}
+		if !indexed {
+			if sub.filter.Tags != nil {
+				d.fallbackTags.Remove(ssid)
+			} else {
+				d.fallbackNothing.Remove(ssid)
+			}
+		}
+
+		return sub, true
+	})
 }
 
 func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
@@ -188,10 +198,21 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 			}
 		}
 
-		for _, ssid := range d.fallback.Slice() {
-			sub, _ := d.subscriptions.Load(ssid)
+		if len(event.Tags) > 0 {
+			for _, ssid := range d.fallbackTags.Slice() {
+				sub, _ := d.subscriptions.Load(ssid)
 
-			if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+				if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+					if !yield(sub) {
+						return
+					}
+				}
+			}
+		}
+
+		for _, ssid := range d.fallbackNothing.Slice() {
+			sub, _ := d.subscriptions.Load(ssid)
+			if filterMatchesTimestampConstraints(sub.filter, event) {
 				if !yield(sub) {
 					return
 				}
@@ -201,12 +222,21 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 }
 
 //go:inline
-func filterMatchesTimestampConstraintsAndTags(filter nostr.Filter, event nostr.Event) bool {
+func filterMatchesTimestampConstraints(filter nostr.Filter, event nostr.Event) bool {
 	if filter.Since != 0 && event.CreatedAt < filter.Since {
 		return false
 	}
 
 	if filter.Until != 0 && event.CreatedAt > filter.Until {
+		return false
+	}
+
+	return true
+}
+
+//go:inline
+func filterMatchesTimestampConstraintsAndTags(filter nostr.Filter, event nostr.Event) bool {
+	if !filterMatchesTimestampConstraints(filter, event) {
 		return false
 	}
 

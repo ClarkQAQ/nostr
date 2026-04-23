@@ -89,6 +89,7 @@ func FuzzDispatcherCandidates(f *testing.F) {
 				}
 
 				ssid := d.addSubscription(sub)
+
 				active[ssid] = sub
 				activeSSIDs = append(activeSSIDs, ssid)
 			} else {
@@ -96,14 +97,17 @@ func FuzzDispatcherCandidates(f *testing.F) {
 				ssid := activeSSIDs[idx]
 
 				d.removeSubscription(ssid)
+
 				delete(active, ssid)
 				activeSSIDs = append(activeSSIDs[:idx], activeSSIDs[idx+1:]...)
 			}
 
 			for range int(checks%7) + 1 {
 				event := fuzzDispatcherEvent(&state)
+
 				expected := expectedDispatcherCandidates(active, event)
 				actual := collectedDispatcherCandidates(&d, event)
+
 				require.Equalf(t, expected, actual, "seed=%d advance=%d event=%s active=%v", seed, advance, event.String(), active)
 			}
 		}
@@ -203,7 +207,7 @@ func fuzzDispatcherTagMap(seed *fuzzState) nostr.TagMap {
 
 	count := seed.next(3)
 	if count == 0 {
-		return nostr.TagMap{}
+		return nil
 	}
 
 	tags := make(nostr.TagMap, count)
