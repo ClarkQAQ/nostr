@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"iter"
+	"sync"
 
 	"fiatjaf.com/lib/set"
 	"fiatjaf.com/nostr"
@@ -39,13 +40,19 @@ type dispatcher struct {
 	fallbackNothing set.Set[int]
 }
 
+var setPool = sync.Pool{
+	New: func() any {
+		return set.NewEmptySliceSetReusing[int](make([]int, 0, 10))
+	},
+}
+
 func newDispatcher() dispatcher {
 	return dispatcher{
 		subscriptions:   xsync.NewMapOf[int, subscription](),
 		byAuthor:        xsync.NewMapOf[nostr.PubKey, set.Set[int]](),
 		byKind:          xsync.NewMapOf[nostr.Kind, set.Set[int]](),
-		fallbackTags:    set.NewSliceSet[int](),
-		fallbackNothing: set.NewSliceSet[int](),
+		fallbackTags:    setPool.Get().(set.Set[int]),
+		fallbackNothing: setPool.Get().(set.Set[int]),
 	}
 }
 
@@ -61,7 +68,7 @@ func (d *dispatcher) addSubscription(sub subscription) int {
 		for _, author := range sub.filter.Authors {
 			d.byAuthor.Compute(author, func(s set.Set[int], loaded bool) (set.Set[int], bool) {
 				if !loaded {
-					s = set.NewSliceSet[int]()
+					s = setPool.Get().(set.Set[int])
 				}
 				s.Add(ssid)
 				return s, false
@@ -74,7 +81,7 @@ func (d *dispatcher) addSubscription(sub subscription) int {
 		for _, kind := range sub.filter.Kinds {
 			d.byKind.Compute(kind, func(s set.Set[int], loaded bool) (set.Set[int], bool) {
 				if !loaded {
-					s = set.NewSliceSet[int]()
+					s = setPool.Get().(set.Set[int])
 				}
 				s.Add(ssid)
 				return s, false
@@ -105,7 +112,12 @@ func (d *dispatcher) removeSubscription(ssid int) {
 						return s, true
 					}
 					s.Remove(ssid)
-					return s, s.Len() == 0
+
+					delete := s.Len() == 0
+					if delete {
+						setPool.Put(s)
+					}
+					return s, delete
 				})
 			}
 		}
@@ -118,7 +130,12 @@ func (d *dispatcher) removeSubscription(ssid int) {
 						return s, true
 					}
 					s.Remove(ssid)
-					return s, s.Len() == 0
+
+					delete := s.Len() == 0
+					if delete {
+						setPool.Put(s)
+					}
+					return s, delete
 				})
 			}
 		}
