@@ -25,7 +25,6 @@ import "C"
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"unsafe"
 
@@ -33,14 +32,14 @@ import (
 )
 
 func (evt Event) VerifySignature() bool {
-	msg := sha256.Sum256(evt.Serialize())
+	evt.SetID()
 
 	var xonly C.secp256k1_xonly_pubkey
 	if C.secp256k1_xonly_pubkey_parse(globalSecp256k1Context, &xonly, (*C.uchar)(unsafe.Pointer(&evt.PubKey[0]))) != 1 {
 		return false
 	}
 
-	res := C.secp256k1_schnorrsig_verify(globalSecp256k1Context, (*C.uchar)(unsafe.Pointer(&evt.Sig[0])), (*C.uchar)(unsafe.Pointer(&msg[0])), 32, &xonly)
+	res := C.secp256k1_schnorrsig_verify(globalSecp256k1Context, (*C.uchar)(unsafe.Pointer(&evt.Sig[0])), (*C.uchar)(unsafe.Pointer(&evt.ID[0])), 32, &xonly)
 	return res == 1
 }
 
@@ -59,15 +58,13 @@ func (evt *Event) Sign(secretKey [32]byte, signOpts ...schnorr.SignOption) error
 	C.secp256k1_keypair_xonly_pub(globalSecp256k1Context, &xonly, nil, &keypair)
 	C.secp256k1_xonly_pubkey_serialize(globalSecp256k1Context, (*C.uchar)(unsafe.Pointer(&evt.PubKey[0])), &xonly)
 
-	h := sha256.Sum256(evt.Serialize())
+	evt.SetID()
 
 	var random [32]byte
 	rand.Read(random[:])
-	if C.secp256k1_schnorrsig_sign32(globalSecp256k1Context, (*C.uchar)(unsafe.Pointer(&evt.Sig[0])), (*C.uchar)(unsafe.Pointer(&h[0])), &keypair, (*C.uchar)(unsafe.Pointer(&random[0]))) != 1 {
+	if C.secp256k1_schnorrsig_sign32(globalSecp256k1Context, (*C.uchar)(unsafe.Pointer(&evt.Sig[0])), (*C.uchar)(unsafe.Pointer(&evt.ID[0])), &keypair, (*C.uchar)(unsafe.Pointer(&random[0]))) != 1 {
 		return errors.New("failed to sign message")
 	}
-
-	evt.ID = h
 
 	return nil
 }
