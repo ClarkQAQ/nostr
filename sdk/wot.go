@@ -52,7 +52,7 @@ start:
 
 	wc.mutex.Lock()
 	if wc.id == id {
-		// there is already a call for this exact pubkey ongoing, so we just wait
+		// there is already a call for this exact pubkey ongoing, so we just wait and copy the results
 		resch := make(chan WotXorFilter)
 		wc.resultbacks = append(wc.resultbacks, resch)
 		wc.mutex.Unlock()

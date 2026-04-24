@@ -1,8 +1,12 @@
 package nostr
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"math/rand/v2"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,23 +106,49 @@ func TestIDCheck(t *testing.T) {
 	}
 }
 
-func BenchmarkIDCheck(b *testing.B) {
-	evt := Event{
-		CreatedAt: Timestamp(rand.Int64N(9999999)),
-		Content:   fmt.Sprintf("hello"),
-		Tags:      Tags{},
+func BenchmarkEventVerifySignatureJSONL(b *testing.B) {
+	events := loadBenchmarkEvents(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for _, evt := range events {
+			if !evt.VerifySignature() {
+				b.Fatal("signature verification failed")
+			}
+		}
 	}
-	evt.Sign(Generate())
+}
 
-	b.Run("naïve", func(b *testing.B) {
-		for b.Loop() {
-			_ = evt.GetID() == evt.ID
-		}
-	})
+func loadBenchmarkEvents(b *testing.B) []Event {
+	b.Helper()
 
-	b.Run("big brain", func(b *testing.B) {
-		for b.Loop() {
-			_ = evt.CheckID()
+	f, err := os.Open("testdata/events.jsonl")
+	require.NoError(b, err)
+	b.Cleanup(func() { _ = f.Close() })
+
+	r := bufio.NewReader(f)
+	events := make([]Event, 0, 1024)
+
+	for {
+		line, err := r.ReadBytes('\n')
+		if err != nil && err != io.EOF {
+			require.NoError(b, err)
 		}
-	})
+
+		line = bytes.TrimSpace(line)
+		if len(line) != 0 {
+			var evt Event
+			require.NoError(b, json.Unmarshal(line, &evt))
+			require.True(b, evt.VerifySignature(), "fixture contains invalid signature")
+			events = append(events, evt)
+		}
+
+		if err == io.EOF {
+			break
+		}
+	}
+
+	require.NotEmpty(b, events)
+	return events
 }
