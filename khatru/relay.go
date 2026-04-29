@@ -84,6 +84,8 @@ type Relay struct {
 	RejectConnection          func(r *http.Request) bool
 	OnConnect                 func(ctx context.Context)
 	OnDisconnect              func(ctx context.Context)
+	OnListenerAdded           func(ws *WebSocket, ssid int, id string, filter nostr.Filter)
+	OnListenerRemoved         func(ws *WebSocket, ssid int, id string, filter nostr.Filter)
 	OverwriteRelayInformation func(ctx context.Context, r *http.Request, info nip11.RelayInformationDocument) nip11.RelayInformationDocument
 	PreventBroadcast          func(ws *WebSocket, filter nostr.Filter, event nostr.Event) bool
 

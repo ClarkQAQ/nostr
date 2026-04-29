@@ -100,9 +100,13 @@ func (d *dispatcher) addSubscription(sub subscription) int {
 	return ssid
 }
 
-func (d *dispatcher) removeSubscription(ssid int) {
+func (d *dispatcher) removeSubscription(ssid int) nostr.Filter {
+	var filter nostr.Filter
+
 	d.subscriptions.Compute(ssid, func(sub subscription, loaded bool) (subscription, bool) {
 		indexed := false
+
+		filter = sub.filter
 
 		if sub.filter.Authors != nil {
 			indexed = true
@@ -150,6 +154,8 @@ func (d *dispatcher) removeSubscription(ssid int) {
 
 		return sub, true
 	})
+
+	return filter
 }
 
 func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
@@ -305,6 +311,10 @@ func (rl *Relay) addListener(
 			cancel: cancel,
 			sid:    id,
 		})
+
+		if rl.OnListenerAdded != nil {
+			rl.OnListenerAdded(ws, ssid, id, filter)
+		}
 	}
 }
 
@@ -319,7 +329,12 @@ func (rl *Relay) removeListenerId(ws *WebSocket, id string) {
 		for _, spec := range specs {
 			if spec.sid == id {
 				spec.cancel(ErrSubscriptionClosedByClient)
-				rl.dispatcher.removeSubscription(spec.ssid)
+				filter := rl.dispatcher.removeSubscription(spec.ssid)
+
+				if rl.OnListenerRemoved != nil {
+					rl.OnListenerRemoved(ws, spec.ssid, id, filter)
+				}
+
 				continue
 			}
 			kept = append(kept, spec)
