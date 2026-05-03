@@ -246,10 +246,6 @@ func (rte RequiredTagError) Error() string {
 }
 
 func (v *Validator) ValidateEvent(evt nostr.Event) error {
-	if !isTrimmed(evt.Content) {
-		return ContentError{ErrDanglingSpace}
-	}
-
 	if sch, ok := v.Schema.Kinds[strconv.FormatUint(uint64(evt.Kind), 10)]; ok {
 		if validator, ok := v.TypeValidators[sch.Content.Type]; ok {
 			if err := validator(evt.Content, &sch.Content); err != nil {
