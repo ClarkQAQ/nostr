@@ -42,6 +42,8 @@ func (il *IndexingLayer) ComputeStats(opts StatsOptions) (EventStats, error) {
 	}
 
 	err := il.lmdbEnv.View(func(txn *lmdb.Txn) error {
+		txn.RawRead = true
+
 		cursor, err := txn.OpenCursor(il.indexPubkeyKind)
 		if err != nil {
 			return err
