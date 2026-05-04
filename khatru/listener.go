@@ -349,7 +349,11 @@ func (rl *Relay) removeClientAndListeners(ws *WebSocket) {
 	if specs, ok := rl.clients[ws]; ok {
 		for _, spec := range specs {
 			// no need to cancel contexts since they inherit from the main connection context
-			rl.dispatcher.removeSubscription(spec.ssid)
+			filter := rl.dispatcher.removeSubscription(spec.ssid)
+
+			if rl.OnListenerRemoved != nil {
+				rl.OnListenerRemoved(ws, spec.ssid, spec.sid, filter)
+			}
 		}
 	}
 	delete(rl.clients, ws)
