@@ -290,6 +290,8 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					ws.WriteJSON(resp)
 
 				case *nostr.ReqEnvelope:
+					rl.removeListenerId(ws, env.SubscriptionID)
+
 					eose := sync.WaitGroup{}
 					eose.Add(len(env.Filters))
 
