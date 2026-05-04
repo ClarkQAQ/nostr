@@ -124,3 +124,19 @@ func (tags Tags) ContainsAny(tagName string, values []string) bool {
 
 	return false
 }
+
+func (tags Tags) Eq(other Tags) bool {
+	if len(tags) != len(other) {
+		return false
+	}
+
+	for i, tag := range tags {
+		otherTag := other[i]
+
+		if !slices.Equal(tag, otherTag) {
+			return false
+		}
+	}
+
+	return true
+}
