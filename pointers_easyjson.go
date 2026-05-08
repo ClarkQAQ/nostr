@@ -313,7 +313,7 @@ func easyjson33014d6eEncodeFiatjafComNostr2(out *jwriter.Writer, in EntityPointe
 		out.RawString(prefix)
 		out.Uint(uint(in.Kind))
 	}
-	if in.Identifier == "" && in.Kind.IsReplaceable() {
+	if in.Identifier != "" || in.Kind.IsAddressable() {
 		// this is expected, no identifiers in replaceable events, so don't print
 		// but we do print in case there is an identifier, incorrectly, to assist debug
 		const prefix string = ",\"identifier\":"
