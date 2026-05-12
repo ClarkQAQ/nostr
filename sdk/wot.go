@@ -92,7 +92,7 @@ func (sys *System) loadWoT(ctx context.Context, pubkey nostr.PubKey) chan nostr.
 
 	res := make(chan nostr.PubKey)
 
-	go func() {
+	g.Go(func() error {
 		for _, f := range sys.FetchFollowList(ctx, pubkey).Items {
 			g.Go(func() error {
 				res <- f.Pubkey
@@ -107,7 +107,9 @@ func (sys *System) loadWoT(ctx context.Context, pubkey nostr.PubKey) chan nostr.
 				return nil
 			})
 		}
-	}()
+
+		return nil
+	})
 
 	go func() {
 		g.Wait()
