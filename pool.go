@@ -46,7 +46,8 @@ type Pool struct {
 	RelayOptions RelayOptions
 
 	// custom things not often used
-	penaltyBox *xsync.MapOf[string, [2]float64]
+	penaltyBox       *xsync.MapOf[string, [2]float64]
+	penaltyBoxCancel context.CancelFunc
 }
 
 // DirectedFilter combines a Filter with a specific relay URL.
@@ -74,13 +75,19 @@ func NewPool() *Pool {
 }
 
 func (pool *Pool) StartPenaltyBox() {
+	if pool.penaltyBoxCancel != nil {
+		pool.penaltyBoxCancel()
+	}
+
+	ctx, cancel := context.WithCancel(pool.Context)
+	pool.penaltyBoxCancel = cancel
 	pool.penaltyBox = xsync.NewMapOf[string, [2]float64]()
 
 	go func() {
 		sleep := 30.0
 		for {
 			select {
-			case <-pool.Context.Done():
+			case <-ctx.Done():
 				return
 			case <-time.After(time.Duration(sleep) * time.Second):
 
@@ -104,6 +111,15 @@ func (pool *Pool) StartPenaltyBox() {
 			}
 		}
 	}()
+}
+
+func (pool *Pool) StopPenaltyBox() {
+	if pool.penaltyBoxCancel != nil {
+		pool.penaltyBoxCancel()
+		pool.penaltyBoxCancel = nil
+	}
+
+	pool.penaltyBox = nil
 }
 
 // AddToPenaltyBox manually adds a relay to the penalty box for the specified duration.
