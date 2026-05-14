@@ -3,6 +3,8 @@ package nip46
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strconv"
 	"sync"
 
 	"fiatjaf.com/nostr"
@@ -48,6 +50,50 @@ type DynamicSigner struct {
 
 func (p *DynamicSigner) Init() {
 	p.sessions = make(map[nostr.PubKey]map[nostr.PubKey]*Session)
+}
+
+// HandleNostrConnectURI works like HandleRequest, but takes a nostrconnect:// URI as input, as scanned/pasted
+// by the user, produced by the client. Since DynamicSigner can serve multiple handler keys, the caller must
+// specify which handlerPubkey should respond to this connection.
+func (p *DynamicSigner) HandleNostrConnectURI(ctx context.Context, handlerPubkey nostr.PubKey, uri *url.URL) (
+	resp Response,
+	eventResponse nostr.Event,
+	err error,
+) {
+	clientPublicKey, err := nostr.PubKeyFromHex(uri.Host)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+
+	secret := uri.Query().Get("secret")
+
+	_, handlerSecret, err := p.GetHandlerSecretKey(ctx, handlerPubkey)
+	if err != nil {
+		return resp, eventResponse, fmt.Errorf("no private key for %s: %w", handlerPubkey, err)
+	}
+
+	// pretend they started with a request
+	conversationKey, err := nip44.GenerateConversationKey(clientPublicKey, handlerSecret)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+	reqj, _ := json.Marshal(Request{
+		ID:     "nostrconnect-" + strconv.FormatInt(int64(nostr.Now()), 10),
+		Method: "imagined-nostrconnect",
+		Params: []string{clientPublicKey.Hex(), secret},
+	})
+	ciphertext, err := nip44.Encrypt(string(reqj), conversationKey)
+	if err != nil {
+		return resp, eventResponse, err
+	}
+
+	_, resp, eventResponse, err = p.HandleRequest(ctx, nostr.Event{
+		PubKey:  clientPublicKey,
+		Kind:    nostr.KindNostrConnect,
+		Content: ciphertext,
+		Tags:    nostr.Tags{nostr.Tag{"p", handlerPubkey.Hex()}},
+	})
+	return resp, eventResponse, err
 }
 
 func (p *DynamicSigner) HandleRequest(ctx context.Context, event nostr.Event) (
@@ -118,6 +164,19 @@ func (p *DynamicSigner) HandleRequest(ctx context.Context, event nostr.Event) (
 	var resultErr error
 
 	switch req.Method {
+	case "imagined-nostrconnect":
+		// this is a fake request we pretend has existed, but was actually just we reading the nostrconnect:// uri
+		if len(req.Params) < 2 || req.Params[1] == "" {
+			resultErr = fmt.Errorf("needs a second argument 'secret'")
+			break
+		}
+		if p.OnConnect != nil {
+			if err := p.OnConnect(ctx, event.PubKey, req.Params[1]); err != nil {
+				resultErr = err
+				break
+			}
+		}
+		result = req.Params[1]
 	case "connect":
 		var secret string
 		if len(req.Params) >= 2 {
