@@ -19,7 +19,7 @@ import (
 
 var (
 	db  eventstore.Store
-	end func()
+	end = func() {}
 )
 
 var app = &cli.Command{
