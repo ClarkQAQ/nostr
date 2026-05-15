@@ -227,6 +227,9 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						if writeErr == nil {
 							// this always returns "blocked: " whenever it returns an error
 							writeErr = rl.handleDeleteRequest(ctx, env.Event)
+							if writeErr == ErrNothingToDelete {
+								writeErr = nil
+							}
 						}
 					} else if env.Event.Kind.IsEphemeral() {
 						// this will also always return a prefixed reason
