@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -129,7 +128,7 @@ func (bs BlossomServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	hash := sha256.Sum256(b)
 	hhash := nostr.HexEncodeToString(hash[:])
-	mimeType := mime.TypeByExtension(ext)
+	mimeType := blossom.GetMIMEType(ext)
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
