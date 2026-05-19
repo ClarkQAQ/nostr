@@ -274,7 +274,7 @@ func (bunker *BunkerClient) NIP04Decrypt(
 }
 
 func (bunker *BunkerClient) RPC(ctx context.Context, method string, params []string) (string, error) {
-	id := bunker.idPrefix + "-" + strconv.FormatUint(bunker.serial.Add(1), 10)
+	id := bunker.idPrefix + "-" + strconv.FormatUint(bunker.serial.Add(1), 10) + "-" + method
 	req, err := json.Marshal(Request{
 		ID:     id,
 		Method: method,
