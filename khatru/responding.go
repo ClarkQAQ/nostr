@@ -3,15 +3,12 @@ package khatru
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/nip45/hyperloglog"
 )
 
-func (rl *Relay) handleRequest(ctx context.Context, id string, eose *sync.WaitGroup, ws *WebSocket, filter nostr.Filter) error {
-	defer eose.Done()
-
+func (rl *Relay) handleRequest(ctx context.Context, id string, ws *WebSocket, filter nostr.Filter) error {
 	// then check if we'll reject this filter (we apply this after overwriting
 	// because we may, for example, remove some things from the incoming filters
 	// that we know we don't support, and then if the end result is an empty

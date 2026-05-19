@@ -295,9 +295,6 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 				case *nostr.ReqEnvelope:
 					rl.removeListenerId(ws, env.SubscriptionID)
 
-					eose := sync.WaitGroup{}
-					eose.Add(len(env.Filters))
-
 					// a context just for the "stored events" request handler
 					reqCtx, cancelReqCtx := context.WithCancelCause(ctx)
 
@@ -306,7 +303,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 					// handle each filter separately -- dispatching events as they're loaded from databases
 					for _, filter := range env.Filters {
-						err := rl.handleRequest(reqCtx, env.SubscriptionID, &eose, ws, filter)
+						err := rl.handleRequest(reqCtx, env.SubscriptionID, ws, filter)
 						if err != nil {
 							// fail everything if any filter is rejected
 							reason := err.Error()
@@ -324,11 +321,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 
-					go func() {
-						// when all events have been loaded from databases and dispatched we can fire the EOSE message
-						eose.Wait()
-						ws.WriteJSON(nostr.EOSEEnvelope(env.SubscriptionID))
-					}()
+					ws.WriteJSON(nostr.EOSEEnvelope(env.SubscriptionID))
 				case *nostr.CloseEnvelope:
 					id := string(*env)
 					rl.removeListenerId(ws, id)
