@@ -133,15 +133,16 @@ func NewBunker(
 	cancellableCtx, cancel := context.WithCancel(ctx)
 	_ = cancel
 
+	events, eosed := pool.SubscribeManyNotifyEOSE(cancellableCtx, relays, nostr.Filter{
+		Tags:      nostr.TagMap{"p": []string{clientPublicKey.Hex()}},
+		Kinds:     []nostr.Kind{nostr.KindNostrConnect},
+		Since:     now,
+		LimitZero: true,
+	}, nostr.SubscriptionOptions{
+		Label: "bunker46client",
+	})
+
 	go func() {
-		events := pool.SubscribeMany(cancellableCtx, relays, nostr.Filter{
-			Tags:      nostr.TagMap{"p": []string{clientPublicKey.Hex()}},
-			Kinds:     []nostr.Kind{nostr.KindNostrConnect},
-			Since:     now,
-			LimitZero: true,
-		}, nostr.SubscriptionOptions{
-			Label: "bunker46client",
-		})
 		for ie := range events {
 			if ie.Kind != nostr.KindNostrConnect {
 				continue
@@ -179,6 +180,8 @@ func NewBunker(
 			bunker = NewBunker(ctx, clientSecretKey, targetPublicKey, newRelays, pool, func(string) {})
 		}
 	}
+
+	<-eosed
 
 	return bunker
 }
