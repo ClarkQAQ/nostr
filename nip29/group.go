@@ -8,16 +8,27 @@ import (
 	"strings"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nip19"
 )
 
 type GroupAddress struct {
+	// URL of the relay that is hosting the group
 	Relay string
-	ID    string
+
+	// Group identifier ("d"/"h" tag)
+	ID string
+
+	// Public key of the relay, used to publish kind:39000/etc events
+	Self nostr.PubKey
 }
 
 func (gid GroupAddress) String() string {
 	p, _ := url.Parse(gid.Relay)
 	return fmt.Sprintf("%s'%s", p.Host, gid.ID)
+}
+
+func (gid GroupAddress) Code() string {
+	return nip19.EncodeNaddr(gid.Self, 39000, gid.ID, []string{gid.Relay})
 }
 
 func (gid GroupAddress) IsValid() bool {
@@ -26,14 +37,6 @@ func (gid GroupAddress) IsValid() bool {
 
 func (gid GroupAddress) Equals(gid2 GroupAddress) bool {
 	return gid.Relay == gid2.Relay && gid.ID == gid2.ID
-}
-
-func ParseGroupAddress(raw string) (GroupAddress, error) {
-	spl := strings.Split(raw, "'")
-	if len(spl) != 2 {
-		return GroupAddress{}, fmt.Errorf("invalid group id")
-	}
-	return GroupAddress{ID: spl[1], Relay: nostr.NormalizeURL(spl[0])}, nil
 }
 
 type Group struct {
@@ -130,15 +133,15 @@ func (group Group) String() string {
 }
 
 // NewGroup takes a group address in the form "<id>'<relay-hostname>"
-func NewGroup(gadstr string) (Group, error) {
-	gad, err := ParseGroupAddress(gadstr)
-	if err != nil {
-		return Group{}, fmt.Errorf("invalid group id '%s': %w", gadstr, err)
-	}
+func NewGroup(relayHost, groupId string) (Group, error) {
+	relayHost = nostr.NormalizeURL(relayHost)
 
 	return Group{
-		Address:             gad,
-		Name:                gad.ID,
+		Address: GroupAddress{
+			Relay: relayHost,
+			ID:    groupId,
+		},
+		Name:                groupId,
 		Members:             make(map[nostr.PubKey][]*Role),
 		LiveKitParticipants: make([]nostr.PubKey, 0),
 	}, nil

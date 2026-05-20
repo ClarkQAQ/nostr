@@ -15,7 +15,7 @@ const (
 )
 
 func TestGroupEventBackAndForth(t *testing.T) {
-	group1, _ := NewGroup("relay.com'xyz")
+	group1, _ := NewGroup("relay.com", "xyz")
 	group1.Name = "banana"
 	group1.Private = true
 	meta1 := group1.ToMetadataEvent()
@@ -31,7 +31,7 @@ func TestGroupEventBackAndForth(t *testing.T) {
 	}
 	require.True(t, hasPrivate, "translation of group1 to metadata event failed: %s", meta1)
 
-	group2, _ := NewGroup("groups.com'abc")
+	group2, _ := NewGroup("groups.com", "abc")
 	alicePub, _ := nostr.PubKeyFromHex(ALICE)
 	group2.Members[alicePub] = []*Role{{Name: "nada"}}
 	admins2 := group2.ToAdminsEvent()
