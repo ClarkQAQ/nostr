@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"fiatjaf.com/nostr"
@@ -56,6 +57,7 @@ func ConnectBunker(
 		pool,
 		onAuth,
 	)
+
 	_, err = bunker.RPC(ctx, "connect", []string{nostr.HexEncodeToString(parsed.HostPubKey[:]), parsed.Secret})
 	return bunker, err
 }
@@ -175,10 +177,11 @@ func NewBunker(
 
 	// attempt switch_relays once every 10 times
 	if now%10 == 0 {
-		if newRelays, _ := bunker.SwitchRelays(ctx); newRelays != nil {
-			cancel()
+		swctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		if newRelays, _ := bunker.SwitchRelays(swctx); newRelays != nil {
 			bunker = NewBunker(ctx, clientSecretKey, targetPublicKey, newRelays, pool, func(string) {})
 		}
+		cancel()
 	}
 
 	<-eosed
