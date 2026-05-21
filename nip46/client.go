@@ -315,10 +315,8 @@ func (bunker *BunkerClient) RPC(ctx context.Context, method string, params []str
 		go func(url string) {
 			relay, err := bunker.pool.EnsureRelay(url)
 			if err == nil {
-				select {
-				case relayConnectionWorked <- struct{}{}:
-				default:
-				}
+				relayConnectionWorked <- struct{}{}
+
 				if err := relay.Publish(ctx, evt); err == nil {
 					select {
 					case bunkerConnectionWorked <- struct{}{}:
