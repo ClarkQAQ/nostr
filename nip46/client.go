@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/url"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -309,19 +310,21 @@ func (bunker *BunkerClient) RPC(ctx context.Context, method string, params []str
 	bunker.listeners.Store(id, dispatcher)
 	defer bunker.listeners.Delete(id)
 	relayConnectionWorked := make(chan struct{})
+	relayConnectionWorkedO := sync.OnceFunc(func() {
+		close(relayConnectionWorked)
+	})
 	bunkerConnectionWorked := make(chan struct{})
+	bunkerConnectionWorkedO := sync.OnceFunc(func() {
+		close(bunkerConnectionWorked)
+	})
 
 	for _, url := range bunker.Relays {
 		go func(url string) {
 			relay, err := bunker.pool.EnsureRelay(url)
 			if err == nil {
-				relayConnectionWorked <- struct{}{}
-
+				relayConnectionWorkedO()
 				if err := relay.Publish(ctx, evt); err == nil {
-					select {
-					case bunkerConnectionWorked <- struct{}{}:
-					default:
-					}
+					bunkerConnectionWorkedO()
 				}
 			}
 		}(url)
