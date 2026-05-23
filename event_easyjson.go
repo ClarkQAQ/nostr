@@ -74,6 +74,8 @@ func easyjsonDecodeEvent(in *jlexer.Lexer, out *Event) {
 			if len(b) == 128 {
 				xhex.Decode(out.Sig[:], b)
 			}
+		default:
+			in.SkipRecursive()
 		}
 		in.WantComma()
 	}
