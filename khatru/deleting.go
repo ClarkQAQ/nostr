@@ -65,7 +65,7 @@ func (rl *Relay) handleDeleteRequest(ctx context.Context, evt nostr.Event) error
 			errg, ctx := errgroup.WithContext(ctx)
 			for target := range rl.QueryStored(ctx, f) {
 				// got the event, now check if the user can delete it
-				if target.PubKey == evt.PubKey {
+				if rl.AllowDeleting == nil && target.PubKey == evt.PubKey || rl.AllowDeleting != nil && rl.AllowDeleting(ctx, target, evt) {
 					// delete it
 					errg.Go(func() error {
 						if err := rl.DeleteEvent(ctx, target.ID); err != nil {
