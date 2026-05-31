@@ -385,7 +385,9 @@ func (v *Validator) validateNext(tag nostr.Tag, index int, this *ContentSpec) (f
 		return index, ErrDanglingSpace
 	}
 
-	if validator, ok := v.TypeValidators[this.Type]; ok {
+	if tag[index] == "" && !this.Required {
+		// empty string ok for non-required items
+	} else if validator, ok := v.TypeValidators[this.Type]; ok {
 		if err := validator(tag[index], this); err != nil {
 			return index, fmt.Errorf("invalid %s value '%s' at tag '%s', index %d: %w",
 				this.Type, tag[index], tag[0], index, err)
