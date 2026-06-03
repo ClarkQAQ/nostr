@@ -18,7 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultSchemaURL = "https://raw.githubusercontent.com/nostr-protocol/registry-of-kinds/ffa18bf6fb5496d755b465b062e18c676df1a5d4/schema.yaml"
+const DefaultSchemaURL = "https://raw.githubusercontent.com/nostr-protocol/registry-of-kinds/refs/heads/master/schema.yaml"
 
 // this is used by hex.Decode in the "hex" validator -- we don't care about data races
 var hexdummydecoder = make([]byte, 128)
