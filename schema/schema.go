@@ -39,20 +39,16 @@ func FetchSchemaFromURL(schemaURL string) (Schema, error) {
 		return Schema{}, fmt.Errorf("failed to read schema response: %w", err)
 	}
 
-	var schema Schema
-	if err := yaml.Unmarshal(body, &schema); err != nil {
-		return Schema{}, fmt.Errorf("failed to parse schema: %w", err)
-	}
-
-	return schema, nil
+	return NewSchemaFromBytes(body)
 }
 
 type Schema struct {
 	GenericTags map[string]ContentSpec `yaml:"generic_tags" json:"generic_tags,omitempty"`
-	Kinds       map[string]KindSchema  `yaml:"kinds" json:"kinds,omitempty"`
+	Kinds       map[string]*KindSchema `yaml:"kinds" json:"kinds,omitempty"`
 }
 
 type KindSchema struct {
+	Kind        nostr.Kind  `yaml:"-" json:"kind"`
 	Description string      `yaml:"description" json:"description,omitempty"`
 	InUse       bool        `yaml:"in_use" json:"in_use,omitempty"`
 	Content     ContentSpec `yaml:"content" json:"content,omitempty"`
@@ -78,23 +74,37 @@ type ContentSpec struct {
 }
 
 type Validator struct {
-	Schema            Schema                                            `json:"schema,omitempty"`
-	FailOnUnknownKind bool                                              `json:"fail_on_unknown_kind,omitempty"`
-	FailOnUnknownType bool                                              `json:"fail_on_unknown_type,omitempty"`
+	Schema            Schema                                                 `json:"schema,omitempty"`
+	FailOnUnknownKind bool                                                   `json:"fail_on_unknown_kind,omitempty"`
+	FailOnUnknownType bool                                                   `json:"fail_on_unknown_type,omitempty"`
 	TypeValidators    map[string]func(value string, spec *ContentSpec) error `json:"type_validators,omitempty"`
-	UnknownTypes      []string                                          `json:"unknown_types,omitempty"`
+	UnknownTypes      []string                                               `json:"unknown_types,omitempty"`
 }
 
 func NewValidatorFromBytes(schemaData []byte) (Validator, error) {
-	schema := Schema{
-		GenericTags: make(map[string]ContentSpec),
-		Kinds:       make(map[string]KindSchema),
-	}
-	if err := yaml.Unmarshal(schemaData, &schema); err != nil {
-		return Validator{}, fmt.Errorf("failed to parse schema: %w", err)
+	schema, err := NewSchemaFromBytes(schemaData)
+	if err != nil {
+		return Validator{}, err
 	}
 
 	return NewValidatorFromSchema(schema), nil
+}
+
+func NewSchemaFromBytes(schemaData []byte) (Schema, error) {
+	schema := Schema{
+		GenericTags: make(map[string]ContentSpec),
+		Kinds:       make(map[string]*KindSchema),
+	}
+	if err := yaml.Unmarshal(schemaData, &schema); err != nil {
+		return Schema{}, fmt.Errorf("failed to parse schema: %w", err)
+	}
+
+	for k := range schema.Kinds {
+		kn, _ := strconv.ParseUint(k, 10, 16)
+		schema.Kinds[k].Kind = nostr.Kind(kn)
+	}
+
+	return schema, nil
 }
 
 func NewValidatorFromSchema(sch Schema) Validator {
@@ -185,11 +195,19 @@ func NewValidatorFromSchema(sch Schema) Validator {
 }
 
 func NewValidatorFromFile(filename string) (Validator, error) {
+	schema, err := NewSchemaFromFile(filename)
+	if err != nil {
+		return Validator{}, err
+	}
+	return NewValidatorFromSchema(schema), nil
+}
+
+func NewSchemaFromFile(filename string) (Schema, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return Validator{}, fmt.Errorf("failed to read schema file: %w", err)
+		return Schema{}, fmt.Errorf("failed to read schema file: %w", err)
 	}
-	return NewValidatorFromBytes(data)
+	return NewSchemaFromBytes(data)
 }
 
 func NewValidatorFromURL(schemaURL string) (Validator, error) {
@@ -228,9 +246,9 @@ func (ce ContentError) Error() string {
 }
 
 type TagError struct {
-	Tag  int    `json:"tag,omitempty"`
-	Item int    `json:"item,omitempty"`
-	Err  error  `json:"err,omitempty"`
+	Tag  int   `json:"tag,omitempty"`
+	Item int   `json:"item,omitempty"`
+	Err  error `json:"err,omitempty"`
 }
 
 func (te TagError) Error() string {
