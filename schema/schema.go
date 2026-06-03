@@ -48,41 +48,41 @@ func FetchSchemaFromURL(schemaURL string) (Schema, error) {
 }
 
 type Schema struct {
-	GenericTags map[string]ContentSpec `yaml:"generic_tags"`
-	Kinds       map[string]KindSchema  `yaml:"kinds"`
+	GenericTags map[string]ContentSpec `yaml:"generic_tags" json:"generic_tags,omitempty"`
+	Kinds       map[string]KindSchema  `yaml:"kinds" json:"kinds,omitempty"`
 }
 
 type KindSchema struct {
-	Description string      `yaml:"description"`
-	InUse       bool        `yaml:"in_use"`
-	Content     ContentSpec `yaml:"content"`
-	Required    []string    `yaml:"required"`
-	Multiple    []string    `yaml:"multiple"`
-	Tags        []TagSpec   `yaml:"tags"`
+	Description string      `yaml:"description" json:"description,omitempty"`
+	InUse       bool        `yaml:"in_use" json:"in_use,omitempty"`
+	Content     ContentSpec `yaml:"content" json:"content,omitempty"`
+	Required    []string    `yaml:"required" json:"required,omitempty"`
+	Multiple    []string    `yaml:"multiple" json:"multiple,omitempty"`
+	Tags        []TagSpec   `yaml:"tags" json:"tags,omitempty"`
 }
 
 type TagSpec struct {
-	Name   string       `yaml:"name"`
-	Prefix string       `yaml:"prefix"`
-	Next   *ContentSpec `yaml:"next"`
+	Name   string       `yaml:"name" json:"name,omitempty"`
+	Prefix string       `yaml:"prefix" json:"prefix,omitempty"`
+	Next   *ContentSpec `yaml:"next" json:"next,omitempty"`
 }
 
 type ContentSpec struct {
-	Type     string       `yaml:"type"`
-	Required bool         `yaml:"required"`
-	Min      int          `yaml:"min"`
-	Max      int          `yaml:"max"`
-	Either   []string     `yaml:"either"`
-	Next     *ContentSpec `yaml:"next"`
-	Variadic bool         `yaml:"variadic"`
+	Type     string       `yaml:"type" json:"type,omitempty"`
+	Required bool         `yaml:"required" json:"required,omitempty"`
+	Min      int          `yaml:"min" json:"min,omitempty"`
+	Max      int          `yaml:"max" json:"max,omitempty"`
+	Either   []string     `yaml:"either" json:"either,omitempty"`
+	Next     *ContentSpec `yaml:"next" json:"next,omitempty"`
+	Variadic bool         `yaml:"variadic" json:"variadic,omitempty"`
 }
 
 type Validator struct {
-	Schema            Schema
-	FailOnUnknownKind bool
-	FailOnUnknownType bool
-	TypeValidators    map[string]func(value string, spec *ContentSpec) error
-	UnknownTypes      []string
+	Schema            Schema                                            `json:"schema,omitempty"`
+	FailOnUnknownKind bool                                              `json:"fail_on_unknown_kind,omitempty"`
+	FailOnUnknownType bool                                              `json:"fail_on_unknown_type,omitempty"`
+	TypeValidators    map[string]func(value string, spec *ContentSpec) error `json:"type_validators,omitempty"`
+	UnknownTypes      []string                                          `json:"unknown_types,omitempty"`
 }
 
 func NewValidatorFromBytes(schemaData []byte) (Validator, error) {
@@ -212,7 +212,7 @@ var (
 )
 
 type UnknownTypes struct {
-	Types []string
+	Types []string `json:"types,omitempty"`
 }
 
 func (ut UnknownTypes) Error() string {
@@ -220,7 +220,7 @@ func (ut UnknownTypes) Error() string {
 }
 
 type ContentError struct {
-	Err error
+	Err error `json:"err,omitempty"`
 }
 
 func (ce ContentError) Error() string {
@@ -228,9 +228,9 @@ func (ce ContentError) Error() string {
 }
 
 type TagError struct {
-	Tag  int
-	Item int
-	Err  error
+	Tag  int    `json:"tag,omitempty"`
+	Item int    `json:"item,omitempty"`
+	Err  error  `json:"err,omitempty"`
 }
 
 func (te TagError) Error() string {
@@ -238,7 +238,7 @@ func (te TagError) Error() string {
 }
 
 type RequiredTagError struct {
-	Missing []string
+	Missing []string `json:"missing,omitempty"`
 }
 
 func (rte RequiredTagError) Error() string {
