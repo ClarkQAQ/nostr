@@ -59,6 +59,30 @@ func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubK
 	}
 }
 
+func (es EventStoreBlobIndexWrapper) ListAllBlobs(ctx context.Context) iter.Seq2[nostr.PubKey, blossom.BlobDescriptor] {
+	return func(yield func(nostr.PubKey, blossom.BlobDescriptor) bool) {
+		for evt := range es.Store.QueryEvents(nostr.Filter{
+			Kinds: []nostr.Kind{24242},
+		}, 1000) {
+			bd := es.parseEvent(evt)
+			if !yield(evt.PubKey, bd) {
+				return
+			}
+		}
+	}
+}
+
+func (es EventStoreBlobIndexWrapper) OwnersForBlob(ctx context.Context, sha256 string) []nostr.PubKey {
+	var owners []nostr.PubKey
+	for evt := range es.Store.QueryEvents(nostr.Filter{
+		Tags:  nostr.TagMap{"x": []string{sha256}},
+		Kinds: []nostr.Kind{24242},
+	}, 1000) {
+		owners = append(owners, evt.PubKey)
+	}
+	return owners
+}
+
 func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string) (*blossom.BlobDescriptor, error) {
 	next, stop := iter.Pull(
 		es.Store.QueryEvents(nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),

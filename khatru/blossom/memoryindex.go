@@ -59,6 +59,25 @@ func (x MemoryBlobIndex) List(ctx context.Context, pubkey nostr.PubKey) iter.Seq
 	}
 }
 
+func (x MemoryBlobIndex) ListAllBlobs(ctx context.Context) iter.Seq2[nostr.PubKey, blossom.BlobDescriptor] {
+	return func(yield func(nostr.PubKey, blossom.BlobDescriptor) bool) {
+		for _, v := range x.m.Range {
+			for _, owner := range v.owners {
+				if !yield(owner, v.blob) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (x MemoryBlobIndex) OwnersForBlob(ctx context.Context, sha256 string) []nostr.PubKey {
+	if val, ok := x.m.Load(sha256); ok {
+		return val.owners
+	}
+	return nil
+}
+
 func (x MemoryBlobIndex) Get(ctx context.Context, sha256 string) (*blossom.BlobDescriptor, error) {
 	if val, ok := x.m.Load(sha256); ok {
 		return &val.blob, nil

@@ -13,6 +13,9 @@ type BlobIndex interface {
 	List(ctx context.Context, pubkey nostr.PubKey) iter.Seq[blossom.BlobDescriptor]
 	Get(ctx context.Context, sha256 string) (*blossom.BlobDescriptor, error)
 	Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error
+
+	ListAllBlobs(ctx context.Context) iter.Seq2[nostr.PubKey, blossom.BlobDescriptor]
+	OwnersForBlob(ctx context.Context, sha256 string) []nostr.PubKey
 }
 
 var (
