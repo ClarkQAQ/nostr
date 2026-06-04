@@ -142,7 +142,7 @@ func (sys *System) FetchProfileMetadata(ctx context.Context, pubkey nostr.PubKey
 	if newM := sys.tryFetchMetadataFromNetwork(ctx, pubkey); newM != nil {
 		pm = *newM
 
-		sys.Store.SaveEvent(*pm.Event)
+		sys.Store.ReplaceEvent(*pm.Event)
 
 		// we'll only save this if we got something which means we found at least one event
 		lastFetchKey := makeLastFetchKey(0, pubkey)

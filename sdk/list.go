@@ -94,7 +94,7 @@ func fetchGenericList[V comparable, I TagItemWithValue[V]](
 		// we'll only save this if we got something which means we found at least one event
 		lastFetchKey := makeLastFetchKey(actualKind, pubkey)
 		sys.KVStore.Set(lastFetchKey, encodeTimestamp(nostr.Now()))
-		sys.Store.SaveEvent(*v.Event)
+		sys.Store.ReplaceEvent(*v.Event)
 	}
 
 	// save cache even if we didn't get anything
