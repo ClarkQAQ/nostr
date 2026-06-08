@@ -159,7 +159,7 @@ func (pool *Pool) EnsureRelay(url string) (*Relay, error) {
 		if pool.penaltyBox != nil {
 			// putting relay in penalty box
 			pool.penaltyBox.Compute(nm, func(v [2]float64, loaded bool) (newV [2]float64, delete bool) {
-				return [2]float64{v[0] + 1, 30.0 + math.Pow(2, v[0]+1)}, false
+				return [2]float64{v[0] + 1, math.Min(600.0, 30.0*math.Pow(1.5, v[0]+1))}, false
 			})
 			pool.Relays.Store(nm, nil) // this is important for penalty box detection on EnsureRelay
 		}
