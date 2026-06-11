@@ -97,7 +97,9 @@ func (sm SiteManifest) ToEvent() nostr.Event {
 		event.Tags = append(event.Tags, nostr.Tag{"path", NormalizePath(path), hex.EncodeToString(hash[:])})
 	}
 	for _, s := range sm.Servers {
-		event.Tags = append(event.Tags, nostr.Tag{"server", s})
+		if ns, err := nostr.NormalizeHTTPURL(s); err == nil {
+			event.Tags = append(event.Tags, nostr.Tag{"server", ns})
+		}
 	}
 	if sm.Title != "" {
 		event.Tags = append(event.Tags, nostr.Tag{"title", sm.Title})
