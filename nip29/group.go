@@ -66,6 +66,12 @@ type Group struct {
 	// indicates which event kinds this group supports
 	SupportedKinds []nostr.Kind
 
+	// arbitrary string indicating the parent group
+	Parent string
+
+	// ordered list of identifiers of child groups
+	Children []string
+
 	Roles       []*Role
 	InviteCodes []string
 
@@ -206,6 +212,14 @@ func (group Group) ToMetadataEvent() nostr.Event {
 		evt.Tags = append(evt.Tags, tag)
 	}
 
+	if group.Parent != "" {
+		evt.Tags = append(evt.Tags, nostr.Tag{"parent", group.Parent})
+	}
+
+	for _, child := range group.Children {
+		evt.Tags = append(evt.Tags, nostr.Tag{"child", child})
+	}
+
 	return evt
 }
 
@@ -327,6 +341,10 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 						group.About = tag[1]
 					case "picture":
 						group.Picture = tag[1]
+					case "parent":
+						group.Parent = tag[1]
+					case "child":
+						group.Children = append(group.Children, tag[1])
 					}
 				}
 			}
