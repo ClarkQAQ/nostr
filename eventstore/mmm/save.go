@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"slices"
 	"syscall"
 	"unsafe"
 
@@ -119,7 +120,8 @@ func (b *MultiMmapManager) storeOn(
 					b.freeRangesLarge = b.freeRangesLarge[0 : len(b.freeRangesLarge)-1]
 
 					// also delete it from b.freeRangesAll
-					b.freeRangesAll = b.freeRangesAll.del(fr.start)
+					idx := b.freeRangesAll.find(fr.start)
+					b.freeRangesAll = slices.Delete(b.freeRangesAll, idx, idx+1)
 				} else {
 					// otherwise modify it in place
 					newFreeRange := position{

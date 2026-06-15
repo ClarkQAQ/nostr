@@ -17,11 +17,6 @@ func (poss positions) find(start uint64) (idx int) {
 	return idx
 }
 
-func (poss positions) del(start uint64) positions {
-	idx := poss.find(start)
-	return slices.Delete(poss, idx, idx+1)
-}
-
 func (poss positions) String() string {
 	str := strings.Builder{}
 	str.Grow(10 + 20*len(poss))
@@ -46,6 +41,7 @@ func (pos position) isLarge() bool {
 	return pos.size >= LARGE_FREERANGE
 }
 
+//go:inline
 func positionFromBytes(posb []byte) position {
 	return position{
 		size:  binary.BigEndian.Uint32(posb[0:4]),
@@ -53,6 +49,7 @@ func positionFromBytes(posb []byte) position {
 	}
 }
 
+//go:inline
 func writeBytesFromPosition(out []byte, pos position) {
 	binary.BigEndian.PutUint32(out[0:4], pos.size)
 	binary.BigEndian.PutUint64(out[4:12], pos.start)

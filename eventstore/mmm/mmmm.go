@@ -341,6 +341,7 @@ func (b *MultiMmapManager) removeAllReferencesFromLayer(txn *lmdb.Txn, layerId u
 	return nil
 }
 
+//go:inline
 func (b *MultiMmapManager) loadEvent(pos position, eventReceiver *nostr.Event) error {
 	return betterbinary.Unmarshal(b.mmapf[pos.start:pos.start+uint64(pos.size)], eventReceiver)
 }

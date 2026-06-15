@@ -142,6 +142,11 @@ func FuzzTest(f *testing.F) {
 			mmmm.Rescan()
 		}
 
+		// perform random defrags -- shouldn't break the database
+		if rnd.UintN(3) == 1 {
+			mmmm.Defragment(len(deleted) / 3)
+		}
+
 		for id, deletedlayers := range deleted {
 			evt, foundlayers := mmmm.GetByID(id)
 

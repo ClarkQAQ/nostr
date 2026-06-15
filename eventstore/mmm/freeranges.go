@@ -2,9 +2,15 @@ package mmm
 
 import (
 	"cmp"
+	"encoding/binary"
 	"fmt"
+	"runtime"
 	"slices"
+	"syscall"
+	"unsafe"
 
+	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
 	"github.com/PowerDNS/lmdb-go/lmdb"
 )
 
@@ -149,4 +155,168 @@ func (b *MultiMmapManager) mergeNewFreeRange(newFreeRange position) {
 			b.freeRangesLarge = append(b.freeRangesLarge, newFreeRange)
 		}
 	}
+}
+
+func (b *MultiMmapManager) Defragment(n int) error {
+	if b.ReadOnly {
+		return ReadOnly
+	}
+
+	b.writeMutex.Lock()
+	defer b.writeMutex.Unlock()
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if n > len(b.freeRangesAll)-1 {
+		n = len(b.freeRangesAll) - 1
+	}
+	if n <= 0 {
+		return nil
+	}
+
+	mmmtxn, err := b.lmdbEnv.BeginTxn(nil, 0)
+	if err != nil {
+		return fmt.Errorf("failed to begin mmm transaction: %w", err)
+	}
+	defer mmmtxn.Abort()
+
+	type layerTxn struct {
+		il  *IndexingLayer
+		txn *lmdb.Txn
+	}
+	layerTxns := make(map[uint16]*layerTxn)
+	defer func() {
+		for _, lt := range layerTxns {
+			lt.txn.Abort()
+		}
+	}()
+
+	// iterate only through `n` free ranges, as specified
+	for i := 0; i < n; i++ {
+		fr := b.freeRangesAll[i]
+
+		// where the free range ends, the events start (any number of them)
+		eventsStart := fr.start + uint64(fr.size)
+		eventsEnd := b.freeRangesAll[i+1].start // and they end when the next free range starts
+
+		c := uint64(0) // this tracks our relative position inside the events section
+		for (eventsStart + c) < eventsEnd {
+			var evt nostr.Event
+			if err := betterbinary.Unmarshal(b.mmapf[(eventsStart+c):eventsEnd], &evt); err != nil {
+				id := betterbinary.GetID(b.mmapf[(eventsStart + c):eventsEnd])
+				return fmt.Errorf("failed to read event (%x) from mmap: %w", id[:], err)
+			}
+
+			// now that we have an event we'll update its pos on the id index and on every layer:
+			oldVal, err := mmmtxn.Get(b.indexId, evt.ID[0:8])
+			if err != nil {
+				return fmt.Errorf("failed to read val (%x) from index: %w", evt.ID[:], err)
+			}
+
+			// current position
+			pos := positionFromBytes(oldVal[0:12])
+
+			// new position (from the beginning of the free range before + relative position)
+			pos.start = fr.start + uint64(c)
+
+			// update this cursor
+			c += uint64(pos.size)
+
+			// prepare and save id index
+			newVal := make([]byte, len(oldVal))
+			writeBytesFromPosition(newVal, pos)
+			copy(newVal[12:], oldVal[12:])
+			if err := mmmtxn.Put(b.indexId, evt.ID[0:8], newVal, 0); err != nil {
+				return fmt.Errorf("failed to write new pos to id index: %w", err)
+			}
+
+			for s := 12; s < len(oldVal); s += 2 {
+				layer := binary.BigEndian.Uint16(oldVal[s : s+2])
+				lt, ok := layerTxns[layer]
+				if !ok {
+					il := b.layers.ByID(layer)
+					if il == nil {
+						fmt.Println(b.layers)
+						panic(fmt.Errorf("missing layer %d", layer))
+					}
+					txn, err := il.lmdbEnv.BeginTxn(nil, 0)
+					if err != nil {
+						return fmt.Errorf("failed to begin layer txn for layer %d: %w", il.id, err)
+					}
+					txn.RawRead = true
+					lt = &layerTxn{il: il, txn: txn}
+					layerTxns[il.id] = lt
+				}
+
+				for k := range lt.il.getIndexKeysForEvent(evt) {
+					if err := lt.txn.Del(k.dbi, k.key, oldVal[0:12]); err != nil {
+						return fmt.Errorf("failed to delete old index entry for %x: %w", evt.ID[:], err)
+					}
+					if err := lt.txn.Put(k.dbi, k.key, newVal[0:12], 0); err != nil {
+						return fmt.Errorf("failed to insert new index entry for %x: %w", evt.ID[:], err)
+					}
+				}
+			}
+		}
+
+		// now that we have updated all the pointers, just copy all the bytes between the two free ranges
+		copy(b.mmapf[fr.start:], b.mmapf[fr.start+uint64(fr.size):eventsEnd])
+
+		// delete this free range if it's one of the big ones
+		if fr.isLarge() {
+			for l, lfr := range b.freeRangesLarge {
+				if lfr.start == fr.start {
+					b.freeRangesLarge[l] = b.freeRangesLarge[len(b.freeRangesLarge)-1]
+					b.freeRangesLarge = b.freeRangesLarge[0 : len(b.freeRangesLarge)-1]
+					break
+				}
+			}
+		}
+
+		// now we have some space left at the end of this events section that is a free range
+		remainingSpaceStart := fr.start + c
+
+		// it must be merged with the next free range
+		updated := position{
+			start: remainingSpaceStart,
+			size:  b.freeRangesAll[i+1].size + uint32(eventsEnd) - uint32(remainingSpaceStart),
+		}
+		nextWasLarge := b.freeRangesAll[i+1].isLarge()
+		b.freeRangesAll[i+1] = updated
+
+		if nextWasLarge {
+			for l, lfr := range b.freeRangesLarge {
+				if lfr.start == eventsEnd {
+					b.freeRangesLarge[l] = updated
+					break
+				}
+			}
+		} else if updated.isLarge() {
+			// if it wasn't large but now is, add it to the list of large free ranges
+			b.freeRangesLarge = append(b.freeRangesLarge, updated)
+		}
+	}
+
+	// msync
+	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC,
+		uintptr(unsafe.Pointer(&b.mmapf[0])), uintptr(len(b.mmapf)), syscall.MS_SYNC)
+	if errno != 0 {
+		return fmt.Errorf("msync failed: %w", syscall.Errno(errno))
+	}
+
+	// commit transactions
+	if err := mmmtxn.Commit(); err != nil {
+		return fmt.Errorf("failed to commit mmm transaction: %w", err)
+	}
+	for lid, lt := range layerTxns {
+		if err := lt.txn.Commit(); err != nil {
+			return fmt.Errorf("failed to commit layer %d transaction: %w", lid, err)
+		}
+	}
+
+	// delete the free ranges in bulk
+	b.freeRangesAll = slices.Delete(b.freeRangesAll, 0, n)
+
+	return nil
 }
