@@ -37,6 +37,7 @@ func createHTTPClient() *fasthttp.Client {
 			Concurrency:      4096,
 			DNSCacheDuration: time.Hour,
 		},
+		DialDualStack: true,
 	}
 	dialFunc, _ := d.GetDialFunc(true)
 
