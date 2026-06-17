@@ -239,7 +239,13 @@ func verifyFreeRangesInvariants(t *testing.T, mmmm *MultiMmapManager) {
 	all := mmmm.freeRangesAll
 	large := mmmm.freeRangesLarge
 
+	require.True(t, slices.IsSortedFunc(all, func(a, b position) int {
+		return cmp.Compare(a.start, b.start)
+	}), "free ranges aren't sorted by start position")
+
 	for _, l := range large {
+		require.True(t, l.isLarge())
+
 		found := false
 		for _, a := range all {
 			if l.start == a.start && l.size == a.size {
@@ -254,13 +260,24 @@ func verifyFreeRangesInvariants(t *testing.T, mmmm *MultiMmapManager) {
 		require.Greater(t, all[i].start, all[i-1].start, "all ranges should be sorted by start")
 	}
 
-	for i := range all {
+	for i, fr := range all {
 		for j := i + 1; j < len(all); j++ {
 			end1 := all[i].start + uint64(all[i].size)
 			end2 := all[j].start + uint64(all[j].size)
 			require.False(t, (all[i].start >= all[j].start && all[i].start < end2) ||
 				(all[j].start >= all[i].start && all[j].start < end1),
 				"ranges %v and %v overlap", all[i], all[j])
+		}
+
+		foundInLarge := false
+		for _, l := range large {
+			if l.start == fr.start {
+				foundInLarge = true
+				break
+			}
+		}
+		if !foundInLarge {
+			require.False(t, fr.isLarge())
 		}
 	}
 
@@ -382,6 +399,8 @@ func FuzzDefragment(f *testing.F) {
 						err := mmmm.Defragment(param)
 						require.NoError(t, err)
 					}
+
+					verifyFreeRangesInvariants(t, mmmm)
 				}
 			}
 		}
