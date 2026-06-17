@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/binary"
 	"fmt"
+	"iter"
 	"runtime"
 	"slices"
 	"syscall"
@@ -15,6 +16,17 @@ import (
 )
 
 const LARGE_FREERANGE = 142
+
+// AllFreeRanges returns an iterator of (start_pos, size) of all free ranges, in positional order.
+func (b *MultiMmapManager) AllFreeRanges() iter.Seq2[uint64, uint32] {
+	return func(yield func(uint64, uint32) bool) {
+		for _, pos := range b.freeRangesAll {
+			if !yield(pos.start, pos.size) {
+				return
+			}
+		}
+	}
+}
 
 func (b *MultiMmapManager) gatherFreeRanges(txn *lmdb.Txn) error {
 	cursor, err := txn.OpenCursor(b.indexId)
