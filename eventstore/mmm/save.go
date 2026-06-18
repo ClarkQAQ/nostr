@@ -157,7 +157,7 @@ func (b *MultiMmapManager) storeOn(
 		}
 
 		// write to the mmap
-		if err := betterbinary.Marshal(evt, b.mmapf[pos.start:]); err != nil {
+		if err := betterbinary.Marshal(evt, b.mmapf[pos.start:pos.start+uint64(pos.size)]); err != nil {
 			return false, fmt.Errorf("error marshaling to %d: %w", pos.start, err)
 		}
 
