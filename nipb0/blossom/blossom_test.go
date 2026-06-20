@@ -3,6 +3,8 @@ package blossom_test
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http/httptest"
@@ -17,6 +19,18 @@ import (
 	khatru_blossom "fiatjaf.com/nostr/khatru/blossom"
 	blossomclient "fiatjaf.com/nostr/nipb0/blossom"
 )
+
+func hexTo32(s string) (h [32]byte, err error) {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return h, err
+	}
+	if len(b) != 32 {
+		return h, errors.New("not 32 bytes")
+	}
+	copy(h[:], b)
+	return h, nil
+}
 
 func TestBlossomBasicOperations(t *testing.T) {
 	// setup two test servers
@@ -78,7 +92,10 @@ func TestBlossomBasicOperations(t *testing.T) {
 			t.Fatalf("Expected 1 blob, got %d", len(blobs))
 		}
 
-		hash := blobs[0].SHA256
+		hash, err := hexTo32(blobs[0].SHA256)
+		if err != nil {
+			t.Fatalf("Failed to parse hash: %v", err)
+		}
 		downloaded, err := client1.Download(ctx, hash)
 		if err != nil {
 			t.Fatalf("Failed to download blob: %v", err)
@@ -173,8 +190,12 @@ func TestBlossomBasicOperations(t *testing.T) {
 			t.Errorf("Expected pubkey2 to still see 1 blob after pubkey1 delete, got %d", len(blobs2))
 		}
 
+		hash32, err := hexTo32(hash)
+		if err != nil {
+			t.Fatalf("Failed to parse hash: %v", err)
+		}
 		// download should still work
-		downloaded, err := client2.Download(ctx, hash)
+		downloaded, err := client2.Download(ctx, hash32)
 		if err != nil {
 			t.Fatalf("Failed to download blob after pubkey1 delete: %v", err)
 		}
@@ -203,8 +224,12 @@ func TestBlossomBasicOperations(t *testing.T) {
 			t.Errorf("Expected 1 blob on server2, got %d", len(blobs))
 		}
 
+		hash32, err := hexTo32(bd.SHA256)
+		if err != nil {
+			t.Fatalf("Failed to parse hash: %v", err)
+		}
 		// verify download
-		downloaded, err := client2Server.Download(ctx, bd.SHA256)
+		downloaded, err := client2Server.Download(ctx, hash32)
 		if err != nil {
 			t.Fatalf("Failed to download from server2: %v", err)
 		}
@@ -246,13 +271,21 @@ func TestBlossomBasicOperations(t *testing.T) {
 		}
 
 		// verify the mirrored blob can be downloaded
-		downloaded, err := client2Server.Download(ctx, bd.SHA256)
+		hash32, err := hexTo32(bd.SHA256)
+		if err != nil {
+			t.Fatalf("Failed to parse hash: %v", err)
+		}
+		downloaded, err := client2Server.Download(ctx, hash32)
 		if err != nil {
 			t.Fatalf("Failed to download mirrored blob: %v", err)
 		}
 
+		hash32, err = hexTo32(blobs1[0].SHA256)
+		if err != nil {
+			t.Fatalf("Failed to parse hash: %v", err)
+		}
 		// should match the original content
-		originalDownloaded, err := client2.Download(ctx, blobs1[0].SHA256)
+		originalDownloaded, err := client2.Download(ctx, hash32)
 		if err != nil {
 			t.Fatalf("Failed to download original blob for comparison: %v", err)
 		}
