@@ -15,7 +15,7 @@ import (
 func (c *Client) Download(ctx context.Context, hash [32]byte) ([]byte, error) {
 	hhash := hex.EncodeToString(hash[:])
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+"/"+hhash, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+hhash, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -43,7 +43,7 @@ func (c *Client) Download(ctx context.Context, hash [32]byte) ([]byte, error) {
 func (c *Client) DownloadToFile(ctx context.Context, hash [32]byte, filePath string) error {
 	hhash := hex.EncodeToString(hash[:])
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+"/"+hhash, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", c.mediaserver+hhash, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
