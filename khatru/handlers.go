@@ -346,6 +346,9 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 						ws.authLock.Unlock()
 						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: true})
+						if rl.OnAuth != nil {
+							rl.OnAuth(ctx, pubkey)
+						}
 					} else {
 						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "error: failed to authenticate: " + err.Error()})
 					}
