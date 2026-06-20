@@ -494,7 +494,7 @@ func (r *Relay) Auth(ctx context.Context, sign func(context.Context, *Event) err
 			},
 			Content: "",
 		}
-		if err := sign(ctx, &authEvent); err != nil {
+		if err = sign(ctx, &authEvent); err != nil {
 			err = fmt.Errorf("error signing auth event: %w", err)
 		} else {
 			err = r.publish(ctx, authEvent.ID, &AuthEnvelope{Event: authEvent})
