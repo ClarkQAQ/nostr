@@ -22,9 +22,7 @@ func IsVirtualRelay(url string) bool {
 		return true
 	}
 
-	if !testing.Testing() &&
-		strings.HasPrefix(url, "ws://localhost") ||
-		strings.HasPrefix(url, "ws://127.0.0.1") {
+	if !testing.Testing() && (strings.HasPrefix(url, "ws://localhost") || strings.HasPrefix(url, "ws://127.0.0.1")) {
 		return true
 	}
 
