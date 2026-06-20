@@ -17,6 +17,12 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
+var bunkerClientCtxKey = &struct{}{}
+
+func IsBunkerClientOperation(ctx context.Context) bool {
+	return ctx.Value(bunkerClientCtxKey) == true
+}
+
 type BunkerClient struct {
 	Relays []string
 
@@ -134,9 +140,10 @@ func NewBunker(
 	}
 
 	cancellableCtx, cancel := context.WithCancel(ctx)
+	bunkerClientCtx := context.WithValue(cancellableCtx, bunkerClientCtxKey, true)
 	_ = cancel
 
-	events, eosed := pool.SubscribeManyNotifyEOSE(cancellableCtx, relays, nostr.Filter{
+	events, eosed := pool.SubscribeManyNotifyEOSE(bunkerClientCtx, relays, nostr.Filter{
 		Tags:      nostr.TagMap{"p": []string{clientPublicKey.Hex()}},
 		Kinds:     []nostr.Kind{nostr.KindNostrConnect},
 		Since:     now,
@@ -318,12 +325,14 @@ func (bunker *BunkerClient) RPC(ctx context.Context, method string, params []str
 		close(bunkerConnectionWorked)
 	})
 
+	bunkerClientCtx := context.WithValue(ctx, bunkerClientCtxKey, true)
+
 	for _, url := range bunker.Relays {
 		go func(url string) {
 			relay, err := bunker.pool.EnsureRelay(url)
 			if err == nil {
 				relayConnectionWorkedO()
-				if err := relay.Publish(ctx, evt); err == nil {
+				if err := relay.Publish(bunkerClientCtx, evt); err == nil {
 					bunkerConnectionWorkedO()
 				}
 			}
