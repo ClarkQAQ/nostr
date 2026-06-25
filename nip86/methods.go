@@ -211,12 +211,12 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		id, _ := req.Params[0].(string)
 		label, _ := req.Params[1].(string)
 		description, _ := req.Params[2].(string)
-		color, _ := req.Params[3].(string)
+		color, _ := req.Params[3].(float64)
 		order, ok := req.Params[4].(float64)
 		if !ok || math.Trunc(order) != order {
 			return nil, fmt.Errorf("invalid order param for '%s'", req.Method)
 		}
-		return CreateRole{id, label, description, color, int(order)}, nil
+		return CreateRole{id, label, description, int(color), int(order)}, nil
 	case "editrole":
 		if len(req.Params) < 5 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
@@ -224,12 +224,12 @@ func DecodeRequest(req Request) (MethodParams, error) {
 		id, _ := req.Params[0].(string)
 		label, _ := req.Params[1].(string)
 		description, _ := req.Params[2].(string)
-		color, _ := req.Params[3].(string)
+		color, _ := req.Params[3].(float64)
 		order, ok := req.Params[4].(float64)
 		if !ok || math.Trunc(order) != order {
 			return nil, fmt.Errorf("invalid order param for '%s'", req.Method)
 		}
-		return EditRole{id, label, description, color, int(order)}, nil
+		return EditRole{id, label, description, int(color), int(order)}, nil
 	case "deleterole":
 		if len(req.Params) == 0 {
 			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
@@ -436,7 +436,7 @@ type CreateRole struct {
 	ID          string
 	Label       string
 	Description string
-	Color       string
+	Color       int
 	Order       int
 }
 
@@ -446,7 +446,7 @@ type EditRole struct {
 	ID          string
 	Label       string
 	Description string
-	Color       string
+	Color       int
 	Order       int
 }
 

@@ -41,8 +41,8 @@ type RelayManagementAPI struct {
 	Stats                       func(ctx context.Context) (nip86.Response, error)
 	GrantAdmin                  func(ctx context.Context, pubkey nostr.PubKey, methods []string) error
 	RevokeAdmin                 func(ctx context.Context, pubkey nostr.PubKey, methods []string) error
-	CreateRole                  func(ctx context.Context, id, label, description, color string, order int) error
-	EditRole                    func(ctx context.Context, id, label, description, color string, order int) error
+	CreateRole                  func(ctx context.Context, id string, label string, description string, color int, order int) error
+	EditRole                    func(ctx context.Context, id string, label string, description string, color int, order int) error
 	DeleteRole                  func(ctx context.Context, id string) error
 	AssignRole                  func(ctx context.Context, pubkey nostr.PubKey, roleID string) error
 	UnassignRole                func(ctx context.Context, pubkey nostr.PubKey, roleID string) error
