@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/nip04"
 	"fiatjaf.com/nostr/nip44"
 	"github.com/mailru/easyjson"
 )
@@ -259,6 +258,50 @@ func (p *DynamicSigner) HandleRequest(ctx context.Context, event nostr.Event) (
 		ciphertext := req.Params[1]
 
 		plaintext, err := userKeyer.Decrypt(ctx, ciphertext, thirdPartyPubkey)
+		if err != nil {
+			resultErr = fmt.Errorf("failed to decrypt: %w", err)
+			break
+		}
+		result = plaintext
+	case "nip04_encrypt":
+		if len(req.Params) != 2 {
+			resultErr = fmt.Errorf("wrong number of arguments to 'nip04_encrypt'")
+			break
+		}
+		thirdPartyPubkey, err := nostr.PubKeyFromHex(req.Params[0])
+		if err != nil {
+			resultErr = fmt.Errorf("first argument to 'nip04_encrypt' is not a valid pubkey hex")
+			break
+		}
+		if p.AuthorizeEncryption != nil && !p.AuthorizeEncryption(ctx, event.PubKey) {
+			resultErr = fmt.Errorf("refusing to encrypt")
+			break
+		}
+		plaintext := req.Params[1]
+
+		ciphertext, err := userKeyer.Nip04Encrypt(ctx, plaintext, thirdPartyPubkey)
+		if err != nil {
+			resultErr = fmt.Errorf("failed to encrypt: %w", err)
+			break
+		}
+		result = ciphertext
+	case "nip04_decrypt":
+		if len(req.Params) != 2 {
+			resultErr = fmt.Errorf("wrong number of arguments to 'nip04_decrypt'")
+			break
+		}
+		thirdPartyPubkey, err := nostr.PubKeyFromHex(req.Params[0])
+		if err != nil {
+			resultErr = fmt.Errorf("first argument to 'nip04_decrypt' is not a valid pubkey hex")
+			break
+		}
+		if p.AuthorizeEncryption != nil && !p.AuthorizeEncryption(ctx, event.PubKey) {
+			resultErr = fmt.Errorf("refusing to decrypt")
+			break
+		}
+		ciphertext := req.Params[1]
+
+		plaintext, err := userKeyer.Nip04Decrypt(ctx, ciphertext, thirdPartyPubkey)
 		if err != nil {
 			resultErr = fmt.Errorf("failed to decrypt: %w", err)
 			break

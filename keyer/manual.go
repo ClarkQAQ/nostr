@@ -19,11 +19,17 @@ type ManualSigner struct {
 	// ManualSignEvent is called when an event needs to be signed
 	ManualSignEvent func(context.Context, *nostr.Event) error
 
-	// ManualEncrypt is called when a message needs to be encrypted
+	// ManualEncrypt is called when a message needs to be encrypted (NIP-44)
 	ManualEncrypt func(ctx context.Context, plaintext string, recipientPublicKey nostr.PubKey) (base64ciphertext string, err error)
 
-	// ManualDecrypt is called when a message needs to be decrypted
+	// ManualDecrypt is called when a message needs to be decrypted (NIP-44)
 	ManualDecrypt func(ctx context.Context, base64ciphertext string, senderPublicKey nostr.PubKey) (plaintext string, err error)
+
+	// ManualNip04Encrypt is called when a message needs to be encrypted with NIP-04
+	ManualNip04Encrypt func(ctx context.Context, plaintext string, recipientPublicKey nostr.PubKey) (ciphertext string, err error)
+
+	// ManualNip04Decrypt is called when a message needs to be decrypted with NIP-04
+	ManualNip04Decrypt func(ctx context.Context, ciphertext string, senderPublicKey nostr.PubKey) (plaintext string, err error)
 }
 
 // SignEvent delegates event signing to the ManualSignEvent function.
@@ -44,4 +50,14 @@ func (ms ManualSigner) Encrypt(ctx context.Context, plaintext string, recipient 
 // Decrypt delegates decryption to the ManualDecrypt function.
 func (ms ManualSigner) Decrypt(ctx context.Context, base64ciphertext string, sender nostr.PubKey) (plaintext string, err error) {
 	return ms.ManualDecrypt(ctx, base64ciphertext, sender)
+}
+
+// Nip04Encrypt delegates NIP-04 encryption to the ManualNip04Encrypt function.
+func (ms ManualSigner) Nip04Encrypt(ctx context.Context, plaintext string, recipient nostr.PubKey) (string, error) {
+	return ms.ManualNip04Encrypt(ctx, plaintext, recipient)
+}
+
+// Nip04Decrypt delegates NIP-04 decryption to the ManualNip04Decrypt function.
+func (ms ManualSigner) Nip04Decrypt(ctx context.Context, ciphertext string, sender nostr.PubKey) (string, error) {
+	return ms.ManualNip04Decrypt(ctx, ciphertext, sender)
 }
