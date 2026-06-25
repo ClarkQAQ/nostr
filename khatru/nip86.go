@@ -41,6 +41,11 @@ type RelayManagementAPI struct {
 	Stats                       func(ctx context.Context) (nip86.Response, error)
 	GrantAdmin                  func(ctx context.Context, pubkey nostr.PubKey, methods []string) error
 	RevokeAdmin                 func(ctx context.Context, pubkey nostr.PubKey, methods []string) error
+	CreateRole                  func(ctx context.Context, id, label, description, color string, order int) error
+	EditRole                    func(ctx context.Context, id, label, description, color string, order int) error
+	DeleteRole                  func(ctx context.Context, id string) error
+	AssignRole                  func(ctx context.Context, pubkey nostr.PubKey, roleID string) error
+	UnassignRole                func(ctx context.Context, pubkey nostr.PubKey, roleID string) error
 	Generic                     func(ctx context.Context, request nip86.Request) (nip86.Response, error)
 }
 
@@ -327,6 +332,46 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 				resp.Error = err.Error()
 			} else {
 				resp.Result = result
+			}
+		case nip86.CreateRole:
+			if rl.ManagementAPI.CreateRole == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.CreateRole(ctx, thing.ID, thing.Label, thing.Description, thing.Color, thing.Order); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
+			}
+		case nip86.EditRole:
+			if rl.ManagementAPI.EditRole == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.EditRole(ctx, thing.ID, thing.Label, thing.Description, thing.Color, thing.Order); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
+			}
+		case nip86.DeleteRole:
+			if rl.ManagementAPI.DeleteRole == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.DeleteRole(ctx, thing.ID); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
+			}
+		case nip86.AssignRole:
+			if rl.ManagementAPI.AssignRole == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.AssignRole(ctx, thing.PubKey, thing.RoleID); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
+			}
+		case nip86.UnassignRole:
+			if rl.ManagementAPI.UnassignRole == nil {
+				resp.Error = fmt.Sprintf("method %s not supported", thing.MethodName())
+			} else if err := rl.ManagementAPI.UnassignRole(ctx, thing.PubKey, thing.RoleID); err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Result = true
 			}
 		default:
 			if rl.ManagementAPI.Generic == nil {

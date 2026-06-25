@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nip04"
 	"fiatjaf.com/nostr/nip44"
 	"github.com/mailru/easyjson"
 )
