@@ -204,6 +204,66 @@ func DecodeRequest(req Request) (MethodParams, error) {
 			Pubkey:          pk,
 			DisallowMethods: disallowedMethods,
 		}, nil
+	case "createrole":
+		if len(req.Params) < 5 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		id, _ := req.Params[0].(string)
+		label, _ := req.Params[1].(string)
+		description, _ := req.Params[2].(string)
+		color, _ := req.Params[3].(string)
+		order, ok := req.Params[4].(float64)
+		if !ok || math.Trunc(order) != order {
+			return nil, fmt.Errorf("invalid order param for '%s'", req.Method)
+		}
+		return CreateRole{id, label, description, color, int(order)}, nil
+	case "editrole":
+		if len(req.Params) < 5 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		id, _ := req.Params[0].(string)
+		label, _ := req.Params[1].(string)
+		description, _ := req.Params[2].(string)
+		color, _ := req.Params[3].(string)
+		order, ok := req.Params[4].(float64)
+		if !ok || math.Trunc(order) != order {
+			return nil, fmt.Errorf("invalid order param for '%s'", req.Method)
+		}
+		return EditRole{id, label, description, color, int(order)}, nil
+	case "deleterole":
+		if len(req.Params) == 0 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		id, _ := req.Params[0].(string)
+		return DeleteRole{id}, nil
+	case "assignrole":
+		if len(req.Params) < 2 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		pkh, ok := req.Params[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
+		}
+		pk, err := nostr.PubKeyFromHex(pkh)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
+		}
+		roleID, _ := req.Params[1].(string)
+		return AssignRole{pk, roleID}, nil
+	case "unassignrole":
+		if len(req.Params) < 2 {
+			return nil, fmt.Errorf("invalid number of params for '%s'", req.Method)
+		}
+		pkh, ok := req.Params[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing pubkey param for '%s'", req.Method)
+		}
+		pk, err := nostr.PubKeyFromHex(pkh)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pubkey param for '%s'", req.Method)
+		}
+		roleID, _ := req.Params[1].(string)
+		return UnassignRole{pk, roleID}, nil
 	case "stats":
 		return Stats{}, nil
 	default:
@@ -238,6 +298,11 @@ var (
 	_ MethodParams = (*ListDisallowedKinds)(nil)
 	_ MethodParams = (*GrantAdmin)(nil)
 	_ MethodParams = (*RevokeAdmin)(nil)
+	_ MethodParams = (*CreateRole)(nil)
+	_ MethodParams = (*EditRole)(nil)
+	_ MethodParams = (*DeleteRole)(nil)
+	_ MethodParams = (*AssignRole)(nil)
+	_ MethodParams = (*UnassignRole)(nil)
 	_ MethodParams = (*Stats)(nil)
 )
 
@@ -366,3 +431,43 @@ func (RevokeAdmin) MethodName() string { return "revokeadmin" }
 type Stats struct{}
 
 func (Stats) MethodName() string { return "stats" }
+
+type CreateRole struct {
+	ID          string
+	Label       string
+	Description string
+	Color       string
+	Order       int
+}
+
+func (CreateRole) MethodName() string { return "createrole" }
+
+type EditRole struct {
+	ID          string
+	Label       string
+	Description string
+	Color       string
+	Order       int
+}
+
+func (EditRole) MethodName() string { return "editrole" }
+
+type DeleteRole struct {
+	ID string
+}
+
+func (DeleteRole) MethodName() string { return "deleterole" }
+
+type AssignRole struct {
+	PubKey nostr.PubKey
+	RoleID string
+}
+
+func (AssignRole) MethodName() string { return "assignrole" }
+
+type UnassignRole struct {
+	PubKey nostr.PubKey
+	RoleID string
+}
+
+func (UnassignRole) MethodName() string { return "unassignrole" }
