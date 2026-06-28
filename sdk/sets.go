@@ -7,9 +7,10 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/sdk/cache"
+	cache_memory "fiatjaf.com/nostr/sdk/cache/memory"
 )
 
-// this is similar to list.go and inherits code from that.
+// this is similar to lists.go and inherits code from that.
 
 type GenericSets[V comparable, I TagItemWithValue[V]] struct {
 	PubKey nostr.PubKey  `json:"-"`
@@ -32,8 +33,6 @@ func fetchGenericSets[V comparable, I TagItemWithValue[V]](
 	genericListMutexes[lockIdx].Lock()
 
 	if valueWasJustCached[lockIdx].CompareAndSwap(true, false) {
-		// this ensures the cache has had time to commit the values
-		// so we don't repeat a fetch immediately after the other
 		time.Sleep(time.Millisecond * 10)
 	}
 
@@ -49,29 +48,23 @@ func fetchGenericSets[V comparable, I TagItemWithValue[V]](
 		sys.Store.QueryEvents(nostr.Filter{Kinds: []nostr.Kind{actualKind}, Authors: []nostr.PubKey{pubkey}}, 100),
 	)
 	if len(events) != 0 {
-		// ok, we found something locally
 		sets := parseSetsFromEvents(events, parseTag)
 		v.Events = events
 		v.Sets = sets
 
-		// but if we haven't tried fetching from the network recently we should do it
 		lastFetchKey := makeLastFetchKey(actualKind, pubkey)
 		lastFetchData, _ := sys.KVStore.Get(lastFetchKey)
 		if lastFetchData == nil || nostr.Now()-decodeTimestamp(lastFetchData) > getLocalStoreRefreshDaysForKind(actualKind)*24*60*60 {
 			newV := tryFetchSetsFromNetwork(ctx, sys, pubkey, addressableIndex, parseTag)
 
-			// unlike for lists, when fetching sets we will blindly trust whatever we get from the network
 			v = *newV
 			for _, evt := range newV.Events {
 				sys.Store.ReplaceEvent(evt)
 			}
 
-			// even if we didn't find anything register this because we tried
-			// (and we still have the previous event in our local store)
 			sys.KVStore.Set(lastFetchKey, encodeTimestamp(nostr.Now()))
 		}
 
-		// and finally save this to cache
 		cache.SetWithTTL(pubkey, v, time.Hour*6)
 		valueWasJustCached[lockIdx].Store(true)
 
@@ -85,12 +78,10 @@ func fetchGenericSets[V comparable, I TagItemWithValue[V]](
 			sys.Store.ReplaceEvent(evt)
 		}
 
-		// we'll only save this if we got something which means we found at least one event
 		lastFetchKey := makeLastFetchKey(actualKind, pubkey)
 		sys.KVStore.Set(lastFetchKey, encodeTimestamp(nostr.Now()))
 	}
 
-	// save cache even if we didn't get anything
 	cache.SetWithTTL(pubkey, v, time.Hour*6)
 	valueWasJustCached[lockIdx].Store(true)
 
@@ -130,7 +121,6 @@ func parseSetsFromEvents[V comparable, I TagItemWithValue[V]](
 		for _, tag := range evt.Tags {
 			item, ok := parseTag(tag)
 			if ok {
-				// check if this already exists before adding
 				if slices.IndexFunc(items, func(i I) bool { return i.Value() == item.Value() }) == -1 {
 					items = append(items, item)
 				}
@@ -139,4 +129,50 @@ func parseSetsFromEvents[V comparable, I TagItemWithValue[V]](
 		sets[evt.Tags.GetD()] = items
 	}
 	return sets
+}
+
+// -- set fetch methods
+
+func (sys *System) FetchFollowSets(ctx context.Context, pubkey nostr.PubKey) GenericSets[nostr.PubKey, ProfileRef] {
+	sys.followSetsCacheOnce.Do(func() {
+		if sys.FollowSetsCache == nil {
+			sys.FollowSetsCache = cache_memory.New[GenericSets[nostr.PubKey, ProfileRef]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericSets(sys, ctx, pubkey, 30000, kind_30000, parseProfileRef, sys.FollowSetsCache)
+	return ml
+}
+
+func (sys *System) FetchRelaySets(ctx context.Context, pubkey nostr.PubKey) GenericSets[string, RelayURL] {
+	sys.relaySetsCacheOnce.Do(func() {
+		if sys.RelaySetsCache == nil {
+			sys.RelaySetsCache = cache_memory.New[GenericSets[string, RelayURL]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericSets(sys, ctx, pubkey, 30002, kind_30002, parseRelayURL, sys.RelaySetsCache)
+	return ml
+}
+
+func (sys *System) FetchTopicSets(ctx context.Context, pubkey nostr.PubKey) GenericSets[string, Topic] {
+	sys.topicSetsCacheOnce.Do(func() {
+		if sys.TopicSetsCache == nil {
+			sys.TopicSetsCache = cache_memory.New[GenericSets[string, Topic]](1000)
+		}
+	})
+
+	ml, _ := fetchGenericSets(sys, ctx, pubkey, 30015, kind_30015, parseTopicString, sys.TopicSetsCache)
+	return ml
+}
+
+func (sys *System) FetchEmojiSets(ctx context.Context, pubkey nostr.PubKey) GenericSets[string, Emoji] {
+	sys.emojiSetsCacheOnce.Do(func() {
+		if sys.EmojiSetsCache == nil {
+			sys.EmojiSetsCache = cache_memory.New[GenericSets[string, Emoji]](1000)
+		}
+	})
+
+	fl, _ := fetchGenericSets(sys, ctx, pubkey, 30030, kind_30030, parseEmojiTag, sys.EmojiSetsCache)
+	return fl
 }

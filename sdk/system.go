@@ -65,6 +65,16 @@ type System struct {
 	BlossomServerListCache        cache.Cache32[GenericList[string, BlossomURL]]
 	gitAuthorListCacheOnce        sync.Once
 	GitAuthorListCache            cache.Cache32[GenericList[nostr.PubKey, ProfileRef]]
+	emojiListCacheOnce            sync.Once
+	EmojiListCache                cache.Cache32[GenericList[string, Emoji]]
+	relayFeedsListCacheOnce       sync.Once
+	RelayFeedsListCache           cache.Cache32[GenericList[string, RelayURL]]
+	podcastFavoriteListCacheOnce  sync.Once
+	PodcastFavoriteListCache      cache.Cache32[GenericList[string, PodcastRef]]
+	authoredPodcastListCacheOnce  sync.Once
+	AuthoredPodcastListCache      cache.Cache32[GenericList[string, PodcastRef]]
+	emojiSetsCacheOnce            sync.Once
+	EmojiSetsCache                cache.Cache32[GenericSets[string, Emoji]]
 	relaySetsCacheOnce            sync.Once
 	RelaySetsCache                cache.Cache32[GenericSets[string, RelayURL]]
 	followSetsCacheOnce           sync.Once
