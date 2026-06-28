@@ -112,26 +112,6 @@ func TestHyperLogLogTargetsForEvent_Kind3(t *testing.T) {
 	require.ElementsMatch(t, []string{follow1, follow2}, refs)
 }
 
-func TestHyperLogLogTargetsForEvent_Kind6(t *testing.T) {
-	rng := rand.New(rand.NewPCG(5, 0))
-	pk := randomPubkey(rng)
-	eid := randomHex(rng)
-
-	// kind 6 uses last #e
-	evt := nostr.Event{
-		Kind:   6,
-		PubKey: pk,
-		Tags:   nostr.Tags{{"e", "00000000000000000000000000000000000000000000000000000000000000ab"}, {"e", eid}},
-	}
-
-	var refs []string
-	for ref := range HyperLogLogTargetsForEvent(evt) {
-		refs = append(refs, ref)
-	}
-
-	require.Equal(t, []string{eid}, refs)
-}
-
 func TestHyperLogLogTargetsForEvent_Kind7(t *testing.T) {
 	rng := rand.New(rand.NewPCG(6, 0))
 	pk := randomPubkey(rng)

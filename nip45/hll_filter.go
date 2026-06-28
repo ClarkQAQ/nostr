@@ -45,7 +45,7 @@ func extractHLLFilterTag(filter nostr.Filter) (string, string, bool) {
 	// validate filter is one of the common NIP-45 cases
 	switch tagKey {
 	case "e":
-		if len(filter.Kinds) != 1 || (filter.Kinds[0] != 1 && filter.Kinds[0] != 6 && filter.Kinds[0] != 7) {
+		if len(filter.Kinds) != 1 || (filter.Kinds[0] != 1 && filter.Kinds[0] != 6 && filter.Kinds[0] != 7 && filter.Kinds[0] != 1111) {
 			return "", "", false
 		}
 	case "q":

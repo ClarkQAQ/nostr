@@ -23,8 +23,7 @@ func HyperLogLogTargetsForEvent(evt nostr.Event) iter.Seq2[string, int] {
 				}
 			}
 			// quote count (#q)
-			qTag := evt.Tags.Find("q")
-			if qTag != nil {
+			for qTag := range evt.Tags.FindAll("q") {
 				v := qTag[1]
 				if nostr.IsValid32ByteHex(v) {
 					p, _ := strconv.ParseInt(v[32:33], 16, 64)
@@ -44,8 +43,8 @@ func HyperLogLogTargetsForEvent(evt nostr.Event) iter.Seq2[string, int] {
 				}
 			}
 		case 6:
-			// repost count (last #e)
-			lastE := evt.Tags.FindLast("e")
+			// repost count (assume just one #e)
+			lastE := evt.Tags.Find("e")
 			if lastE != nil {
 				v := lastE[1]
 				if nostr.IsValid32ByteHex(v) {
@@ -56,8 +55,8 @@ func HyperLogLogTargetsForEvent(evt nostr.Event) iter.Seq2[string, int] {
 				}
 			}
 		case 7:
-			// reaction count (last #e)
-			lastE := evt.Tags.FindLast("e")
+			// reaction count (assume just one #e)
+			lastE := evt.Tags.Find("e")
 			if lastE != nil {
 				v := lastE[1]
 				if nostr.IsValid32ByteHex(v) {
@@ -68,7 +67,7 @@ func HyperLogLogTargetsForEvent(evt nostr.Event) iter.Seq2[string, int] {
 				}
 			}
 		case 1111:
-			// comment count (#E)
+			// comment count (#E, #e)
 			eTag := evt.Tags.Find("E")
 			if eTag != nil {
 				v := eTag[1]
@@ -79,9 +78,17 @@ func HyperLogLogTargetsForEvent(evt nostr.Event) iter.Seq2[string, int] {
 					}
 				}
 			}
+			for eTag := range evt.Tags.FindAll("e") {
+				v := eTag[1]
+				if nostr.IsValid32ByteHex(v) {
+					p, _ := strconv.ParseInt(v[32:33], 16, 64)
+					if !yield(v, int(p+8)) {
+						return
+					}
+				}
+			}
 			// quote count (#q)
-			qTag := evt.Tags.Find("q")
-			if qTag != nil {
+			for qTag := range evt.Tags.FindAll("q") {
 				v := qTag[1]
 				if nostr.IsValid32ByteHex(v) {
 					p, _ := strconv.ParseInt(v[32:33], 16, 64)
