@@ -44,10 +44,10 @@ func HexDecodeString(s string) ([]byte, error) {
 
 // IsValid32ByteHex checks if a string is a valid 32-byte hex string.
 func IsValid32ByteHex(thing string) bool {
-	if !isLowerHex(thing) {
+	if len(thing) != 64 {
 		return false
 	}
-	if len(thing) != 64 {
+	if !isLowerHex(thing) {
 		return false
 	}
 	_, err := HexDecodeString(thing)

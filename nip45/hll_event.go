@@ -7,7 +7,7 @@ import (
 	"fiatjaf.com/nostr"
 )
 
-func HyperLogLogEventPubkeyOffsetsAndReferencesForEvent(evt nostr.Event) iter.Seq2[string, int] {
+func HyperLogLogTargetsForEvent(evt nostr.Event) iter.Seq2[string, int] {
 	return func(yield func(string, int) bool) {
 		switch evt.Kind {
 		case 1:

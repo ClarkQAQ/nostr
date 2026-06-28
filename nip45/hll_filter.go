@@ -82,22 +82,24 @@ func HyperLogLogEventPubkeyOffsetForFilter(filter nostr.Filter) int {
 
 	// derive 32-byte hex string from tag value per NIP-45 offset computation
 	var hexStr string
-	switch {
-	case nostr.IsValid32ByteHex(tagValue):
+	if nostr.IsValid32ByteHex(tagValue) {
 		hexStr = tagValue
-	case strings.Count(tagValue, ":") == 2:
-		// address format: <kind>:<pubkey>:<d-tag>
-		parts := strings.SplitN(tagValue, ":", 3)
-		if nostr.IsValid32ByteHex(parts[1]) {
-			hexStr = parts[1]
-		} else {
-			return -1
-		}
-	default:
+		goto haveHexStr
+	}
+
+	// address format: <kind>:<pubkey>:<d-tag>
+	if parts := strings.SplitN(tagValue, ":", 3); len(parts) == 3 && nostr.IsValid32ByteHex(parts[1]) {
+		hexStr = parts[1]
+		goto haveHexStr
+	}
+
+	// fallback
+	{
 		hash := sha256.Sum256([]byte(tagValue))
 		hexStr = nostr.HexEncodeToString(hash[:])
 	}
 
+haveHexStr:
 	// character at position 32 (0-indexed), parse as hex nibble, add 8 for offset
 	p, err := strconv.ParseInt(hexStr[32:33], 16, 64)
 	if err != nil {

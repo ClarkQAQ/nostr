@@ -146,7 +146,7 @@ func (b *LMDBBackend) CountEventsHLL(filter nostr.Filter, offset int) (uint32, *
 				if extraKinds == nil && extraTagValues == nil {
 					// nothing extra to check
 					count++
-					hll.AddBytes(betterbinary.GetPubKey(bin))
+					hll.Add(betterbinary.GetPubKey(bin))
 				} else {
 					// check it against kinds without decoding the entire thing
 					if !slices.Contains(extraKinds, betterbinary.GetKind(bin)) {
@@ -214,7 +214,7 @@ func (b *LMDBBackend) updateHyperLogLogCachedValues(txn *lmdb.Txn, evt nostr.Eve
 	cacheKey := make([]byte, 2+8)
 	binary.BigEndian.PutUint16(cacheKey[0:2], uint16(evt.Kind))
 
-	for ref, offset := range nip45.HyperLogLogEventPubkeyOffsetsAndReferencesForEvent(evt) {
+	for ref, offset := range nip45.HyperLogLogTargetsForEvent(evt) {
 		// setup cache key (reusing buffer)
 		xhex.Decode(cacheKey[2:2+8], []byte(ref[0:8*2]))
 
