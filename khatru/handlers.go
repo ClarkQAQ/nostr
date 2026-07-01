@@ -286,7 +286,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						SubscriptionID: env.SubscriptionID,
 						Count:          &total,
 					}
-					if hll != nil {
+					if hll != nil && hll.Count() > 0 {
 						resp.HyperLogLog = hll.GetRegisters()
 					}
 
