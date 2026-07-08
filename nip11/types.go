@@ -7,30 +7,31 @@ import (
 )
 
 type RelayInformationDocument struct {
-	URL string `json:"-"`
+	URL string
 
-	Name          string        `json:"name,omitempty"`
-	Description   string        `json:"description,omitempty"`
-	PubKey        *nostr.PubKey `json:"pubkey,omitempty"`
-	Self          *nostr.PubKey `json:"self,omitempty"`
-	Contact       string        `json:"contact,omitempty"`
-	SupportedNIPs []any         `json:"supported_nips,omitempty"`
-	Software      string        `json:"software,omitempty"`
-	Version       string        `json:"version,omitempty"`
+	Name          string
+	Description   string
+	PubKey        *nostr.PubKey
+	Self          *nostr.PubKey
+	Contact       string
+	SupportedNIPs []any
+	Software      string
+	Version       string
 
-	Limitation     *RelayLimitationDocument  `json:"limitation,omitempty"`
-	RelayCountries []string                  `json:"relay_countries,omitempty"`
-	LanguageTags   []string                  `json:"language_tags,omitempty"`
-	Tags           []string                  `json:"tags,omitempty"`
-	PostingPolicy  string                    `json:"posting_policy,omitempty"`
-	PaymentsURL    string                    `json:"payments_url,omitempty"`
-	Fees           *RelayFeesDocument        `json:"fees,omitempty"`
-	Retention      []*RelayRetentionDocument `json:"retention,omitempty"`
-	Icon           string                    `json:"icon,omitempty"`
-	Banner         string                    `json:"banner,omitempty"`
+	Limitation     *RelayLimitationDocument
+	RelayCountries []string
+	LanguageTags   []string
+	Tags           []string
+	PostingPolicy  string
+	PaymentsURL    string
+	Fees           *RelayFeesDocument
+	Retention      []*RelayRetentionDocument
+	Icon           string
+	Banner         string
 
-	// nip-34 grasp stuff
-	SupportedGrasps []string `json:"supported_grasps,omitempty"`
+	SupportedGrasps []string
+
+	Malformed map[string]any
 }
 
 func (info *RelayInformationDocument) AddSupportedNIP(nip string) {
@@ -61,40 +62,40 @@ func (info *RelayInformationDocument) AddSupportedNIPs(numbers []string) {
 }
 
 type RelayLimitationDocument struct {
-	MaxMessageLength    int   `json:"max_message_length,omitempty"`
-	MaxSubscriptions    int   `json:"max_subscriptions,omitempty"`
-	MaxLimit            int   `json:"max_limit,omitempty"`
-	DefaultLimit        int   `json:"default_limit,omitempty"`
-	MaxSubidLength      int   `json:"max_subid_length,omitempty"`
-	MaxEventTags        int   `json:"max_event_tags,omitempty"`
-	MaxContentLength    int   `json:"max_content_length,omitempty"`
-	MinPowDifficulty    int   `json:"min_pow_difficulty,omitempty"`
-	CreatedAtLowerLimit int64 `json:"created_at_lower_limit"`
-	CreatedAtUpperLimit int64 `json:"created_at_upper_limit"`
-	AuthRequired        bool  `json:"auth_required"`
-	PaymentRequired     bool  `json:"payment_required"`
-	RestrictedWrites    bool  `json:"restricted_writes"`
+	MaxMessageLength    int
+	MaxSubscriptions    int
+	MaxLimit            int
+	DefaultLimit        int
+	MaxSubidLength      int
+	MaxEventTags        int
+	MaxContentLength    int
+	MinPowDifficulty    int
+	CreatedAtLowerLimit int64
+	CreatedAtUpperLimit int64
+	AuthRequired        bool
+	PaymentRequired     bool
+	RestrictedWrites    bool
 }
 
 type RelayFeesDocument struct {
 	Admission []struct {
-		Amount int    `json:"amount"`
-		Unit   string `json:"unit"`
-	} `json:"admission,omitempty"`
+		Amount int
+		Unit   string
+	}
 	Subscription []struct {
-		Amount int    `json:"amount"`
-		Unit   string `json:"unit"`
-		Period int    `json:"period"`
-	} `json:"subscription,omitempty"`
+		Amount int
+		Unit   string
+		Period int
+	}
 	Publication []struct {
-		Kinds  []int  `json:"kinds"`
-		Amount int    `json:"amount"`
-		Unit   string `json:"unit"`
-	} `json:"publication,omitempty"`
+		Kinds  []int
+		Amount int
+		Unit   string
+	}
 }
 
 type RelayRetentionDocument struct {
-	Time  int64   `json:"time,omitempty"`
-	Count int     `json:"count,omitempty"`
-	Kinds [][]int `json:"kinds,omitempty"`
+	Time  int64
+	Count int
+	Kinds [][]int
 }

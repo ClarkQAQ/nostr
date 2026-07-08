@@ -2,6 +2,7 @@ package khatru
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 )
@@ -33,6 +34,9 @@ func (rl *Relay) HandleNIP11(w http.ResponseWriter, r *http.Request) {
 	if nil != rl.OverwriteRelayInformation {
 		info = rl.OverwriteRelayInformation(r.Context(), r, info)
 	}
+
+	fmt.Println(info.SupportedNIPs)
+	fmt.Println(info.SupportedNIPs[0] == "1")
 
 	json.NewEncoder(w).Encode(info)
 }
