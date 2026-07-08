@@ -1,7 +1,7 @@
 package nip11
 
 import (
-	"slices"
+	"strconv"
 
 	"fiatjaf.com/nostr"
 )
@@ -14,7 +14,7 @@ type RelayInformationDocument struct {
 	PubKey        *nostr.PubKey `json:"pubkey,omitempty"`
 	Self          *nostr.PubKey `json:"self,omitempty"`
 	Contact       string        `json:"contact,omitempty"`
-	SupportedNIPs []string      `json:"supported_nips,omitempty"`
+	SupportedNIPs []any         `json:"supported_nips,omitempty"`
 	Software      string        `json:"software,omitempty"`
 	Version       string        `json:"version,omitempty"`
 
@@ -34,12 +34,24 @@ type RelayInformationDocument struct {
 }
 
 func (info *RelayInformationDocument) AddSupportedNIP(nip string) {
-	idx := slices.IndexFunc(info.SupportedNIPs, func(n string) bool { return n == nip })
-	if idx != -1 {
-		return
+	for _, n := range info.SupportedNIPs {
+		switch v := n.(type) {
+		case int:
+			if strconv.Itoa(v) == nip {
+				return
+			}
+		case string:
+			if v == nip {
+				return
+			}
+		}
 	}
 
-	info.SupportedNIPs = append(info.SupportedNIPs, nip)
+	if n, err := strconv.Atoi(nip); err == nil {
+		info.SupportedNIPs = append(info.SupportedNIPs, n)
+	} else {
+		info.SupportedNIPs = append(info.SupportedNIPs, nip)
+	}
 }
 
 func (info *RelayInformationDocument) AddSupportedNIPs(numbers []string) {

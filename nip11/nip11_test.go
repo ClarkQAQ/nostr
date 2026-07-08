@@ -24,15 +24,17 @@ func TestAddSupportedNIP(t *testing.T) {
 	info.AddSupportedNIP("19")
 	info.AddSupportedNIP("1")
 	info.AddSupportedNIP("18")
+	info.AddSupportedNIP("FE")
 
-	assert.Contains(t, info.SupportedNIPs, "0", "1", "2", "12", "13", "17", "18", "19", "44")
+	assert.Contains(t, info.SupportedNIPs, 0, 1, 2, 12, 13, 17, 18, 19, 44)
+	assert.Contains(t, info.SupportedNIPs, "FE")
 }
 
 func TestAddSupportedNIPs(t *testing.T) {
 	info := RelayInformationDocument{}
-	info.AddSupportedNIPs([]int{"0", "1", "2", "12", "13", "17", "18", "19", "44"})
+	info.AddSupportedNIPs([]string{"0", "1", "2", "12", "13", "17", "18", "19", "44"})
 
-	assert.Contains(t, info.SupportedNIPs, "0", "1", "2", "12", "13", "17", "18", "19", "44")
+	assert.Contains(t, info.SupportedNIPs, 0, 1, 2, 12, 13, 17, 18, 19, 44)
 }
 
 func TestFetch(t *testing.T) {
