@@ -172,10 +172,51 @@ func NewValidatorFromSchema(sch Schema) Validator {
 				return err
 			},
 			"imeta": func(value string, spec *ContentSpec) error {
-				if len(strings.SplitN(value, " ", 2)) == 2 {
-					return nil
+				parts := strings.SplitN(value, " ", 2)
+				if len(parts) != 2 {
+					return fmt.Errorf("not a space-separated keyval")
 				}
-				return fmt.Errorf("not a space-separated keyval")
+				key, val := parts[0], parts[1]
+
+				switch key {
+				case "url", "fallback", "thumb", "image":
+					if u, err := url.Parse(val); err != nil || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "data") {
+						return fmt.Errorf("invalid %s URL", key)
+					}
+				case "magnet":
+					if !strings.HasPrefix(val, "magnet:") {
+						return fmt.Errorf("invalid magnet URI")
+					}
+				case "x", "ox":
+					if len(val) != 64 {
+						return fmt.Errorf("SHA-256 must be 64 hex chars")
+					}
+					_, err := hex.Decode(hexdummydecoder, unsafe.Slice(unsafe.StringData(val), len(val)))
+					return err
+				case "dim":
+					dimParts := strings.Split(val, "x")
+					if len(dimParts) != 2 {
+						return fmt.Errorf("dim must be WxH format")
+					}
+					if _, err := strconv.ParseUint(dimParts[0], 10, 32); err != nil {
+						return fmt.Errorf("invalid width in dim")
+					}
+					if _, err := strconv.ParseUint(dimParts[1], 10, 32); err != nil {
+						return fmt.Errorf("invalid height in dim")
+					}
+				case "size":
+					if _, err := strconv.ParseUint(val, 10, 64); err != nil {
+						return fmt.Errorf("invalid size")
+					}
+				case "m":
+					if !strings.Contains(val, "/") {
+						return fmt.Errorf("invalid MIME type")
+					}
+				case "blurhash", "alt", "summary", "service", "i":
+				default:
+					return fmt.Errorf("unknown imeta key: %s", key)
+				}
+				return nil
 			},
 			"empty": func(value string, spec *ContentSpec) error {
 				if len(value) > 0 {
@@ -417,9 +458,12 @@ func (v *Validator) validateNext(tag nostr.Tag, index int, this *ContentSpec) (f
 	}
 
 	if this.Variadic {
-		// apply this same validation to all further items
+		// apply this same validation to all further items,
+		// but additional items beyond the first are optional
 		if len(tag) >= index {
-			return v.validateNext(tag, index+1, this)
+			sub := *this
+			sub.Required = false
+			return v.validateNext(tag, index+1, &sub)
 		}
 	}
 

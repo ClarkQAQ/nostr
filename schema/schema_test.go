@@ -1,12 +1,18 @@
 package schema
 
 import (
+	_ "embed"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"fiatjaf.com/nostr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+//go:embed imeta_events.jsonl
+var imetaEventsJSONL string
 
 func TestNewValidatorFromURL(t *testing.T) {
 	v, err := NewValidatorFromURL(DefaultSchemaURL)
@@ -654,6 +660,73 @@ func TestValidateEvent_GenericTags(t *testing.T) {
 	// should pass now
 	err = v.ValidateEvent(evt)
 	require.NoError(t, err)
+}
+
+func TestValidateIMetaEvents(t *testing.T) {
+	v, err := NewValidatorFromURL(DefaultSchemaURL)
+	require.NoError(t, err)
+
+	lines := strings.Split(strings.TrimSpace(imetaEventsJSONL), "\n")
+	for i, line := range lines {
+		var evt nostr.Event
+		err := json.Unmarshal([]byte(line), &evt)
+		require.NoError(t, err, "line %d: parse", i+1)
+
+		err = v.ValidateEvent(evt)
+		require.NoError(t, err, "line %d: validate", i+1)
+	}
+}
+
+func TestValidateIMetaTagItems(t *testing.T) {
+	v, err := NewValidatorFromURL(DefaultSchemaURL)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name  string
+		value string
+		valid bool
+	}{
+		{"valid url", "url https://example.com/img.jpg", true},
+		{"valid x", "x 168ee4ce6015bd6eab6fe69af34de38d06ede1f2a8b9b14254ece27d46df5940", true},
+		{"valid dim", "dim 1152x1024", true},
+		{"valid m", "m image/jpeg", true},
+		{"valid blurhash", "blurhash gaMi[#Md_2%1Ioxss,*0t2kXWCn$WBof?EV@IpNHayWBt6RjWCs,xtNHt6oKflbakDt7n$ofWB", true},
+		{"valid fallback", "fallback https://void.cat/alt1.jpg", true},
+		{"valid thumb", "thumb https://example.com/thumb.jpg", true},
+		{"valid image", "image https://example.com/preview.jpg", true},
+		{"valid magnet", "magnet magnet:?xt=urn:btih:...", true},
+		{"valid size", "size 1024", true},
+		{"valid alt", "alt A scenic photo", true},
+		{"valid summary", "summary some text", true},
+		{"valid ox", "ox 168ee4ce6015bd6eab6fe69af34de38d06ede1f2a8b9b14254ece27d46df5940", true},
+		{"valid service", "service nip96", true},
+		{"valid i", "i somehash", true},
+
+		{"no space", "url", false},
+		{"unknown key", "unknown value", false},
+		{"bad url scheme", "url ws://example.com/img.jpg", false},
+		{"bad url not a url", "url not a url", false},
+		{"bad x short", "x abc123", false},
+		{"bad x not hex", "x zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", false},
+		{"bad dim no x", "dim 1152", false},
+		{"bad dim non-numeric", "dim abcx1024", false},
+		{"bad size not number", "size big", false},
+		{"bad m missing slash", "m imagejpeg", false},
+		{"bad magnet prefix", "magnet http://example.com", false},
+		{"bad url relative path", "url relative/path", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := &ContentSpec{Type: "imeta", Required: true}
+			_, err := v.validateNext(nostr.Tag{"imeta", tt.value}, 1, spec)
+			if tt.valid {
+				require.NoError(t, err, "expected valid, got error")
+			} else {
+				require.Error(t, err, "expected error, got valid")
+			}
+		})
+	}
 }
 
 func TestValidateEvent_DTagPresence(t *testing.T) {
