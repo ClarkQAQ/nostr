@@ -31,7 +31,13 @@ type RelayInformationDocument struct {
 
 	SupportedGrasps []string
 
+	NIP29 *NIP29Document
+
 	Malformed map[string]any
+}
+
+type NIP29Document struct {
+	Subgroups bool `json:"subgroups"`
 }
 
 func (info *RelayInformationDocument) AddSupportedNIP(nip string) {

@@ -192,6 +192,12 @@ func easyjsonDecodeRelayInformationDocument(in *jlexer.Lexer, out *RelayInformat
 			}
 			in.Delim(']')
 			goto next
+		case "nip29":
+			if out.NIP29 == nil {
+				out.NIP29 = new(NIP29Document)
+			}
+			easyjsonDecodeNIP29Document(in, out.NIP29)
+			goto next
 		}
 
 		if out.Malformed == nil {
@@ -675,6 +681,27 @@ func easyjsonEncodeRelayInformationDocument(out *jwriter.Writer, in RelayInforma
 		}
 		encodeAny(out, v)
 		delete(in.Malformed, "supported_grasps")
+	}
+	if in.NIP29 != nil {
+		const prefix string = ",\"nip29\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		easyjsonEncodeNIP29Document(out, *in.NIP29)
+		delete(in.Malformed, "nip29")
+	} else if v, ok := in.Malformed["nip29"]; ok {
+		const prefix string = ",\"nip29\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		encodeAny(out, v)
+		delete(in.Malformed, "nip29")
 	}
 	for key, v := range in.Malformed {
 		if first {
@@ -1330,6 +1357,48 @@ func easyjsonEncodeRelayRetentionDocument(out *jwriter.Writer, in RelayRetention
 			}
 			out.RawByte(']')
 		}
+	}
+	out.RawByte('}')
+}
+
+func easyjsonDecodeNIP29Document(in *jlexer.Lexer, out *NIP29Document) {
+	if in.IsNull() {
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "subgroups":
+			out.Subgroups = in.Bool()
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+}
+
+func easyjsonEncodeNIP29Document(out *jwriter.Writer, in NIP29Document) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	if in.Subgroups {
+		const prefix string = ",\"subgroups\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Bool(in.Subgroups)
 	}
 	out.RawByte('}')
 }
