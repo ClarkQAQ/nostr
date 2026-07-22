@@ -90,6 +90,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	ws := &WebSocket{
 		conn:               conn,
+		writeWait:          rl.WriteWait,
 		Request:            r,
 		Challenge:          rl.ChallengePrefix + nostr.HexEncodeToString(challenge),
 		AuthedPublicKeys:   make([]nostr.PubKey, 0),

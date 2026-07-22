@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 	"unsafe"
 
 	"fiatjaf.com/nostr"
@@ -17,6 +18,8 @@ import (
 type WebSocket struct {
 	conn  *websocket.Conn
 	mutex sync.Mutex
+
+	writeWait time.Duration
 
 	// original request
 	Request *http.Request
@@ -46,6 +49,9 @@ func (ws *WebSocket) WriteJSON(any any) error {
 		return fmt.Errorf("connection doesn't exist")
 	}
 	ws.mutex.Lock()
+	if ws.writeWait > 0 {
+		ws.conn.SetWriteDeadline(time.Now().Add(ws.writeWait))
+	}
 	err := ws.conn.WriteJSON(any)
 	ws.mutex.Unlock()
 	return err
@@ -53,6 +59,9 @@ func (ws *WebSocket) WriteJSON(any any) error {
 
 func (ws *WebSocket) WriteMessage(t int, b []byte) error {
 	ws.mutex.Lock()
+	if ws.writeWait > 0 {
+		ws.conn.SetWriteDeadline(time.Now().Add(ws.writeWait))
+	}
 	err := ws.conn.WriteMessage(t, b)
 	ws.mutex.Unlock()
 	return err
