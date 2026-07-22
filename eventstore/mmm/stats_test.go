@@ -89,4 +89,13 @@ func TestComputeStats(t *testing.T) {
 
 	require.Equal(t, uint(10), stats.Total)
 	require.Len(t, stats.PerPubKey, 1)
+
+	// test ComputeStats with OnlyPubKey set to a non-existent pubkey (zero results)
+	bogusPriv := nostr.Generate()
+	bogusPubkey := bogusPriv.Public()
+	stats, err = il.ComputeStats(StatsOptions{OnlyPubKey: bogusPubkey})
+	require.NoError(t, err)
+	require.Equal(t, uint(0), stats.Total)
+	require.Empty(t, stats.PerPubKey)
+	require.Empty(t, stats.PerKind)
 }

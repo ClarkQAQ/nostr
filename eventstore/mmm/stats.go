@@ -57,7 +57,7 @@ func (il *IndexingLayer) ComputeStats(opts StatsOptions) (EventStats, error) {
 		var initialKey []byte
 		if opts.OnlyPubKey != nostr.ZeroPK {
 			// position cursor at the start of this author's data
-			initialKey = make([]byte, 8+4+4)
+			initialKey = make([]byte, 8+2+4)
 			copy(initialKey[0:8], opts.OnlyPubKey[0:8])
 		}
 
@@ -75,6 +75,9 @@ func (il *IndexingLayer) ComputeStats(opts StatsOptions) (EventStats, error) {
 			key, val, err = cursor.Get(initialKey, nil, lmdb.SetRange)
 			if err != nil {
 				return err
+			}
+			if !bytes.HasPrefix(key, initialKey[:8]) {
+				return nil
 			}
 		}
 
