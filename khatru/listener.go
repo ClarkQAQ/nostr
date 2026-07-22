@@ -165,7 +165,10 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 
 		if hasAuthorSubs && hasKindSubs {
 			for _, ssid := range authorSubs.Slice() {
-				sub, _ := d.subscriptions.Load(ssid)
+				sub, ok := d.subscriptions.Load(ssid)
+				if !ok {
+					continue
+				}
 
 				if kindSubs.Has(ssid) || sub.filter.Kinds == nil {
 					if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
@@ -177,7 +180,10 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 			}
 
 			for _, ssid := range kindSubs.Slice() {
-				sub, _ := d.subscriptions.Load(ssid)
+				sub, ok := d.subscriptions.Load(ssid)
+				if !ok {
+					continue
+				}
 
 				if sub.filter.Authors != nil {
 					continue
@@ -191,7 +197,10 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 			}
 		} else if hasAuthorSubs {
 			for _, ssid := range authorSubs.Slice() {
-				sub, _ := d.subscriptions.Load(ssid)
+				sub, ok := d.subscriptions.Load(ssid)
+				if !ok {
+					continue
+				}
 
 				if sub.filter.Kinds != nil {
 					// if there are any kinds in the filter we already know this doesn't qualify
@@ -206,7 +215,10 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 			}
 		} else if hasKindSubs {
 			for _, ssid := range kindSubs.Slice() {
-				sub, _ := d.subscriptions.Load(ssid)
+				sub, ok := d.subscriptions.Load(ssid)
+				if !ok {
+					continue
+				}
 
 				if sub.filter.Authors != nil {
 					// if there are any authors in the filter we already know this doesn't qualify
@@ -223,7 +235,10 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 
 		if len(event.Tags) > 0 {
 			for _, ssid := range d.fallbackTags.Slice() {
-				sub, _ := d.subscriptions.Load(ssid)
+				sub, ok := d.subscriptions.Load(ssid)
+				if !ok {
+					continue
+				}
 
 				if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
 					if !yield(sub) {
@@ -234,7 +249,11 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 		}
 
 		for _, ssid := range d.fallbackNothing.Slice() {
-			sub, _ := d.subscriptions.Load(ssid)
+			sub, ok := d.subscriptions.Load(ssid)
+			if !ok {
+				continue
+			}
+
 			if filterMatchesTimestampConstraints(sub.filter, event) {
 				if !yield(sub) {
 					return
