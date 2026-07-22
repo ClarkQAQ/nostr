@@ -212,7 +212,7 @@ func NewValidatorFromSchema(sch Schema) Validator {
 					if !strings.Contains(val, "/") {
 						return fmt.Errorf("invalid MIME type")
 					}
-				case "blurhash", "alt", "summary", "service", "i":
+				case "blurhash", "alt", "summary", "service", "i", "thumbhash":
 				default:
 					return fmt.Errorf("unknown imeta key: %s", key)
 				}
