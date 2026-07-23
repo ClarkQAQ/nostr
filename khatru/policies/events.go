@@ -139,9 +139,14 @@ func RejectUnprefixedNostrReferences(ctx context.Context, event nostr.Event) (bo
 				ref := block.Text[start:end]
 				_, _, err := nip19.Decode(ref)
 				if err != nil {
-					// invalid reference, ignore and allow
-					// (it's probably someone saying something like "oh, write something like npub1foo...")
 					continue
+				}
+
+				// skip if part of URL: followed by "." and letter
+				if end < len(block.Text) && block.Text[end] == '.' && end+1 < len(block.Text) {
+					if next := block.Text[end+1]; (next >= 'a' && next <= 'z') || (next >= 'A' && next <= 'Z') {
+						continue
+					}
 				}
 
 				return true, "references must be prefixed with \"nostr:\""

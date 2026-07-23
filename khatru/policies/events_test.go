@@ -73,6 +73,16 @@ func TestRejectUnprefixedNostrReferences(t *testing.T) {
 			content:      "note1jkl012",
 			shouldReject: false, // invalid, so allowed
 		},
+		{
+			name:         "url with valid npub followed by dot",
+			content:      "FIPS: ws://[npub1zmk8n4muff3ujwne4t3acfpsmxerfzhykxrkwqdfp72srqws6lnsw449d3.fips]/",
+			shouldReject: false, // part of URL, allowed
+		},
+		{
+			name:         "part of a path",
+			content:      "visit https://qwbeiqw.com/npub1zmk8n4muff3ujwne4t3acfpsmxerfzhykxrkwqdfp72srqws6lnsw449d3 ok",
+			shouldReject: false, // part of URL, allowed
+		},
 	}
 
 	for _, tt := range tests {
