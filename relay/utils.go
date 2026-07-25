@@ -11,6 +11,7 @@ const (
 	subscriptionIdKey
 	nip86HeaderAuthKey
 	internalCallKey
+	serviceURLOverrideKey
 )
 
 func RequestAuth(ctx context.Context) {
@@ -71,6 +72,13 @@ func IsAuthed(ctx context.Context, pubkey nostr.PubKey) bool {
 	}
 
 	return false
+}
+
+// ForceSetAuthed modifies the context to insert a custom authed public key.
+// It can be used in testing or other rare scenarios for making requests as if a given public key
+// was authenticated when in fact it didn't perform any of the authentication rituals.
+func ForceSetAuthed(ctx context.Context, pubkey nostr.PubKey) context.Context {
+	return context.WithValue(ctx, nip86HeaderAuthKey, pubkey)
 }
 
 // IsInternalCall returns true when a call to QueryEvents, for example, is being made because of a deletion

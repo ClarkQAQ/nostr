@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nip04"
 	"fiatjaf.com/nostr/nip44"
 	"fiatjaf.com/nostr/nip49"
 )
@@ -66,6 +67,32 @@ func (es EncryptedKeySigner) Encrypt(ctx context.Context, plaintext string, reci
 
 // Decrypt decrypts a base64-encoded ciphertext from a sender using NIP-44.
 // It first decrypts the private key using the password callback.
+func (es EncryptedKeySigner) Nip04Encrypt(ctx context.Context, plaintext string, recipient nostr.PubKey) (string, error) {
+	password := es.callback(ctx)
+	sk, err := nip49.Decrypt(es.ncryptsec, password)
+	if err != nil {
+		return "", fmt.Errorf("invalid password: %w", err)
+	}
+	sharedSecret, err := nip04.ComputeSharedSecret(recipient, sk)
+	if err != nil {
+		return "", err
+	}
+	return nip04.Encrypt(plaintext, sharedSecret)
+}
+
+func (es EncryptedKeySigner) Nip04Decrypt(ctx context.Context, ciphertext string, sender nostr.PubKey) (string, error) {
+	password := es.callback(ctx)
+	sk, err := nip49.Decrypt(es.ncryptsec, password)
+	if err != nil {
+		return "", fmt.Errorf("invalid password: %w", err)
+	}
+	sharedSecret, err := nip04.ComputeSharedSecret(sender, sk)
+	if err != nil {
+		return "", err
+	}
+	return nip04.Decrypt(ciphertext, sharedSecret)
+}
+
 func (es EncryptedKeySigner) Decrypt(ctx context.Context, base64ciphertext string, sender nostr.PubKey) (plaintext string, err error) {
 	password := es.callback(ctx)
 	sk, err := nip49.Decrypt(es.ncryptsec, password)

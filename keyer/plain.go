@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nip04"
 	"fiatjaf.com/nostr/nip44"
 	"github.com/puzpuzpuz/xsync/v3"
 )
@@ -48,6 +49,22 @@ func (ks KeySigner) Encrypt(ctx context.Context, plaintext string, recipient nos
 
 // Decrypt decrypts a base64-encoded ciphertext from a sender using NIP-44.
 // It caches conversation keys for efficiency in repeated operations.
+func (ks KeySigner) Nip04Encrypt(ctx context.Context, plaintext string, recipient nostr.PubKey) (string, error) {
+	sharedSecret, err := nip04.ComputeSharedSecret(recipient, ks.sk)
+	if err != nil {
+		return "", err
+	}
+	return nip04.Encrypt(plaintext, sharedSecret)
+}
+
+func (ks KeySigner) Nip04Decrypt(ctx context.Context, ciphertext string, sender nostr.PubKey) (string, error) {
+	sharedSecret, err := nip04.ComputeSharedSecret(sender, ks.sk)
+	if err != nil {
+		return "", err
+	}
+	return nip04.Decrypt(ciphertext, sharedSecret)
+}
+
 func (ks KeySigner) Decrypt(ctx context.Context, base64ciphertext string, sender nostr.PubKey) (string, error) {
 	ck, ok := ks.conversationKeys.Load(sender)
 	if !ok {

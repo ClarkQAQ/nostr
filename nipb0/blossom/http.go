@@ -99,5 +99,5 @@ func (c *Client) authorizationHeader(
 	}
 
 	jevt, _ := json.Marshal(evt)
-	return "Nostr " + base64.StdEncoding.EncodeToString(jevt)
+	return "Nostr " + base64.RawURLEncoding.EncodeToString(jevt)
 }

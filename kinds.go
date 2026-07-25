@@ -38,10 +38,20 @@ func (kind Kind) Name() string {
 		return "Seal"
 	case KindDirectMessage:
 		return "DirectMessage"
+	case KindFileMessage:
+		return "FileMessage"
 	case KindGenericRepost:
 		return "GenericRepost"
 	case KindReactionToWebsite:
 		return "ReactionToWebsite"
+	case KindPhoto:
+		return "Photo"
+	case KindNormalVideoEvent:
+		return "NormalVideoEvent"
+	case KindShortVideoEvent:
+		return "ShortVideoEvent"
+	case KindPublicMessage:
+		return "PublicMessage"
 	case KindChannelCreation:
 		return "ChannelCreation"
 	case KindChannelMetadata:
@@ -52,12 +62,14 @@ func (kind Kind) Name() string {
 		return "ChannelHideMessage"
 	case KindChannelMuteUser:
 		return "ChannelMuteUser"
+	case KindPodcastEpisode:
+		return "PodcastEpisode"
 	case KindChess:
 		return "Chess"
 	case KindMergeRequests:
 		return "MergeRequests"
-	case KindComment:
-		return "Comment"
+	case KindPollResponse:
+		return "PollResponse"
 	case KindBid:
 		return "Bid"
 	case KindBidConfirmation:
@@ -68,10 +80,26 @@ func (kind Kind) Name() string {
 		return "GiftWrap"
 	case KindFileMetadata:
 		return "FileMetadata"
+	case KindPoll:
+		return "Poll"
+	case KindComment:
+		return "Comment"
+	case KindVoiceMessage:
+		return "VoiceMessage"
+	case KindScroll:
+		return "Scroll"
+	case KindVoiceMessageComment:
+		return "VoiceMessageComment"
 	case KindLiveChatMessage:
 		return "LiveChatMessage"
+	case KindCodeSnippet:
+		return "CodeSnippet"
 	case KindPatch:
 		return "Patch"
+	case KindGitPullRequest:
+		return "GitPullRequest"
+	case KindGitPullRequestUpdate:
+		return "GitPullRequestUpdate"
 	case KindIssue:
 		return "Issue"
 	case KindReply:
@@ -100,10 +128,24 @@ func (kind Kind) Name() string {
 		return "TorrentComment"
 	case KindCoinjoinPool:
 		return "CoinjoinPool"
+	case KindDecoupledKeyClientAnnouncement:
+		return "DecoupledKeyClientAnnouncement"
+	case KindDecoupledEncryptionKeyDistribution:
+		return "DecoupledEncryptionKeyDistribution"
 	case KindCommunityPostApproval:
 		return "CommunityPostApproval"
 	case KindJobFeedback:
 		return "JobFeedback"
+	case KindReservedCashuWalletTokens:
+		return "ReservedCashuWalletTokens"
+	case KindCashuWalletTokens:
+		return "CashuWalletTokens"
+	case KindCashuWalletHistory:
+		return "CashuWalletHistory"
+	case KindGeocacheLog:
+		return "GeocacheLog"
+	case KindGeocacheProofOfFind:
+		return "GeocacheProofOfFind"
 	case KindSimpleGroupPutUser:
 		return "SimpleGroupPutUser"
 	case KindSimpleGroupRemoveUser:
@@ -152,14 +194,24 @@ func (kind Kind) Name() string {
 		return "SearchRelayList"
 	case KindSimpleGroupList:
 		return "SimpleGroupList"
+	case KindFavoriteRelaysList:
+		return "FavoriteRelaysList"
+	case KindPrivateEventRelayList:
+		return "PrivateEventRelayList"
 	case KindInterestList:
 		return "InterestList"
 	case KindNutZapInfo:
 		return "NutZapInfo"
+	case KindMediaFollows:
+		return "MediaFollows"
 	case KindEmojiList:
 		return "EmojiList"
+	case KindDecoupledKeyAnnouncement:
+		return "DecoupledKeyAnnouncement"
 	case KindDMRelayList:
 		return "DMRelayList"
+	case KindFavoritePodcasts:
+		return "FavoritePodcasts"
 	case KindUserServerList:
 		return "UserServerList"
 	case KindFileStorageServerList:
@@ -168,8 +220,26 @@ func (kind Kind) Name() string {
 		return "GoodWikiAuthorList"
 	case KindGoodWikiRelayList:
 		return "GoodWikiRelayList"
+	case KindPodcastMetadata:
+		return "PodcastMetadata"
+	case KindAuthoredPodcasts:
+		return "AuthoredPodcasts"
+	case KindRelayMonitorAnnouncement:
+		return "RelayMonitorAnnouncement"
+	case KindRoomPresence:
+		return "RoomPresence"
+	case KindUserGraspList:
+		return "UserGraspList"
+	case KindProxyAnnouncement:
+		return "ProxyAnnouncement"
+	case KindTransportMethodAnnouncement:
+		return "TransportMethodAnnouncement"
 	case KindNWCWalletInfo:
 		return "NWCWalletInfo"
+	case KindNsiteRoot:
+		return "NsiteRoot"
+	case KindCashuWalletEvent:
+		return "CashuWalletEvent"
 	case KindLightningPubRPC:
 		return "LightningPubRPC"
 	case KindClientAuthentication:
@@ -226,10 +296,20 @@ func (kind Kind) Name() string {
 		return "ReleaseArtifactSets"
 	case KindApplicationSpecificData:
 		return "ApplicationSpecificData"
+	case KindRelayDiscovery:
+		return "RelayDiscovery"
+	case KindAppCurationSet:
+		return "AppCurationSet"
 	case KindLiveEvent:
 		return "LiveEvent"
+	case KindInteractiveRoom:
+		return "InteractiveRoom"
+	case KindConferenceEvent:
+		return "ConferenceEvent"
 	case KindUserStatuses:
 		return "UserStatuses"
+	case KindSlideSet:
+		return "SlideSet"
 	case KindClassifiedListing:
 		return "ClassifiedListing"
 	case KindDraftClassifiedListing:
@@ -238,20 +318,14 @@ func (kind Kind) Name() string {
 		return "RepositoryAnnouncement"
 	case KindRepositoryState:
 		return "RepositoryState"
-	case KindSimpleGroupMetadata:
-		return "SimpleGroupMetadata"
-	case KindSimpleGroupAdmins:
-		return "SimpleGroupAdmins"
-	case KindSimpleGroupMembers:
-		return "SimpleGroupMembers"
-	case KindSimpleGroupRoles:
-		return "SimpleGroupRoles"
-	case KindSimpleGroupLiveKitParticipants:
-		return "SimpleGroupLiveKitParticipants"
 	case KindWikiArticle:
 		return "WikiArticle"
 	case KindRedirects:
 		return "Redirects"
+	case KindDraftEvent:
+		return "DraftEvent"
+	case KindLinkSet:
+		return "LinkSet"
 	case KindFeed:
 		return "Feed"
 	case KindDateCalendarEvent:
@@ -266,14 +340,43 @@ func (kind Kind) Name() string {
 		return "HandlerRecommendation"
 	case KindHandlerInformation:
 		return "HandlerInformation"
-	case KindVideoEvent:
-		return "VideoEvent"
-	case KindShortVideoEvent:
-		return "ShortVideoEvent"
+	case KindSoftwareApplication:
+		return "SoftwareApplication"
+	case KindLegacyNsiteFile:
+		return "LegacyNsiteFile"
 	case KindVideoViewEvent:
 		return "VideoViewEvent"
 	case KindCommunityDefinition:
 		return "CommunityDefinition"
+	case KindNsiteNamed:
+		return "NsiteNamed"
+	case KindGeocacheListing:
+		return "GeocacheListing"
+	case KindGeocacheLogEntry:
+		return "GeocacheLogEntry"
+	case KindCashuMintAnnouncement:
+		return "CashuMintAnnouncement"
+	case KindFedimintAnnouncement:
+		return "FedimintAnnouncement"
+	case KindPeerToPeerOrderEvents:
+		return "PeerToPeerOrderEvents"
+	case KindSimpleGroupMetadata:
+		return "SimpleGroupMetadata"
+	case KindSimpleGroupAdmins:
+		return "SimpleGroupAdmins"
+	case KindSimpleGroupMembers:
+		return "SimpleGroupMembers"
+	case KindSimpleGroupRoles:
+		return "SimpleGroupRoles"
+	case KindSimpleGroupLiveKitParticipants:
+		return "SimpleGroupLiveKitParticipants"
+	case KindStarterPacks:
+		return "StarterPacks"
+	case KindMediaStarterPacks:
+		return "MediaStarterPacks"
+	case KindWebBookmarks:
+		return "WebBookmarks"
+
 	}
 	return "unknown"
 }
@@ -410,6 +513,58 @@ const (
 	KindHandlerInformation             Kind = 31990
 	KindVideoEvent                     Kind = 34235
 	KindShortVideoEvent                Kind = 34236
+	KindFileMessage                    Kind = 15
+	KindPhoto                          Kind = 20
+	KindNormalVideoEvent               Kind = 21
+	KindPublicMessage                  Kind = 24
+	KindPodcastEpisode                 Kind = 54
+	KindCodeSnippet                    Kind = 1337
+	KindGitPullRequest                 Kind = 1618
+	KindGitPullRequestUpdate           Kind = 1619
+	KindPollResponse                   Kind = 1018
+	KindPoll                           Kind = 1068
+	KindVoiceMessage                   Kind = 1222
+	KindScroll                         Kind = 1227
+	KindVoiceMessageComment            Kind = 1244
+	KindDecoupledKeyClientAnnouncement     Kind = 4454
+	KindDecoupledEncryptionKeyDistribution Kind = 4455
+	KindReservedCashuWalletTokens          Kind = 7374
+	KindCashuWalletTokens                  Kind = 7375
+	KindCashuWalletHistory                 Kind = 7376
+	KindGeocacheLog                        Kind = 7516
+	KindGeocacheProofOfFind                Kind = 7517
+	KindFavoriteRelaysList                 Kind = 10012
+	KindPrivateEventRelayList              Kind = 10013
+	KindMediaFollows                       Kind = 10020
+	KindDecoupledKeyAnnouncement           Kind = 10044
+	KindFavoritePodcasts                   Kind = 10054
+	KindPodcastMetadata                    Kind = 10154
+	KindAuthoredPodcasts                   Kind = 10164
+	KindRelayMonitorAnnouncement           Kind = 10166
+	KindRoomPresence                       Kind = 10312
+	KindUserGraspList                      Kind = 10317
+	KindProxyAnnouncement                  Kind = 10377
+	KindTransportMethodAnnouncement        Kind = 11111
+	KindNsiteRoot                          Kind = 15128
+	KindCashuWalletEvent                   Kind = 17375
+	KindRelayDiscovery                     Kind = 30166
+	KindAppCurationSet                     Kind = 30267
+	KindInteractiveRoom                    Kind = 30312
+	KindConferenceEvent                    Kind = 30313
+	KindSlideSet                           Kind = 30388
+	KindDraftEvent                         Kind = 31234
+	KindLinkSet                            Kind = 31388
+	KindSoftwareApplication                Kind = 32267
+	KindLegacyNsiteFile                    Kind = 34128
+	KindNsiteNamed                         Kind = 35128
+	KindGeocacheListing                    Kind = 37515
+	KindGeocacheLogEntry                   Kind = 37516
+	KindCashuMintAnnouncement              Kind = 38172
+	KindFedimintAnnouncement               Kind = 38173
+	KindPeerToPeerOrderEvents              Kind = 38383
+	KindStarterPacks                       Kind = 39089
+	KindMediaStarterPacks                  Kind = 39092
+	KindWebBookmarks                       Kind = 39701
 	KindVideoViewEvent                 Kind = 34237
 	KindCommunityDefinition            Kind = 34550
 )

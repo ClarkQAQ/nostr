@@ -62,19 +62,6 @@ func (hll *HyperLogLog) Add(pubkey [32]byte) {
 	}
 }
 
-// AddBytes is like Add, but takes pubkey as bytes instead of as string
-func (hll *HyperLogLog) AddBytes(pubkey [32]byte) {
-	x := pubkey[hll.offset : hll.offset+8]
-	j := x[0] // register address (first 8 bits, i.e. first byte)
-
-	w := binary.BigEndian.Uint64(x) // number that we will use
-	zeroBits := clz56(w) + 1        // count zeroes (skip the first byte, so only use 56 bits)
-
-	if zeroBits > hll.registers[j] {
-		hll.registers[j] = zeroBits
-	}
-}
-
 func (hll *HyperLogLog) Merge(other *HyperLogLog) {
 	for i, v := range other.registers {
 		if v > hll.registers[i] {

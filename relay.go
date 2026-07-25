@@ -147,6 +147,9 @@ type RelayOptions struct {
 
 	// RequestHeader sets the HTTP request header of the websocket preflight request
 	RequestHeader http.Header
+
+	// AssumeValid disables signature verification for events received from this relay
+	AssumeValid bool
 }
 
 // String just returns the relay URL.

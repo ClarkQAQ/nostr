@@ -133,10 +133,12 @@ func (sys *System) FetchFeedPage(
 				events = append(events, evt)
 				count++
 				if count >= limitPerKey {
-					// we got enough from the local store
-					wg.Done()
 					break
 				}
+			}
+			if count >= limitPerKey {
+				wg.Done()
+				continue
 			}
 		}
 

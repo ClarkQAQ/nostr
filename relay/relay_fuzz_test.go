@@ -3,7 +3,6 @@ package relay
 import (
 	"context"
 	"math"
-	"math/rand/v2"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -14,12 +13,14 @@ import (
 )
 
 func FuzzReplaceableEvents(f *testing.F) {
-	f.Add(uint(1), uint(2))
+	f.Add(1, 1, uint(2))
 
-	f.Fuzz(func(t *testing.T, seed uint, nevents uint) {
+	f.Fuzz(func(t *testing.T, seed int, advance int, nevents uint) {
 		if nevents == 0 {
 			return
 		}
+
+		state := fuzzState{value: seed, advance: advance}
 
 		relay := NewRelay()
 		store := &boltdb.BoltBackend{Path: "/tmp/fuzz"}
@@ -67,12 +68,10 @@ func FuzzReplaceableEvents(f *testing.F) {
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 
-			rnd := rand.New(rand.NewPCG(uint64(seed), 0))
-
 			newest := nostr.Timestamp(0)
 			for range nevents {
 				evt := createEvent(sk1, 0, `{"name":"blblbl"}`, nil)
-				evt.CreatedAt = nostr.Timestamp(rnd.Int64() % math.MaxUint32)
+				evt.CreatedAt = nostr.Timestamp(state.next(math.MaxUint32))
 				evt.Sign(sk1)
 				err = client1.Publish(ctx, evt)
 				if err != nil {

@@ -6,7 +6,9 @@ import (
 	"math/rand"
 	"net/url"
 	"strconv"
+	"sync"
 	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"fiatjaf.com/nostr"
@@ -14,6 +16,12 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/puzpuzpuz/xsync/v3"
 )
+
+var bunkerClientCtxKey = &struct{}{}
+
+func IsBunkerClientOperation(ctx context.Context) bool {
+	return ctx.Value(bunkerClientCtxKey) == true
+}
 
 type BunkerClient struct {
 	Relays []string
@@ -56,6 +64,7 @@ func ConnectBunker(
 		pool,
 		onAuth,
 	)
+
 	_, err = bunker.RPC(ctx, "connect", []string{nostr.HexEncodeToString(parsed.HostPubKey[:]), parsed.Secret})
 	return bunker, err
 }
@@ -131,17 +140,19 @@ func NewBunker(
 	}
 
 	cancellableCtx, cancel := context.WithCancel(ctx)
+	bunkerClientCtx := context.WithValue(cancellableCtx, bunkerClientCtxKey, true)
 	_ = cancel
 
+	events, eosed := pool.SubscribeManyNotifyEOSE(bunkerClientCtx, relays, nostr.Filter{
+		Tags:      nostr.TagMap{"p": []string{clientPublicKey.Hex()}},
+		Kinds:     []nostr.Kind{nostr.KindNostrConnect},
+		Since:     now,
+		LimitZero: true,
+	}, nostr.SubscriptionOptions{
+		Label: "bunker46client",
+	})
+
 	go func() {
-		events := pool.SubscribeMany(cancellableCtx, relays, nostr.Filter{
-			Tags:      nostr.TagMap{"p": []string{clientPublicKey.Hex()}},
-			Kinds:     []nostr.Kind{nostr.KindNostrConnect},
-			Since:     now,
-			LimitZero: true,
-		}, nostr.SubscriptionOptions{
-			Label: "bunker46client",
-		})
 		for ie := range events {
 			if ie.Kind != nostr.KindNostrConnect {
 				continue
@@ -174,11 +185,14 @@ func NewBunker(
 
 	// attempt switch_relays once every 10 times
 	if now%10 == 0 {
-		if newRelays, _ := bunker.SwitchRelays(ctx); newRelays != nil {
-			cancel()
+		swctx, cancel := context.WithTimeout(ctx, time.Second*3)
+		if newRelays, _ := bunker.SwitchRelays(swctx); newRelays != nil {
 			bunker = NewBunker(ctx, clientSecretKey, targetPublicKey, newRelays, pool, func(string) {})
 		}
+		cancel()
 	}
+
+	<-eosed
 
 	return bunker
 }
@@ -274,7 +288,7 @@ func (bunker *BunkerClient) NIP04Decrypt(
 }
 
 func (bunker *BunkerClient) RPC(ctx context.Context, method string, params []string) (string, error) {
-	id := bunker.idPrefix + "-" + strconv.FormatUint(bunker.serial.Add(1), 10)
+	id := bunker.idPrefix + "-" + strconv.FormatUint(bunker.serial.Add(1), 10) + "-" + method
 	req, err := json.Marshal(Request{
 		ID:     id,
 		Method: method,
@@ -303,21 +317,23 @@ func (bunker *BunkerClient) RPC(ctx context.Context, method string, params []str
 	bunker.listeners.Store(id, dispatcher)
 	defer bunker.listeners.Delete(id)
 	relayConnectionWorked := make(chan struct{})
+	relayConnectionWorkedO := sync.OnceFunc(func() {
+		close(relayConnectionWorked)
+	})
 	bunkerConnectionWorked := make(chan struct{})
+	bunkerConnectionWorkedO := sync.OnceFunc(func() {
+		close(bunkerConnectionWorked)
+	})
+
+	bunkerClientCtx := context.WithValue(ctx, bunkerClientCtxKey, true)
 
 	for _, url := range bunker.Relays {
 		go func(url string) {
 			relay, err := bunker.pool.EnsureRelay(url)
 			if err == nil {
-				select {
-				case relayConnectionWorked <- struct{}{}:
-				default:
-				}
-				if err := relay.Publish(ctx, evt); err == nil {
-					select {
-					case bunkerConnectionWorked <- struct{}{}:
-					default:
-					}
+				relayConnectionWorkedO()
+				if err := relay.Publish(bunkerClientCtx, evt); err == nil {
+					bunkerConnectionWorkedO()
 				}
 			}
 		}(url)

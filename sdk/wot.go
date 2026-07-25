@@ -19,18 +19,17 @@ type wotCall struct {
 	id          uint64 // basically the pubkey we're targeting here
 	mutex       sync.Mutex
 	resultbacks []chan WotXorFilter // all callers waiting for results
-	errorbacks  []chan error        // all callers waiting for errors
 	done        chan struct{}       // this is closed when this call is fully resolved and deleted
 }
 
-const wotCallsSize = 8
+const wotCallsSize = 16
 
 var (
 	wotCallsMutex   sync.Mutex
 	wotCallsInPlace [wotCallsSize]*wotCall
 )
 
-func (sys *System) LoadWoTFilter(ctx context.Context, pubkey nostr.PubKey) (WotXorFilter, error) {
+func (sys *System) LoadWoTFilter(ctx context.Context, pubkey nostr.PubKey) WotXorFilter {
 	id := PubKeyToShid(pubkey)
 	pos := int(id % wotCallsSize)
 
@@ -42,7 +41,6 @@ start:
 		wc = &wotCall{
 			id:          id,
 			resultbacks: make([]chan WotXorFilter, 0),
-			errorbacks:  make([]chan error, 0),
 			done:        make(chan struct{}),
 		}
 		wotCallsInPlace[pos] = wc
@@ -54,17 +52,13 @@ start:
 
 	wc.mutex.Lock()
 	if wc.id == id {
-		// there is already a call for this exact pubkey ongoing, so we just wait
+		// there is already a call for this exact pubkey ongoing, so we just wait and copy the results
 		resch := make(chan WotXorFilter)
-		errch := make(chan error)
 		wc.resultbacks = append(wc.resultbacks, resch)
-		wc.errorbacks = append(wc.errorbacks, errch)
 		wc.mutex.Unlock()
 		select {
 		case res := <-resch:
-			return res, nil
-		case err := <-errch:
-			return WotXorFilter{}, err
+			return res
 		}
 	} else {
 		wc.mutex.Unlock()
@@ -76,18 +70,11 @@ start:
 
 actualcall:
 	var res WotXorFilter
-	m, err := sys.loadWoT(ctx, pubkey)
-	if err != nil {
-		wc.mutex.Lock()
-		for _, ch := range wc.errorbacks {
-			ch <- err
-		}
-	} else {
-		res = makeWoTFilter(m)
-		wc.mutex.Lock()
-		for _, ch := range wc.resultbacks {
-			ch <- res
-		}
+	m := sys.loadWoT(ctx, pubkey)
+	res = makeWoTFilter(m)
+	wc.mutex.Lock()
+	for _, ch := range wc.resultbacks {
+		ch <- res
 	}
 
 	wotCallsMutex.Lock()
@@ -96,23 +83,17 @@ actualcall:
 	close(wc.done)
 	wotCallsMutex.Unlock()
 
-	return res, err
+	return res
 }
 
-func (sys *System) loadWoT(ctx context.Context, pubkey nostr.PubKey) (chan nostr.PubKey, error) {
+func (sys *System) loadWoT(ctx context.Context, pubkey nostr.PubKey) chan nostr.PubKey {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(45)
 
 	res := make(chan nostr.PubKey)
 
-	// process follow lists
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
+	g.Go(func() error {
 		for _, f := range sys.FetchFollowList(ctx, pubkey).Items {
-			wg.Add(1)
-
 			g.Go(func() error {
 				res <- f.Pubkey
 
@@ -123,20 +104,19 @@ func (sys *System) loadWoT(ctx context.Context, pubkey nostr.PubKey) (chan nostr
 				for _, f2 := range ff {
 					res <- f2.Pubkey
 				}
-				wg.Done()
 				return nil
 			})
 		}
 
-		wg.Done()
-	}()
+		return nil
+	})
 
 	go func() {
-		wg.Wait()
+		g.Wait()
 		close(res)
 	}()
 
-	return res, nil
+	return res
 }
 
 func makeWoTFilter(m chan nostr.PubKey) WotXorFilter {

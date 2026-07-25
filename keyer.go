@@ -31,13 +31,19 @@ type Signer interface {
 	SignEvent(ctx context.Context, evt *Event) error
 }
 
-// Cipher is an interface for encrypting and decrypting messages with NIP-44
+// Cipher is an interface for encrypting and decrypting messages
 type Cipher interface {
-	// Encrypt encrypts a plaintext message for a recipient.
+	// Encrypt encrypts a plaintext message for a recipient using NIP-44.
 	// Returns the encrypted message as a base64-encoded string.
 	Encrypt(ctx context.Context, plaintext string, recipient PubKey) (base64ciphertext string, err error)
 
-	// Decrypt decrypts a base64-encoded ciphertext from a sender.
+	// Decrypt decrypts a base64-encoded ciphertext from a sender using NIP-44.
 	// Returns the decrypted plaintext.
 	Decrypt(ctx context.Context, base64ciphertext string, sender PubKey) (plaintext string, err error)
+
+	// Nip04Encrypt encrypts a plaintext message for a recipient using NIP-04.
+	Nip04Encrypt(ctx context.Context, plaintext string, recipient PubKey) (ciphertext string, err error)
+
+	// Nip04Decrypt decrypts a ciphertext from a sender using NIP-04.
+	Nip04Decrypt(ctx context.Context, ciphertext string, sender PubKey) (plaintext string, err error)
 }

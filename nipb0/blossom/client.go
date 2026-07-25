@@ -6,6 +6,7 @@ import (
 
 	"fiatjaf.com/nostr"
 	"github.com/valyala/fasthttp"
+	"github.com/valyala/fasthttp/fasthttpproxy"
 )
 
 // Client represents a Blossom client for interacting with a media server
@@ -26,6 +27,18 @@ func NewClient(mediaserver *url.URL, signer nostr.Signer) *Client {
 
 // createHTTPClient creates a properly configured HTTP client
 func createHTTPClient() *fasthttp.Client {
+	d := fasthttpproxy.Dialer{
+		Timeout:        10 * time.Second,
+		ConnectTimeout: 10 * time.Second,
+		TCPDialer: fasthttp.TCPDialer{
+			// increase DNS cache time to an hour instead of default minute
+			Concurrency:      4096,
+			DNSCacheDuration: time.Hour,
+		},
+		DialDualStack: true,
+	}
+	dialFunc, _ := d.GetDialFunc(true)
+
 	return &fasthttp.Client{
 		MaxIdleConnDuration:           time.Hour,
 		DisableHeaderNamesNormalizing: true, // because our headers are properly constructed
@@ -33,11 +46,7 @@ func createHTTPClient() *fasthttp.Client {
 
 		Name: "nl-b", // user-agent
 
-		// increase DNS cache time to an hour instead of default minute
-		Dial: (&fasthttp.TCPDialer{
-			Concurrency:      4096,
-			DNSCacheDuration: time.Hour,
-		}).Dial,
+		Dial: dialFunc,
 	}
 }
 

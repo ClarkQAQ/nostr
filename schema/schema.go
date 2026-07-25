@@ -39,62 +39,72 @@ func FetchSchemaFromURL(schemaURL string) (Schema, error) {
 		return Schema{}, fmt.Errorf("failed to read schema response: %w", err)
 	}
 
-	var schema Schema
-	if err := yaml.Unmarshal(body, &schema); err != nil {
-		return Schema{}, fmt.Errorf("failed to parse schema: %w", err)
-	}
-
-	return schema, nil
+	return NewSchemaFromBytes(body)
 }
 
 type Schema struct {
-	GenericTags map[string]ContentSpec `yaml:"generic_tags"`
-	Kinds       map[string]KindSchema  `yaml:"kinds"`
+	GenericTags map[string]ContentSpec `yaml:"generic_tags" json:"generic_tags,omitempty"`
+	Kinds       map[string]*KindSchema `yaml:"kinds" json:"kinds,omitempty"`
 }
 
 type KindSchema struct {
-	Description string      `yaml:"description"`
-	InUse       bool        `yaml:"in_use"`
-	Content     ContentSpec `yaml:"content"`
-	Required    []string    `yaml:"required"`
-	Multiple    []string    `yaml:"multiple"`
-	Tags        []TagSpec   `yaml:"tags"`
+	Kind        nostr.Kind  `yaml:"-" json:"kind"`
+	Description string      `yaml:"description" json:"description,omitempty"`
+	InUse       bool        `yaml:"in_use" json:"in_use,omitempty"`
+	Content     ContentSpec `yaml:"content" json:"content,omitempty"`
+	Required    []string    `yaml:"required" json:"required,omitempty"`
+	Multiple    []string    `yaml:"multiple" json:"multiple,omitempty"`
+	Tags        []TagSpec   `yaml:"tags" json:"tags,omitempty"`
 }
 
 type TagSpec struct {
-	Name   string       `yaml:"name"`
-	Prefix string       `yaml:"prefix"`
-	Next   *ContentSpec `yaml:"next"`
+	Name   string       `yaml:"name" json:"name,omitempty"`
+	Prefix string       `yaml:"prefix" json:"prefix,omitempty"`
+	Next   *ContentSpec `yaml:"next" json:"next,omitempty"`
 }
 
 type ContentSpec struct {
-	Type     string       `yaml:"type"`
-	Required bool         `yaml:"required"`
-	Min      int          `yaml:"min"`
-	Max      int          `yaml:"max"`
-	Either   []string     `yaml:"either"`
-	Next     *ContentSpec `yaml:"next"`
-	Variadic bool         `yaml:"variadic"`
+	Type     string       `yaml:"type" json:"type,omitempty"`
+	Required bool         `yaml:"required" json:"required,omitempty"`
+	Min      int          `yaml:"min" json:"min,omitempty"`
+	Max      int          `yaml:"max" json:"max,omitempty"`
+	Either   []string     `yaml:"either" json:"either,omitempty"`
+	Next     *ContentSpec `yaml:"next" json:"next,omitempty"`
+	Variadic bool         `yaml:"variadic" json:"variadic,omitempty"`
 }
 
 type Validator struct {
-	Schema            Schema
-	FailOnUnknownKind bool
-	FailOnUnknownType bool
-	TypeValidators    map[string]func(value string, spec *ContentSpec) error
-	UnknownTypes      []string
+	Schema            Schema                                                 `json:"schema,omitempty"`
+	FailOnUnknownKind bool                                                   `json:"fail_on_unknown_kind,omitempty"`
+	FailOnUnknownType bool                                                   `json:"fail_on_unknown_type,omitempty"`
+	TypeValidators    map[string]func(value string, spec *ContentSpec) error `json:"type_validators,omitempty"`
+	UnknownTypes      []string                                               `json:"unknown_types,omitempty"`
 }
 
 func NewValidatorFromBytes(schemaData []byte) (Validator, error) {
-	schema := Schema{
-		GenericTags: make(map[string]ContentSpec),
-		Kinds:       make(map[string]KindSchema),
-	}
-	if err := yaml.Unmarshal(schemaData, &schema); err != nil {
-		return Validator{}, fmt.Errorf("failed to parse schema: %w", err)
+	schema, err := NewSchemaFromBytes(schemaData)
+	if err != nil {
+		return Validator{}, err
 	}
 
 	return NewValidatorFromSchema(schema), nil
+}
+
+func NewSchemaFromBytes(schemaData []byte) (Schema, error) {
+	schema := Schema{
+		GenericTags: make(map[string]ContentSpec),
+		Kinds:       make(map[string]*KindSchema),
+	}
+	if err := yaml.Unmarshal(schemaData, &schema); err != nil {
+		return Schema{}, fmt.Errorf("failed to parse schema: %w", err)
+	}
+
+	for k := range schema.Kinds {
+		kn, _ := strconv.ParseUint(k, 10, 16)
+		schema.Kinds[k].Kind = nostr.Kind(kn)
+	}
+
+	return schema, nil
 }
 
 func NewValidatorFromSchema(sch Schema) Validator {
@@ -162,10 +172,51 @@ func NewValidatorFromSchema(sch Schema) Validator {
 				return err
 			},
 			"imeta": func(value string, spec *ContentSpec) error {
-				if len(strings.SplitN(value, " ", 2)) == 2 {
-					return nil
+				parts := strings.SplitN(value, " ", 2)
+				if len(parts) != 2 {
+					return fmt.Errorf("not a space-separated keyval")
 				}
-				return fmt.Errorf("not a space-separated keyval")
+				key, val := parts[0], parts[1]
+
+				switch key {
+				case "url", "fallback", "thumb", "image":
+					if u, err := url.Parse(val); err != nil || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "data") {
+						return fmt.Errorf("invalid %s URL", key)
+					}
+				case "magnet":
+					if !strings.HasPrefix(val, "magnet:") {
+						return fmt.Errorf("invalid magnet URI")
+					}
+				case "x", "ox":
+					if len(val) != 64 {
+						return fmt.Errorf("SHA-256 must be 64 hex chars")
+					}
+					_, err := hex.Decode(hexdummydecoder, unsafe.Slice(unsafe.StringData(val), len(val)))
+					return err
+				case "dim":
+					dimParts := strings.Split(val, "x")
+					if len(dimParts) != 2 {
+						return fmt.Errorf("dim must be WxH format")
+					}
+					if _, err := strconv.ParseUint(dimParts[0], 10, 32); err != nil {
+						return fmt.Errorf("invalid width in dim")
+					}
+					if _, err := strconv.ParseUint(dimParts[1], 10, 32); err != nil {
+						return fmt.Errorf("invalid height in dim")
+					}
+				case "size":
+					if _, err := strconv.ParseUint(val, 10, 64); err != nil {
+						return fmt.Errorf("invalid size")
+					}
+				case "m":
+					if !strings.Contains(val, "/") {
+						return fmt.Errorf("invalid MIME type")
+					}
+				case "blurhash", "alt", "summary", "service", "i", "thumbhash":
+				default:
+					return fmt.Errorf("unknown imeta key: %s", key)
+				}
+				return nil
 			},
 			"empty": func(value string, spec *ContentSpec) error {
 				if len(value) > 0 {
@@ -185,11 +236,19 @@ func NewValidatorFromSchema(sch Schema) Validator {
 }
 
 func NewValidatorFromFile(filename string) (Validator, error) {
+	schema, err := NewSchemaFromFile(filename)
+	if err != nil {
+		return Validator{}, err
+	}
+	return NewValidatorFromSchema(schema), nil
+}
+
+func NewSchemaFromFile(filename string) (Schema, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return Validator{}, fmt.Errorf("failed to read schema file: %w", err)
+		return Schema{}, fmt.Errorf("failed to read schema file: %w", err)
 	}
-	return NewValidatorFromBytes(data)
+	return NewSchemaFromBytes(data)
 }
 
 func NewValidatorFromURL(schemaURL string) (Validator, error) {
@@ -212,7 +271,7 @@ var (
 )
 
 type UnknownTypes struct {
-	Types []string
+	Types []string `json:"types,omitempty"`
 }
 
 func (ut UnknownTypes) Error() string {
@@ -220,7 +279,7 @@ func (ut UnknownTypes) Error() string {
 }
 
 type ContentError struct {
-	Err error
+	Err error `json:"err,omitempty"`
 }
 
 func (ce ContentError) Error() string {
@@ -228,9 +287,9 @@ func (ce ContentError) Error() string {
 }
 
 type TagError struct {
-	Tag  int
-	Item int
-	Err  error
+	Tag  int   `json:"tag,omitempty"`
+	Item int   `json:"item,omitempty"`
+	Err  error `json:"err,omitempty"`
 }
 
 func (te TagError) Error() string {
@@ -238,7 +297,7 @@ func (te TagError) Error() string {
 }
 
 type RequiredTagError struct {
-	Missing []string
+	Missing []string `json:"missing,omitempty"`
 }
 
 func (rte RequiredTagError) Error() string {
@@ -246,10 +305,6 @@ func (rte RequiredTagError) Error() string {
 }
 
 func (v *Validator) ValidateEvent(evt nostr.Event) error {
-	if !isTrimmed(evt.Content) {
-		return ContentError{ErrDanglingSpace}
-	}
-
 	if sch, ok := v.Schema.Kinds[strconv.FormatUint(uint64(evt.Kind), 10)]; ok {
 		if validator, ok := v.TypeValidators[sch.Content.Type]; ok {
 			if err := validator(evt.Content, &sch.Content); err != nil {
@@ -389,7 +444,9 @@ func (v *Validator) validateNext(tag nostr.Tag, index int, this *ContentSpec) (f
 		return index, ErrDanglingSpace
 	}
 
-	if validator, ok := v.TypeValidators[this.Type]; ok {
+	if tag[index] == "" && !this.Required {
+		// empty string ok for non-required items
+	} else if validator, ok := v.TypeValidators[this.Type]; ok {
 		if err := validator(tag[index], this); err != nil {
 			return index, fmt.Errorf("invalid %s value '%s' at tag '%s', index %d: %w",
 				this.Type, tag[index], tag[0], index, err)
@@ -401,9 +458,12 @@ func (v *Validator) validateNext(tag nostr.Tag, index int, this *ContentSpec) (f
 	}
 
 	if this.Variadic {
-		// apply this same validation to all further items
+		// apply this same validation to all further items,
+		// but additional items beyond the first are optional
 		if len(tag) >= index {
-			return v.validateNext(tag, index+1, this)
+			sub := *this
+			sub.Required = false
+			return v.validateNext(tag, index+1, &sub)
 		}
 	}
 

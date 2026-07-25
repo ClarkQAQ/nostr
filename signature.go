@@ -3,8 +3,6 @@
 package nostr
 
 import (
-	"crypto/sha256"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -34,8 +32,8 @@ func (evt Event) VerifySignature() bool {
 	sig := schnorr.NewSignature(&r, &s)
 
 	// check signature
-	hash := sha256.Sum256(evt.Serialize())
-	return sig.Verify(hash[:], pubkey)
+	evt.SetID()
+	return sig.Verify(evt.ID[:], pubkey)
 }
 
 // Sign signs an event with a given privateKey.
@@ -52,13 +50,12 @@ func (evt *Event) Sign(secretKey [32]byte) error {
 	pkBytes := pk.SerializeCompressed()[1:]
 	evt.PubKey = PubKey(pkBytes)
 
-	h := sha256.Sum256(evt.Serialize())
-	sig, err := schnorr.Sign(sk, h[:], schnorr.FastSign())
+	evt.SetID()
+	sig, err := schnorr.Sign(sk, evt.ID[:], schnorr.FastSign())
 	if err != nil {
 		return err
 	}
 
-	evt.ID = h
 	sigb := sig.Serialize()
 	evt.Sig = [64]byte(sigb)
 
