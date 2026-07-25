@@ -41,7 +41,6 @@ require (
 	github.com/dgraph-io/ristretto/v2 v2.3.0
 	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/go-git/go-git/v5 v5.16.3
-	github.com/pemistahl/lingua-go v1.4.0
 	github.com/sivukhin/godjot v1.0.6
 	github.com/templexxx/cpu v0.0.1
 	github.com/templexxx/xhex v0.0.0-20200614015412-aed53437177b
@@ -92,7 +91,6 @@ require (
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 // indirect
-	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect

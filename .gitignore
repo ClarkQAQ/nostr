@@ -1,3 +1,5 @@
 go-nostr
 libsecp256k1
-/test
+.claude/
+.omc/
+.agents/
