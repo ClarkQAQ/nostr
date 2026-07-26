@@ -88,9 +88,11 @@ func (b *BadgerBackend) Init(ctx context.Context) error {
 	return nil
 }
 
-func (b *BadgerBackend) Close() {
+func (b *BadgerBackend) Close() error {
 	if b.DB != nil {
-		b.DB.Close()
+		err := b.DB.Close()
 		b.DB = nil
+		return err
 	}
+	return nil
 }

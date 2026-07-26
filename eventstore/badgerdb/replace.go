@@ -18,7 +18,7 @@ func (b *BadgerBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) (dele
 
 		// now we fetch the past events, whatever they are, delete them and then save the new
 		shouldStore := true
-		if qerr := b.query(txn, filter, 10 /* could be just 1 */, func(previous nostr.Event) bool {
+		if qerr := b.query(txn, filter, 10 /* could be just 1 */, func(previous nostr.Event, _ error) bool {
 			if nostr.IsOlder(previous, evt) {
 				if qerr := b.delete(txn, previous.ID); qerr != nil {
 					qerr = fmt.Errorf("failed to delete event %s for replacing: %w", previous.ID, qerr)

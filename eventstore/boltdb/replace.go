@@ -27,7 +27,7 @@ func (b *BoltBackend) ReplaceEvent(ctx context.Context, evt nostr.Event) (delete
 
 		// now we fetch the past events, whatever they are, delete them and then save the new
 		var qerr error
-		var results iter.Seq[nostr.Event] = func(yield func(nostr.Event) bool) {
+		var results iter.Seq2[nostr.Event, error] = func(yield func(nostr.Event, error) bool) {
 			qerr = b.query(txn, filter, 10 /* in theory limit could be just 1 and this should work */, yield)
 		}
 		if qerr != nil {

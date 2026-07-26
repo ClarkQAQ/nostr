@@ -67,21 +67,21 @@ func countTest(t *testing.T, db eventstore.Store) {
 	// test count all events
 	count, err := db.CountEvents(ctx, nostr.Filter{})
 	require.NoError(t, err)
-	require.Equal(t, uint32(3), count, "should count the 3 new events")
+	require.Equal(t, int64(3), count, "should count the 3 new events")
 
 	// test count by kind 1
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Kinds: []nostr.Kind{1},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(2), count, "should count 2 events of kind 1")
+	require.Equal(t, int64(2), count, "should count 2 events of kind 1")
 
 	// test count by author
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Authors: []nostr.PubKey{pk3},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(2), count, "should count 2 events from sk3")
+	require.Equal(t, int64(2), count, "should count 2 events from sk3")
 
 	// test count by author and tag
 	count, err = db.CountEvents(ctx, nostr.Filter{
@@ -89,21 +89,21 @@ func countTest(t *testing.T, db eventstore.Store) {
 		Tags:    nostr.TagMap{"t": []string{"test"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), count, "should count 1 event")
+	require.Equal(t, int64(1), count, "should count 1 event")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Authors: []nostr.PubKey{pk4},
 		Tags:    nostr.TagMap{"t": []string{"somethingelse"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(0), count, "should count 0 events")
+	require.Equal(t, int64(0), count, "should count 0 events")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Authors: []nostr.PubKey{pk3},
 		Tags:    nostr.TagMap{"t": []string{"test"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(0), count, "should count 0 events")
+	require.Equal(t, int64(0), count, "should count 0 events")
 
 	// test double tag
 	count, err = db.CountEvents(ctx, nostr.Filter{
@@ -111,44 +111,44 @@ func countTest(t *testing.T, db eventstore.Store) {
 		Tags:  nostr.TagMap{"t": []string{"plec"}, "g": []string{"aaaaaa"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), count, "should count 1 event")
+	require.Equal(t, int64(1), count, "should count 1 event")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Tags: nostr.TagMap{"t": []string{"plec"}, "g": []string{"aaaaaa"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), count, "should count 1 event")
+	require.Equal(t, int64(1), count, "should count 1 event")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Kinds: []nostr.Kind{1},
 		Tags:  nostr.TagMap{"t": []string{"plec"}, "g": []string{"aaaaaa"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), count, "should count 1 event")
+	require.Equal(t, int64(1), count, "should count 1 event")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Kinds: []nostr.Kind{1},
 		Tags:  nostr.TagMap{"t": []string{"plec"}, "r": []string{"https://z.com"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(2), count, "should count 2 events")
+	require.Equal(t, int64(2), count, "should count 2 events")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Tags: nostr.TagMap{"t": []string{"plec"}, "r": []string{"https://z.com"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(2), count, "should count 2 events")
+	require.Equal(t, int64(2), count, "should count 2 events")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Kinds: []nostr.Kind{1, 2},
 		Tags:  nostr.TagMap{"t": []string{"plec"}, "r": []string{"https://z.com"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(2), count, "should count 2 events")
+	require.Equal(t, int64(2), count, "should count 2 events")
 
 	count, err = db.CountEvents(ctx, nostr.Filter{
 		Tags: nostr.TagMap{"t": []string{"banana"}, "r": []string{"https://z.com"}},
 	})
 	require.NoError(t, err)
-	require.Equal(t, uint32(0), count, "should count 0 events")
+	require.Equal(t, int64(0), count, "should count 0 events")
 }

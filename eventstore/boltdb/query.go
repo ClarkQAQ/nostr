@@ -13,8 +13,8 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func (b *BoltBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
-	return func(yield func(nostr.Event) bool) {
+func (b *BoltBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq2[nostr.Event, error] {
+	return func(yield func(nostr.Event, error) bool) {
 		if filter.IDs != nil {
 			// when there are ids we ignore everything else and just fetch the ids
 			if err := b.DB.View(func(txn *bbolt.Tx) error {
@@ -46,7 +46,7 @@ func (b *BoltBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxL
 	}
 }
 
-func (b *BoltBackend) queryByIds(txn *bbolt.Tx, ids []nostr.ID, yield func(nostr.Event) bool) error {
+func (b *BoltBackend) queryByIds(txn *bbolt.Tx, ids []nostr.ID, yield func(nostr.Event, error) bool) error {
 	rawBucket := txn.Bucket(rawEventStore)
 
 	for _, id := range ids {
@@ -60,7 +60,7 @@ func (b *BoltBackend) queryByIds(txn *bbolt.Tx, ids []nostr.ID, yield func(nostr
 			continue
 		}
 
-		if !yield(event) {
+		if !yield(event, nil) {
 			return nil
 		}
 	}
@@ -68,7 +68,7 @@ func (b *BoltBackend) queryByIds(txn *bbolt.Tx, ids []nostr.ID, yield func(nostr
 	return nil
 }
 
-func (b *BoltBackend) query(txn *bbolt.Tx, filter nostr.Filter, limit int, yield func(nostr.Event) bool) error {
+func (b *BoltBackend) query(txn *bbolt.Tx, filter nostr.Filter, limit int, yield func(nostr.Event, error) bool) error {
 	queries, extraAuthors, extraKinds, extraTagKey, extraTagValues, since, err := b.prepareQueries(filter)
 	if err != nil {
 		return err
@@ -161,7 +161,7 @@ func (b *BoltBackend) query(txn *bbolt.Tx, filter nostr.Filter, limit int, yield
 		// emit this stuff in order
 		slices.SortFunc(tempResults, nostr.CompareEventReverse)
 		for _, evt := range tempResults {
-			if !yield(evt) {
+			if !yield(evt, nil) {
 				return nil
 			}
 

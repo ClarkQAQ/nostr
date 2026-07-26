@@ -133,10 +133,23 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 			maxLimit = maxQueryLimit * 20
 		}
 
-		return store.QueryEvents(ctx, filter, maxLimit)
+		next, stop := iter.Pull2(store.QueryEvents(ctx, filter, maxLimit))
+		return func(yield func(nostr.Event) bool) {
+			defer stop()
+			for {
+				evt, _, ok := next()
+				if !ok {
+					return
+				}
+				if !yield(evt) {
+					return
+				}
+			}
+		}
 	}
 	rl.Count = func(ctx context.Context, filter nostr.Filter) (uint32, error) {
-		return store.CountEvents(ctx, filter)
+		n, err := store.CountEvents(ctx, filter)
+		return uint32(n), err
 	}
 	rl.StoreEvent = func(ctx context.Context, event nostr.Event) error {
 		return store.SaveEvent(ctx, event)

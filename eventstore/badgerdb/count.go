@@ -13,7 +13,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-func (b *BadgerBackend) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {
+func (b *BadgerBackend) CountEvents(ctx context.Context, filter nostr.Filter) (int64, error) {
 	var count int = 0
 
 	queries, extraAuthors, extraKinds, extraTagKey, extraTagValues, since, e := b.prepareQueries(filter)
@@ -124,5 +124,5 @@ func (b *BadgerBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 		return 0, fmt.Errorf("failed to count events: %w", e)
 	}
 
-	return uint32(count), nil
+	return int64(count), nil
 }

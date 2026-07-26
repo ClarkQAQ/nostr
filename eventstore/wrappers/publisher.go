@@ -17,7 +17,7 @@ type StorePublisher struct {
 }
 
 func (w StorePublisher) QueryEvents(filter nostr.Filter) iter.Seq[nostr.Event] {
-	return w.Store.QueryEvents(context.Background(), filter, w.MaxLimit)
+	return eventstore.EventsOnly(w.Store.QueryEvents(context.Background(), filter, w.MaxLimit))
 }
 
 func (w StorePublisher) Publish(ctx context.Context, evt nostr.Event) error {

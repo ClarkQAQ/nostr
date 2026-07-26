@@ -22,12 +22,12 @@ func (es EventStoreBlobIndexWrapper) Keep(
 	blob blossom.BlobDescriptor,
 	pubkey nostr.PubKey,
 ) error {
-	next, stop := iter.Pull(
+	next, stop := iter.Pull2(
 		es.Store.QueryEvents(ctx, nostr.Filter{Authors: []nostr.PubKey{pubkey}, Kinds: []nostr.Kind{24242}, Tags: nostr.TagMap{"x": []string{blob.SHA256}}}, 1),
 	)
 	defer stop()
 
-	if _, exists := next(); !exists {
+	if _, _, exists := next(); !exists {
 		// doesn't exist, save
 		evt := nostr.Event{
 			PubKey: pubkey,
@@ -60,13 +60,13 @@ func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubK
 }
 
 func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL *url.URL) (*blossom.BlobDescriptor, error) {
-	next, stop := iter.Pull(
+	next, stop := iter.Pull2(
 		es.Store.QueryEvents(ctx, nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
 	)
 
 	defer stop()
 
-	if evt, found := next(); found {
+	if evt, _, found := next(); found {
 		bd := es.parseEvent(evt, publicURL)
 		return &bd, nil
 	}
@@ -75,7 +75,7 @@ func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, pub
 }
 
 func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error {
-	next, stop := iter.Pull(
+	next, stop := iter.Pull2(
 		es.Store.QueryEvents(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
 			Tags:    nostr.TagMap{"x": []string{sha256}},
@@ -86,7 +86,7 @@ func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, 
 
 	defer stop()
 
-	if evt, found := next(); found {
+	if evt, _, found := next(); found {
 		return es.Store.DeleteEvent(ctx, evt.ID)
 	}
 

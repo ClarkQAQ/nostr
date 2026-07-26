@@ -25,10 +25,10 @@ func (b *SliceStore) Init(ctx context.Context) error {
 	return nil
 }
 
-func (b *SliceStore) Close() {}
+func (b *SliceStore) Close() error { return nil }
 
-func (b *SliceStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
-	return func(yield func(nostr.Event) bool) {
+func (b *SliceStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq2[nostr.Event, error] {
+	return func(yield func(nostr.Event, error) bool) {
 		if tlimit := filter.GetTheoreticalLimit(); tlimit == 0 {
 			return
 		} else if tlimit < maxLimit {
@@ -57,7 +57,7 @@ func (b *SliceStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxLi
 			}
 
 			if filter.Matches(event) {
-				if !yield(event) {
+				if !yield(event, nil) {
 					return
 				}
 				count++
@@ -66,8 +66,8 @@ func (b *SliceStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxLi
 	}
 }
 
-func (b *SliceStore) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {
-	var val uint32
+func (b *SliceStore) CountEvents(ctx context.Context, filter nostr.Filter) (int64, error) {
+	var val int64
 	for _, event := range b.internal {
 		if filter.Matches(event) {
 			val++

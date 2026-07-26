@@ -14,8 +14,8 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-func (b *BadgerBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
-	return func(yield func(nostr.Event) bool) {
+func (b *BadgerBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq2[nostr.Event, error] {
+	return func(yield func(nostr.Event, error) bool) {
 		if filter.IDs != nil {
 			// when there are ids we ignore everything else and just fetch the ids
 			if err := b.DB.View(func(txn *badger.Txn) error {
@@ -42,7 +42,7 @@ func (b *BadgerBackend) QueryEvents(ctx context.Context, filter nostr.Filter, ma
 	}
 }
 
-func (b *BadgerBackend) queryByIds(txn *badger.Txn, ids []nostr.ID, yield func(nostr.Event) bool) error {
+func (b *BadgerBackend) queryByIds(txn *badger.Txn, ids []nostr.ID, yield func(nostr.Event, error) bool) error {
 	for _, id := range ids {
 		rawKey := make([]byte, 1+32)
 		rawKey[0] = prefixRaw[0]
@@ -63,7 +63,7 @@ func (b *BadgerBackend) queryByIds(txn *badger.Txn, ids []nostr.ID, yield func(n
 			continue
 		}
 
-		if !yield(event) {
+		if !yield(event, nil) {
 			return nil
 		}
 	}
@@ -71,7 +71,7 @@ func (b *BadgerBackend) queryByIds(txn *badger.Txn, ids []nostr.ID, yield func(n
 	return nil
 }
 
-func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, yield func(nostr.Event) bool) error {
+func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, yield func(nostr.Event, error) bool) error {
 	queries, extraAuthors, extraKinds, extraTagKey, extraTagValues, since, err := b.prepareQueries(filter)
 	if err != nil {
 		return err
@@ -207,7 +207,7 @@ func (b *BadgerBackend) query(txn *badger.Txn, filter nostr.Filter, limit int, y
 		// emit this stuff in order
 		slices.SortFunc(tempResults, nostr.CompareEventReverse)
 		for _, evt := range tempResults {
-			if !yield(evt) {
+			if !yield(evt, nil) {
 				return nil
 			}
 

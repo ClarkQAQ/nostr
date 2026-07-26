@@ -1,5 +1,7 @@
 go-nostr
 libsecp256k1
+/test
+eventstore/pebbledb2/db/
 .claude/
 .omc/
 .agents/

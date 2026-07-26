@@ -87,6 +87,6 @@ func (b *BoltBackend) Init(ctx context.Context) error {
 	return b.migrate()
 }
 
-func (b *BoltBackend) Close() {
-	b.DB.Close()
+func (b *BoltBackend) Close() error {
+	return b.DB.Close()
 }

@@ -9,6 +9,7 @@ import (
 	"fiatjaf.com/nostr/eventstore/badgerdb"
 	"fiatjaf.com/nostr/eventstore/boltdb"
 	"fiatjaf.com/nostr/eventstore/pebbledb"
+	pebbledb2 "fiatjaf.com/nostr/eventstore/pebbledb2"
 	"fiatjaf.com/nostr/eventstore/slicestore"
 )
 
@@ -60,6 +61,21 @@ func TestPebbleDB(t *testing.T) {
 	for _, test := range tests {
 		os.RemoveAll(dbpath + "pebble")
 		db, e := pebbledb.NewPebbleBackend(dbpath + "pebble")
+		if e != nil {
+			t.Fatal(e)
+		}
+
+		t.Run(test.name, func(t *testing.T) {
+			test.run(t, db)
+			db.Close()
+		})
+	}
+}
+
+func TestPebbleDB2(t *testing.T) {
+	for _, test := range tests {
+		os.RemoveAll(dbpath + "pebble2")
+		db, e := pebbledb2.OpenDir(dbpath + "pebble2")
 		if e != nil {
 			t.Fatal(e)
 		}

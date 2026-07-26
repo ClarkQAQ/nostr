@@ -17,7 +17,7 @@ type DynamicPublisher struct {
 }
 
 func (w DynamicPublisher) QueryEvents(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event] {
-	return w.GetStore().QueryEvents(ctx, filter, w.MaxLimit)
+	return eventstore.EventsOnly(w.GetStore().QueryEvents(ctx, filter, w.MaxLimit))
 }
 
 func (w DynamicPublisher) Publish(ctx context.Context, evt nostr.Event) error {

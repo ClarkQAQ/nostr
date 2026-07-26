@@ -14,8 +14,8 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-func (b *BoltBackend) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {
-	var count uint32 = 0
+func (b *BoltBackend) CountEvents(ctx context.Context, filter nostr.Filter) (int64, error) {
+	var count int64 = 0
 
 	queries, extraAuthors, extraKinds, extraTagKey, extraTagValues, since, err := b.prepareQueries(filter)
 	if err != nil {

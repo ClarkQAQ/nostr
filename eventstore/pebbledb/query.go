@@ -31,8 +31,8 @@ type iterState struct {
 }
 
 // QueryEvents returns events matching the filter in reverse chronological order.
-func (b *PebbleBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq[nostr.Event] {
-	return func(yield func(nostr.Event) bool) {
+func (b *PebbleBackend) QueryEvents(ctx context.Context, filter nostr.Filter, maxLimit int) iter.Seq2[nostr.Event, error] {
+	return func(yield func(nostr.Event, error) bool) {
 		// Handle ID-based queries specially (direct lookup)
 		if filter.IDs != nil {
 			b.queryByIDs(filter.IDs, yield)
@@ -54,7 +54,7 @@ func (b *PebbleBackend) QueryEvents(ctx context.Context, filter nostr.Filter, ma
 }
 
 // queryByIDs fetches events directly by their IDs.
-func (b *PebbleBackend) queryByIDs(ids []nostr.ID, yield func(nostr.Event) bool) {
+func (b *PebbleBackend) queryByIDs(ids []nostr.ID, yield func(nostr.Event, error) bool) {
 	for _, id := range ids {
 		rawKey := makeRawKey(id)
 		bin, closer, err := b.DB.Get(rawKey)
@@ -72,14 +72,14 @@ func (b *PebbleBackend) queryByIDs(ids []nostr.ID, yield func(nostr.Event) bool)
 			continue
 		}
 
-		if !yield(evt) {
+		if !yield(evt, nil) {
 			return
 		}
 	}
 }
 
 // query executes a planned query against the database.
-func (b *PebbleBackend) query(filter nostr.Filter, limit int, yield func(nostr.Event) bool) error {
+func (b *PebbleBackend) query(filter nostr.Filter, limit int, yield func(nostr.Event, error) bool) error {
 	// Plan the query
 	plans, extraAuthors, extraKinds, extraTagKey, extraTagValues, extraSearch, sinceTs, untilTs := b.planQuery(filter)
 
@@ -211,7 +211,7 @@ func (b *PebbleBackend) query(filter nostr.Filter, limit int, yield func(nostr.E
 		}
 
 		// Emit the event
-		if !yield(evt) {
+		if !yield(evt, nil) {
 			return nil
 		}
 		emitted++

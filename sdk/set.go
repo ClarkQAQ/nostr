@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/sdk/cache"
 )
 
@@ -45,7 +46,7 @@ func fetchGenericSets[V comparable, I TagItemWithValue[V]](
 
 	v := GenericSets[V, I]{PubKey: pubkey}
 
-	events := slices.Collect(
+	events := eventstore.CollectEvents(
 		sys.Store.QueryEvents(ctx, nostr.Filter{Kinds: []nostr.Kind{actualKind}, Authors: []nostr.PubKey{pubkey}}, 100),
 	)
 	if len(events) != 0 {

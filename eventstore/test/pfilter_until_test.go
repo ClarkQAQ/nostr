@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"encoding/hex"
-	"slices"
 	"testing"
 
 	"fiatjaf.com/nostr"
@@ -72,7 +71,7 @@ func pTagUntilMismatchTest(t *testing.T, db eventstore.Store) {
 		require.NoError(t, err)
 	}
 
-	results := slices.Collect(db.QueryEvents(context.Background(), nostr.Filter{
+	results := eventstore.CollectEvents(db.QueryEvents(context.Background(), nostr.Filter{
 		Until: 1733934976,
 		Limit: 3,
 		Tags:  nostr.TagMap{"p": []string{targetP}},

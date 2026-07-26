@@ -135,11 +135,13 @@ func (b *PebbleBackend) Init(ctx context.Context) error {
 	return nil
 }
 
-func (b *PebbleBackend) Close() {
+func (b *PebbleBackend) Close() error {
 	if b.DB != nil {
-		b.DB.Close()
+		err := b.DB.Close()
 		b.DB = nil
+		return err
 	}
+	return nil
 }
 
 type NoopLoggerAndTracer struct{}

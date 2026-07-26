@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/eventstore"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,7 +94,7 @@ func FuzzQuery(f *testing.F) {
 
 		start := time.Now()
 
-		res := slices.Collect(db.QueryEvents(context.Background(), filter, 500))
+		res := eventstore.CollectEvents(db.QueryEvents(context.Background(), filter, 500))
 		end := time.Now()
 
 		require.Equal(t, len(expected), len(res), "number of results is different than expected")

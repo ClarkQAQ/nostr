@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"slices"
 	"testing"
 
 	"fiatjaf.com/nostr"
@@ -71,7 +70,7 @@ func runSecondTestOn(t *testing.T, db eventstore.Store) {
 		for q, filter := range filters {
 			label := fmt.Sprintf("filter %d: %s", q, filter)
 			t.Run(fmt.Sprintf("q-%d", q), func(t *testing.T) {
-				results := slices.Collect(db.QueryEvents(context.Background(), filter, 500))
+				results := eventstore.CollectEvents(db.QueryEvents(context.Background(), filter, 500))
 				require.NotEmpty(t, results, label)
 			})
 		}

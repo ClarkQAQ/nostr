@@ -10,7 +10,7 @@ import (
 )
 
 // CountEvents counts all events matching the filter.
-func (b *PebbleBackend) CountEvents(ctx context.Context, filter nostr.Filter) (uint32, error) {
+func (b *PebbleBackend) CountEvents(ctx context.Context, filter nostr.Filter) (int64, error) {
 	// Plan the query
 	plans, extraAuthors, extraKinds, extraTagKey, extraTagValues, extraSearch, sinceTs, untilTs := b.planQuery(filter)
 
@@ -18,7 +18,7 @@ func (b *PebbleBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 	snap := b.DB.NewSnapshot()
 	defer snap.Close()
 
-	count := uint32(0)
+	count := int64(0)
 
 	// Iterate over all plans
 	for _, plan := range plans {
@@ -90,7 +90,7 @@ func (b *PebbleBackend) CountEvents(ctx context.Context, filter nostr.Filter) (u
 			count++
 
 			// Check limit
-			if filter.Limit > 0 && int(count) >= filter.Limit {
+			if filter.Limit > 0 && count >= int64(filter.Limit) {
 				iter.Close()
 				return count, nil
 			}
