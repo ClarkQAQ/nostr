@@ -648,9 +648,12 @@ func (c *filterCursor) advance() {
 	}
 
 	// serve from prefetch buffer first
-	for c.prefIdx < len(c.prefBuf) {
+	if c.prefIdx < len(c.prefBuf) {
 		if q.limit > 0 && c.accepted >= q.limit {
-			break
+			c.prefBuf = c.prefBuf[:0]
+			c.prefIdx = 0
+			c.valid = false
+			return
 		}
 		cand := c.prefBuf[c.prefIdx]
 		c.prefIdx++
@@ -661,12 +664,6 @@ func (c *filterCursor) advance() {
 	}
 	c.prefBuf = c.prefBuf[:0]
 	c.prefIdx = 0
-
-	// Limit reached during prefBuf serving: stop.
-	if q.limit > 0 && c.accepted >= q.limit {
-		c.valid = false
-		return
-	}
 
 	// Count-only path: one candidate from the heap, no body load needed.
 	if !q.query && !c.postCheck {
@@ -791,6 +788,12 @@ func (c *filterCursor) advance() {
 		return
 	}
 	// Yield the first from the freshly filled prefetch buffer.
+	if q.limit > 0 && c.accepted >= q.limit {
+		c.prefBuf = c.prefBuf[:0]
+		c.prefIdx = 0
+		c.valid = false
+		return
+	}
 	cand := c.prefBuf[0]
 	c.prefIdx = 1
 	c.accepted++
