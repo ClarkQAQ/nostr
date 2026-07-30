@@ -60,7 +60,7 @@ func (rl *Relay) HandleNIP86(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		resp        nip86.Response
-		ctx         = r.Context()
+		ctx         = context.WithValue(r.Context(), httpRequestKey, r)
 		req         nip86.Request
 		mp          nip86.MethodParams
 		evt         nostr.Event

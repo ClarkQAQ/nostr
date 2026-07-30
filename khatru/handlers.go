@@ -104,8 +104,11 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithCancel(
 		context.WithValue(
-			context.Background(),
-			wsKey, ws,
+			context.WithValue(
+				context.Background(),
+				wsKey, ws,
+			),
+			httpRequestKey, r,
 		),
 	)
 

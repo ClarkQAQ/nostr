@@ -2,23 +2,29 @@ package khatru
 
 import (
 	"context"
+	"net/http"
 
 	"fiatjaf.com/nostr"
 )
 
 const (
 	wsKey = iota
+	httpRequestKey
 	subscriptionIdKey
 	nip86HeaderAuthKey
 	internalCallKey
 	serviceURLOverrideKey
 )
 
+// RequestAuth sends a NIP-42 auth request to the WebSocket connection stored in ctx.
+// Only works in WebSocket context; panics if no WebSocket is in context.
 func RequestAuth(ctx context.Context) {
 	ws := GetConnection(ctx)
 	ws.WriteJSON(nostr.AuthEnvelope{Challenge: &ws.Challenge})
 }
 
+// GetConnection returns the WebSocket stored in the context.
+// Returns nil if called from a non-WebSocket context (e.g. NIP-86 HTTP handler).
 func GetConnection(ctx context.Context) *WebSocket {
 	wsi := ctx.Value(wsKey)
 	if wsi != nil {
@@ -74,6 +80,20 @@ func IsAuthed(ctx context.Context, pubkey nostr.PubKey) bool {
 	return false
 }
 
+// GetRequest returns the *http.Request stored in the context.
+// Works in both WebSocket and NIP-86 contexts.
+// In WebSocket context it returns conn.Request; in NIP-86 context it returns the raw HTTP request.
+func GetRequest(ctx context.Context) *http.Request {
+	if conn := GetConnection(ctx); conn != nil {
+		return conn.Request
+	}
+	r := ctx.Value(httpRequestKey)
+	if r != nil {
+		return r.(*http.Request)
+	}
+	return nil
+}
+
 // ForceSetAuthed modifies the context to insert a custom authed public key.
 // It can be used in testing or other rare scenarios for making requests as if a given public key
 // was authenticated when in fact it didn't perform any of the authentication rituals.
@@ -87,19 +107,25 @@ func IsInternalCall(ctx context.Context) bool {
 	return ctx.Value(internalCallKey) != nil
 }
 
+// GetIP returns the client IP address from the request stored in context.
+// Works in both WebSocket and NIP-86 contexts via GetRequest.
 func GetIP(ctx context.Context) string {
-	conn := GetConnection(ctx)
-	if conn == nil {
+	r := GetRequest(ctx)
+	if r == nil {
 		return ""
 	}
 
-	return GetIPFromRequest(conn.Request)
+	return GetIPFromRequest(r)
 }
 
+// GetSubscriptionID returns the subscription ID stored in the context.
+// Only meaningful during filter processing (REQ message handling).
 func GetSubscriptionID(ctx context.Context) string {
 	return ctx.Value(subscriptionIdKey).(string)
 }
 
+// SendNotice sends a NOTICE message to the WebSocket connection stored in ctx.
+// Only works in WebSocket context; panics if no WebSocket is in context.
 func SendNotice(ctx context.Context, msg string) {
 	GetConnection(ctx).WriteJSON(nostr.NoticeEnvelope(msg))
 }
