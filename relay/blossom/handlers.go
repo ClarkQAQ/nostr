@@ -140,7 +140,7 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// download the blob
-	resp, e := http.Get(u.String())
+	resp, e := mirrorHTTPClient.Get(u.String())
 	if e != nil {
 		blossomError(w, "failed to download from url: "+e.Error(), http.StatusServiceUnavailable)
 		return
