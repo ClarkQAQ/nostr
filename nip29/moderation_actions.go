@@ -22,6 +22,7 @@ var (
 	_ Action = DeleteEvent{}
 	_ Action = EditMetadata{}
 	_ Action = CreateInvite{}
+	_ Action = UpdatePinList{}
 )
 
 func PrepareModerationAction(evt nostr.Event) (Action, error) {
@@ -91,6 +92,11 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 				case "picture":
 					if len(tag) >= 2 {
 						edit.Group.Picture = tag[1]
+						ok = true
+					}
+				case "banner":
+					if len(tag) >= 2 {
+						edit.Group.Banner = tag[1]
 						ok = true
 					}
 				case "about":
@@ -178,6 +184,27 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 		}
 		return CreateInvite{Codes: codes}, nil
 	},
+	nostr.KindSimpleGroupUpdatePinList: func(evt nostr.Event) (Action, error) {
+		update := UpdatePinList{When: evt.CreatedAt}
+
+		for tag := range evt.Tags.FindAll("e") {
+			pointer, err := nostr.EventPointerFromTag(tag)
+			if err != nil {
+				return nil, fmt.Errorf("invalid event id hex")
+			}
+			update.Pinned = append(update.Pinned, pointer)
+		}
+
+		for tag := range evt.Tags.FindAll("a") {
+			pointer, err := nostr.EntityPointerFromTag(tag)
+			if err != nil {
+				return nil, fmt.Errorf("invalid event address")
+			}
+			update.Pinned = append(update.Pinned, pointer)
+		}
+
+		return update, nil
+	},
 }
 
 type DeleteEvent struct {
@@ -253,6 +280,7 @@ func (a EditMetadata) Apply(group *Group) {
 
 	group.Name = a.Group.Name
 	group.Picture = a.Group.Picture
+	group.Banner = a.Group.Banner
 	group.About = a.Group.About
 	group.Restricted = a.Group.Restricted
 	group.Closed = a.Group.Closed
@@ -275,6 +303,7 @@ func (a CreateGroup) Apply(group *Group) {
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
 	group.LastLiveKitParticipantsUpdate = a.When
+	group.LastPinnedEventsUpdate = a.When
 }
 
 type DeleteGroup struct {
@@ -285,6 +314,7 @@ func (_ DeleteGroup) Name() string { return "delete-group" }
 func (a DeleteGroup) Apply(group *Group) {
 	group.Members = make(map[nostr.PubKey][]*Role)
 	group.LiveKitParticipants = make([]nostr.PubKey, 0)
+	group.Pinned = nil
 	group.Closed = true
 	group.Private = true
 	group.Restricted = true
@@ -292,11 +322,13 @@ func (a DeleteGroup) Apply(group *Group) {
 	group.Name = "[deleted]"
 	group.About = ""
 	group.Picture = ""
+	group.Banner = ""
 	group.LiveKit = false
 	group.LastMetadataUpdate = a.When
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
 	group.LastLiveKitParticipantsUpdate = a.When
+	group.LastPinnedEventsUpdate = a.When
 }
 
 type CreateInvite struct {
@@ -306,4 +338,15 @@ type CreateInvite struct {
 func (_ CreateInvite) Name() string { return "create-invite" }
 func (a CreateInvite) Apply(group *Group) {
 	group.InviteCodes = append(group.InviteCodes, a.Codes...)
+}
+
+type UpdatePinList struct {
+	Pinned []nostr.Pointer
+	When   nostr.Timestamp
+}
+
+func (_ UpdatePinList) Name() string { return "update-pin-list" }
+func (a UpdatePinList) Apply(group *Group) {
+	group.Pinned = a.Pinned
+	group.LastPinnedEventsUpdate = a.When
 }

@@ -21,6 +21,7 @@ var ModerationEventKinds = KindRange{
 	nostr.KindSimpleGroupCreateGroup,
 	nostr.KindSimpleGroupDeleteGroup,
 	nostr.KindSimpleGroupCreateInvite,
+	nostr.KindSimpleGroupUpdatePinList,
 }
 
 var MetadataEventKinds = KindRange{
@@ -29,6 +30,7 @@ var MetadataEventKinds = KindRange{
 	nostr.KindSimpleGroupMembers,
 	nostr.KindSimpleGroupRoles,
 	nostr.KindSimpleGroupLiveKitParticipants,
+	nostr.KindSimpleGroupPinnedEvents,
 }
 
 func (kr KindRange) Includes(kind nostr.Kind) bool {

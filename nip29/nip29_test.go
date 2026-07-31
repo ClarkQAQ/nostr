@@ -57,3 +57,68 @@ func TestGroupEventBackAndForth(t *testing.T) {
 	require.Equal(t, "banana", group2.Name, "merge of meta1 into group2 failed")
 	require.Equal(t, "abc", group2.Address.ID, "merge of meta1 into group2 failed")
 }
+
+func TestUpdatePinList(t *testing.T) {
+	group1, _ := NewGroup("relay.com", "xyz")
+	id1, _ := nostr.IDFromHex("0000000000000000000000000000000000000000000000000000000000000001")
+	id2, _ := nostr.IDFromHex("0000000000000000000000000000000000000000000000000000000000000002")
+	alicePub, _ := nostr.PubKeyFromHex(ALICE)
+	group1.Pinned = []nostr.Pointer{
+		nostr.EventPointer{ID: id1},
+		nostr.EntityPointer{Kind: 30023, PublicKey: alicePub, Identifier: "abc"},
+		nostr.EventPointer{ID: id2},
+	}
+	pinned1 := group1.ToPinnedEventsEvent()
+
+	group2, _ := NewGroup("relay.com", "xyz")
+	group2.MergeInPinnedEventsEvent(&pinned1)
+	require.Len(t, group2.Pinned, 3, "merge of pinned1 into group2 failed")
+
+	ep, ok := group2.Pinned[0].(nostr.EventPointer)
+	require.True(t, ok)
+	require.Equal(t, id1, ep.ID, "merge of pinned1 into group2 failed")
+
+	ap, ok := group2.Pinned[1].(nostr.EntityPointer)
+	require.True(t, ok)
+	require.Equal(t, nostr.Kind(30023), ap.Kind, "merge of pinned1 into group2 failed")
+	require.Equal(t, alicePub, ap.PublicKey, "merge of pinned1 into group2 failed")
+	require.Equal(t, "abc", ap.Identifier, "merge of pinned1 into group2 failed")
+}
+
+func TestUpdatePinListAction(t *testing.T) {
+	group, _ := NewGroup("relay.com", "xyz")
+	id, _ := nostr.IDFromHex("0000000000000000000000000000000000000000000000000000000000000001")
+	alicePub, _ := nostr.PubKeyFromHex(ALICE)
+
+	evt := nostr.Event{
+		Kind: nostr.KindSimpleGroupUpdatePinList,
+		Tags: nostr.Tags{
+			{"e", id.Hex()},
+			{"a", "30023:" + ALICE + ":abc"},
+		},
+	}
+
+	action, err := PrepareModerationAction(evt)
+	require.NoError(t, err)
+	action.Apply(&group)
+
+	require.Len(t, group.Pinned, 2)
+	ep, ok := group.Pinned[0].(nostr.EventPointer)
+	require.True(t, ok)
+	require.Equal(t, id, ep.ID)
+	ap, ok := group.Pinned[1].(nostr.EntityPointer)
+	require.True(t, ok)
+	require.Equal(t, alicePub, ap.PublicKey)
+	require.Equal(t, "abc", ap.Identifier)
+}
+
+func TestBannerInMetadata(t *testing.T) {
+	group1, _ := NewGroup("relay.com", "xyz")
+	group1.Banner = "https://pizza.com/banner.png"
+	meta1 := group1.ToMetadataEvent()
+	require.NotNil(t, meta1.Tags.FindWithValue("banner", "https://pizza.com/banner.png"))
+
+	group2, _ := NewGroup("relay.com", "abc")
+	group2.MergeInMetadataEvent(&meta1)
+	require.Equal(t, "https://pizza.com/banner.png", group2.Banner)
+}

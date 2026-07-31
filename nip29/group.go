@@ -44,6 +44,7 @@ type Group struct {
 
 	Name                string
 	Picture             string
+	Banner              string
 	About               string
 	Members             map[nostr.PubKey][]*Role
 	LiveKitParticipants []nostr.PubKey
@@ -75,11 +76,14 @@ type Group struct {
 	Roles       []*Role
 	InviteCodes []string
 
+	Pinned []nostr.Pointer
+
 	LastMetadataUpdate            nostr.Timestamp
 	LastAdminsUpdate              nostr.Timestamp
 	LastMembersUpdate             nostr.Timestamp
 	LastRolesUpdate               nostr.Timestamp
 	LastLiveKitParticipantsUpdate nostr.Timestamp
+	LastPinnedEventsUpdate        nostr.Timestamp
 }
 
 func (group Group) String() string {
@@ -184,6 +188,9 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	}
 	if group.Picture != "" {
 		evt.Tags = append(evt.Tags, nostr.Tag{"picture", group.Picture})
+	}
+	if group.Banner != "" {
+		evt.Tags = append(evt.Tags, nostr.Tag{"banner", group.Banner})
 	}
 
 	// status
@@ -298,6 +305,21 @@ func (group Group) ToLiveKitParticipantsEvent() nostr.Event {
 	return evt
 }
 
+func (group Group) ToPinnedEventsEvent() nostr.Event {
+	evt := nostr.Event{
+		Kind:      nostr.KindSimpleGroupPinnedEvents,
+		CreatedAt: group.LastPinnedEventsUpdate,
+		Tags:      make(nostr.Tags, 1, 1+len(group.Pinned)),
+	}
+	evt.Tags[0] = nostr.Tag{"d", group.Address.ID}
+
+	for _, pointer := range group.Pinned {
+		evt.Tags = append(evt.Tags, pointer.AsTag())
+	}
+
+	return evt
+}
+
 func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 	if evt.Kind != nostr.KindSimpleGroupMetadata {
 		return fmt.Errorf("expected kind %d, got %d", nostr.KindSimpleGroupMetadata, evt.Kind)
@@ -341,6 +363,8 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 						group.About = tag[1]
 					case "picture":
 						group.Picture = tag[1]
+					case "banner":
+						group.Banner = tag[1]
 					case "parent":
 						group.Parent = tag[1]
 					case "child":
@@ -476,6 +500,39 @@ func (group *Group) MergeInLiveKitParticipantsEvent(evt *nostr.Event) error {
 			continue
 		}
 		group.LiveKitParticipants = append(group.LiveKitParticipants, member)
+	}
+
+	return nil
+}
+
+func (group *Group) MergeInPinnedEventsEvent(evt *nostr.Event) error {
+	if evt.Kind != nostr.KindSimpleGroupPinnedEvents {
+		return fmt.Errorf("expected kind %d, got %d", nostr.KindSimpleGroupPinnedEvents, evt.Kind)
+	}
+	if evt.CreatedAt < group.LastPinnedEventsUpdate {
+		return fmt.Errorf("event is older than our last update (%d vs %d)", evt.CreatedAt, group.LastPinnedEventsUpdate)
+	}
+
+	group.LastPinnedEventsUpdate = evt.CreatedAt
+	group.Pinned = nil
+	for _, tag := range evt.Tags {
+		if len(tag) < 2 {
+			continue
+		}
+		switch tag[0] {
+		case "e":
+			pointer, err := nostr.EventPointerFromTag(tag)
+			if err != nil {
+				continue
+			}
+			group.Pinned = append(group.Pinned, pointer)
+		case "a":
+			pointer, err := nostr.EntityPointerFromTag(tag)
+			if err != nil {
+				continue
+			}
+			group.Pinned = append(group.Pinned, pointer)
+		}
 	}
 
 	return nil
