@@ -135,18 +135,33 @@ func (d *dispatcher) candidates(event nostr.Event) iter.Seq[subscription] {
 		kindSubs, hasKindSubs := d.byKind[event.Kind]
 
 		if hasAuthorSubs && hasKindSubs {
+			// subscriptions indexed by author: match if the event's kind is in the
+			// subscription's kinds, or the subscription has no kinds restriction
 			for _, ssid := range authorSubs.Slice() {
 				sub, _ := d.subscriptions.Load(ssid)
 
-				if kindSubs.Has(ssid) {
+				if kindSubs.Has(ssid) || sub.filter.Kinds == nil {
 					if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
 						if !yield(sub) {
 							return
 						}
 					}
-				} else {
-					// matched author but not tags, so this event doesn't qualify for any filter
+				}
+			}
+
+			// subscriptions indexed by kind: skip those with an author restriction
+			// (already handled above), match the rest
+			for _, ssid := range kindSubs.Slice() {
+				sub, _ := d.subscriptions.Load(ssid)
+
+				if sub.filter.Authors != nil {
 					continue
+				}
+
+				if filterMatchesTimestampConstraintsAndTags(sub.filter, event) {
+					if !yield(sub) {
+						return
+					}
 				}
 			}
 		} else if hasAuthorSubs {
