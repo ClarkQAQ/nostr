@@ -167,12 +167,15 @@ func (gs *GraspServer) updateHEAD(ctx context.Context, pubkey nostr.PubKey, repo
 
 	// query for the latest state event
 	var latestState *nip34.RepositoryState
-	for evt := range gs.Relay.QueryStored(ctx, nostr.Filter{
+	for evt, err := range gs.Relay.QueryStored(ctx, nostr.Filter{
 		Kinds:   []nostr.Kind{nostr.KindRepositoryState},
 		Authors: []nostr.PubKey{pubkey},
 		Tags:    nostr.TagMap{"d": []string{repoName}},
 		Limit:   1,
 	}) {
+		if err != nil {
+			return err
+		}
 		state := nip34.ParseRepositoryState(evt)
 		latestState = &state
 		break
@@ -211,12 +214,16 @@ func (gs *GraspServer) cleanupMergedPatches(ctx context.Context, pubkey nostr.Pu
 
 	// get current state to know which branches exist
 	var state *nip34.RepositoryState
-	for evt := range gs.Relay.QueryStored(ctx, nostr.Filter{
+	for evt, err := range gs.Relay.QueryStored(ctx, nostr.Filter{
 		Kinds:   []nostr.Kind{nostr.KindRepositoryState},
 		Authors: []nostr.PubKey{pubkey},
 		Tags:    nostr.TagMap{"d": []string{repoName}},
 		Limit:   1,
 	}) {
+		if err != nil {
+			return
+		}
+
 		parsed := nip34.ParseRepositoryState(evt)
 		state = &parsed
 		break
@@ -249,9 +256,13 @@ func (gs *GraspServer) cleanupMergedPatches(ctx context.Context, pubkey nostr.Pu
 
 		// check if there's still a valid patch event with a "c" tag referencing this commit
 		hasValidEvent := false
-		for evt := range gs.Relay.QueryStored(ctx, nostr.Filter{
+		for evt, err := range gs.Relay.QueryStored(ctx, nostr.Filter{
 			IDs: []nostr.ID{id},
 		}) {
+			if err != nil {
+				return
+			}
+
 			// check if event has a "c" tag
 			for _, tag := range evt.Tags {
 				if tag[0] == "c" && len(tag) > 1 {

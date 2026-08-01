@@ -63,7 +63,10 @@ func (rl *Relay) handleDeleteRequest(ctx context.Context, evt nostr.Event) error
 			ctx := context.WithValue(ctx, internalCallKey, struct{}{})
 
 			errg, ctx := errgroup.WithContext(ctx)
-			for target := range rl.QueryStored(ctx, f) {
+			for target, err := range rl.QueryStored(ctx, f) {
+				if err != nil {
+					return err
+				}
 				// got the event, now check if the user can delete it
 				if target.PubKey == evt.PubKey {
 					// delete it

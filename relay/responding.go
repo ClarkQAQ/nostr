@@ -29,7 +29,10 @@ func (rl *Relay) handleRequest(ctx context.Context, id string, eose *sync.WaitGr
 
 	// run the function to query events
 	if nil != rl.QueryStored {
-		for event := range rl.QueryStored(ctx, filter) {
+		for event, err := range rl.QueryStored(ctx, filter) {
+			if err != nil {
+				break
+			}
 			if nil != ws.WriteJSON(nostr.EventEnvelope{SubscriptionID: &id, Event: event}) {
 				break
 			}
@@ -39,7 +42,7 @@ func (rl *Relay) handleRequest(ctx context.Context, id string, eose *sync.WaitGr
 	return nil
 }
 
-func (rl *Relay) handleCountRequest(ctx context.Context, ws *WebSocket, filter nostr.Filter) uint32 {
+func (rl *Relay) handleCountRequest(ctx context.Context, ws *WebSocket, filter nostr.Filter) int64 {
 	// check if we'll reject this filter
 	if nil != rl.OnCount {
 		if rejecting, msg := rl.OnCount(ctx, filter); rejecting {
@@ -65,7 +68,7 @@ func (rl *Relay) handleCountRequestWithHLL(
 	ws *WebSocket,
 	filter nostr.Filter,
 	offset int,
-) (uint32, *hyperloglog.HyperLogLog) {
+) (int64, *hyperloglog.HyperLogLog) {
 	// check if we'll reject this filter
 	if nil != rl.OnCount {
 		if rejecting, msg := rl.OnCount(ctx, filter); rejecting {

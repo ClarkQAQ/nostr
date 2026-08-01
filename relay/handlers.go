@@ -246,7 +246,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					var total uint32
+					var total int64
 					var hll *hyperloglog.HyperLogLog
 
 					if offset := nip45.HyperLogLogEventPubkeyOffsetForFilter(env.Filter); offset != -1 {
@@ -255,9 +255,10 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						total = rl.handleCountRequest(ctx, ws, env.Filter)
 					}
 
+					totalUint32 := uint32(total)
 					resp := nostr.CountEnvelope{
 						SubscriptionID: env.SubscriptionID,
-						Count:          &total,
+						Count:          &totalUint32,
 					}
 					if hll != nil {
 						resp.HyperLogLog = hll.GetRegisters()

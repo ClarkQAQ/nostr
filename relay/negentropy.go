@@ -31,7 +31,10 @@ func (rl *Relay) startNegentropySession(ctx context.Context, filter nostr.Filter
 	// fetch events and add them to a negentropy Vector store
 	vec := vector.New()
 	if nil != rl.QueryStored {
-		for event := range rl.QueryStored(ctx, filter) {
+		for event, err := range rl.QueryStored(ctx, filter) {
+			if err != nil {
+				return nil, err
+			}
 			vec.Insert(event.CreatedAt, event.ID)
 		}
 	}

@@ -32,12 +32,15 @@ func (gs *GraspServer) validatePush(
 
 	// check state
 	var state nip34.RepositoryState
-	for evt := range gs.Relay.QueryStored(ctx, nostr.Filter{
+	for evt, err := range gs.Relay.QueryStored(ctx, nostr.Filter{
 		Kinds:   []nostr.Kind{nostr.KindRepositoryState},
 		Authors: []nostr.PubKey{pubkey},
 		Tags:    nostr.TagMap{"d": []string{repoName}},
 		Limit:   1,
 	}) {
+		if err != nil {
+			return err
+		}
 		state = nip34.ParseRepositoryState(evt)
 	}
 	if state.Event.ID == nostr.ZeroID {
@@ -46,12 +49,15 @@ func (gs *GraspServer) validatePush(
 
 	// get repository announcement to check maintainers
 	var announcement nip34.Repository
-	for evt := range gs.Relay.QueryStored(ctx, nostr.Filter{
+	for evt, err := range gs.Relay.QueryStored(ctx, nostr.Filter{
 		Kinds:   []nostr.Kind{nostr.KindRepositoryAnnouncement},
 		Authors: []nostr.PubKey{pubkey},
 		Tags:    nostr.TagMap{"d": []string{repoName}},
 		Limit:   1,
 	}) {
+		if err != nil {
+			return err
+		}
 		announcement = nip34.ParseRepository(evt)
 	}
 	if announcement.Event.ID == nostr.ZeroID {
@@ -88,9 +94,13 @@ func (gs *GraspServer) validatePush(
 				return fmt.Errorf("push rejected: invalid event id %s", eventId)
 			}
 			var foundEvent bool
-			for evt := range gs.Relay.QueryStored(ctx, nostr.Filter{
+			for evt, err := range gs.Relay.QueryStored(ctx, nostr.Filter{
 				IDs: []nostr.ID{id},
 			}) {
+				if err != nil {
+					return err
+				}
+
 				// check if event has a "c" tag matching the commit
 				hasMatchingCommit := false
 				for _, tag := range evt.Tags {
@@ -149,11 +159,14 @@ func (gs *GraspServer) getRepositoryPath(pubkey nostr.PubKey, repoName string) s
 
 // repoExists checks if a repository has an announcement event (kind 30617)
 func (gs *GraspServer) repoExists(ctx context.Context, pubkey nostr.PubKey, repoName string) bool {
-	for range gs.Relay.QueryStored(ctx, nostr.Filter{
+	for _, err := range gs.Relay.QueryStored(ctx, nostr.Filter{
 		Kinds:   []nostr.Kind{nostr.KindRepositoryAnnouncement},
 		Authors: []nostr.PubKey{pubkey},
 		Tags:    nostr.TagMap{"d": []string{repoName}},
 	}) {
+		if err != nil {
+			return false
+		}
 		return true
 	}
 	return false

@@ -32,11 +32,13 @@ func main() {
 		store[event.ID] = event
 		return nil
 	}
-	r.QueryStored = func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event] {
-		return func(yield func(nostr.Event) bool) {
+	r.QueryStored = func(ctx context.Context, filter nostr.Filter) iter.Seq2[nostr.Event, error] {
+		return func(yield func(nostr.Event, error) bool) {
 			for _, evt := range store {
 				if filter.Matches(evt) {
-					yield(evt)
+					if !yield(evt, nil) {
+						return
+					}
 				}
 			}
 		}

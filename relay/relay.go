@@ -69,9 +69,9 @@ type Relay struct {
 	OnEphemeralEvent          func(ctx context.Context, event nostr.Event)
 	OnRequest                 func(ctx context.Context, filter nostr.Filter) (reject bool, msg string)
 	OnCount                   func(ctx context.Context, filter nostr.Filter) (reject bool, msg string)
-	QueryStored               func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event]
-	Count                     func(ctx context.Context, filter nostr.Filter) (uint32, error)
-	CountHLL                  func(ctx context.Context, filter nostr.Filter, offset int) (uint32, *hyperloglog.HyperLogLog, error)
+	QueryStored               func(ctx context.Context, filter nostr.Filter) iter.Seq2[nostr.Event, error]
+	Count                     func(ctx context.Context, filter nostr.Filter) (int64, error)
+	CountHLL                  func(ctx context.Context, filter nostr.Filter, offset int) (int64, *hyperloglog.HyperLogLog, error)
 	RejectConnection          func(r *http.Request) bool
 	OnConnect                 func(ctx context.Context)
 	OnDisconnect              func(ctx context.Context)
@@ -127,29 +127,16 @@ type Relay struct {
 // maxQueryLimit is the default max limit to be enforced when querying events, to prevent users for downloading way
 // too much, setting it to something like 500 or 1000 should be ok in most cases.
 func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
-	rl.QueryStored = func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event] {
+	rl.QueryStored = func(ctx context.Context, filter nostr.Filter) iter.Seq2[nostr.Event, error] {
 		maxLimit := maxQueryLimit
 		if IsNegentropySession(ctx) {
 			maxLimit = maxQueryLimit * 20
 		}
 
-		next, stop := iter.Pull2(store.QueryEvents(ctx, filter, maxLimit))
-		return func(yield func(nostr.Event) bool) {
-			defer stop()
-			for {
-				evt, _, ok := next()
-				if !ok {
-					return
-				}
-				if !yield(evt) {
-					return
-				}
-			}
-		}
+		return store.QueryEvents(ctx, filter, maxLimit)
 	}
-	rl.Count = func(ctx context.Context, filter nostr.Filter) (uint32, error) {
-		n, err := store.CountEvents(ctx, filter)
-		return uint32(n), err
+	rl.Count = func(ctx context.Context, filter nostr.Filter) (int64, error) {
+		return store.CountEvents(ctx, filter)
 	}
 	rl.StoreEvent = func(ctx context.Context, event nostr.Event) error {
 		return store.SaveEvent(ctx, event)
@@ -162,7 +149,7 @@ func (rl *Relay) UseEventstore(store eventstore.Store, maxQueryLimit int) {
 	}
 
 	// only when using the eventstore we automatically set up the expiration manager
-	rl.StartExpirationManager(func(ctx context.Context, filter nostr.Filter) iter.Seq[nostr.Event] {
+	rl.StartExpirationManager(func(ctx context.Context, filter nostr.Filter) iter.Seq2[nostr.Event, error] {
 		return rl.QueryStored(ctx, filter)
 	}, func(ctx context.Context, id nostr.ID) error {
 		return rl.DeleteEvent(ctx, id)
