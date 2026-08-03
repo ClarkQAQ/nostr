@@ -232,9 +232,9 @@ type PebbleStore struct {
 
 	qsem chan struct{} // query concurrency gate
 
-	commitHist   hist
-	loadBodyHist hist
-	queryHist    hist
+	commitHist    hist
+	loadBodyHist  hist
+	queryHist     hist
 	groupSizeHist hist
 
 	stats struct {
@@ -246,6 +246,24 @@ type PebbleStore struct {
 		scanned atomic.Int64
 		loaded  atomic.Int64
 	}
+}
+
+// Discard logger and tracers.
+type NoopLoggerAndTracer struct{}
+
+var _ pebble.LoggerAndTracer = NoopLoggerAndTracer{}
+
+func (l NoopLoggerAndTracer) Infof(format string, args ...interface{}) {}
+
+func (l NoopLoggerAndTracer) Errorf(format string, args ...interface{}) {}
+
+func (l NoopLoggerAndTracer) Fatalf(format string, args ...interface{}) {}
+
+func (l NoopLoggerAndTracer) Eventf(ctx context.Context, format string, args ...interface{}) {
+}
+
+func (l NoopLoggerAndTracer) IsTracingEnabled(ctx context.Context) bool {
+	return false
 }
 
 // Open opens (or creates) a store and starts the write pipeline.
@@ -292,6 +310,9 @@ func Open(opts Options) (*PebbleStore, error) {
 		// pebble/v2 caps background compaction concurrency through a
 		// [lower, upper] range instead of the old MaxConcurrentCompactions
 		CompactionConcurrencyRange: func() (int, int) { return 1, maxComp },
+		// discard logging and tracing
+		Logger:          NoopLoggerAndTracer{},
+		LoggerAndTracer: NoopLoggerAndTracer{},
 	}
 	// Pebble defaults ship without bloom filters and with 2MB target files,
 	// which is fine for tiny KV workloads but brutal here: every point get
