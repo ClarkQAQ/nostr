@@ -48,6 +48,8 @@ func (rl *Relay) HandleMatcher(w http.ResponseWriter, r *http.Request) (http.Han
 }
 
 func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	if nil != rl.RejectConnection {
 		if rl.RejectConnection(r) {
 			w.WriteHeader(429) // Too many requests
@@ -74,7 +76,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 		AuthedPublicKeys:   make([]nostr.PubKey, 0),
 		negentropySessions: xsync.NewMapOf[string, *NegentropySession](),
 	}
-	ws.Context, ws.cancel = context.WithCancel(context.Background())
+	ws.Context, ws.cancel = context.WithCancel(ctx)
 
 	rl.clientsMutex.Lock()
 	rl.clients[ws] = make([]listenerSpec, 0, 2)
@@ -82,7 +84,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithCancel(
 		context.WithValue(
-			context.Background(),
+			context.WithoutCancel(ctx),
 			wsKey, ws,
 		),
 	)
