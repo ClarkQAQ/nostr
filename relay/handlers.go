@@ -134,7 +134,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if typ == websocket.PingMessage {
-				ws.WriteMessage(websocket.PongMessage, nil)
+				_ = ws.WriteMessage(websocket.PongMessage, nil)
 				continue
 			}
 
@@ -241,10 +241,10 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 							RequestAuth(ctx)
 						}
 					}
-					ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: ok, Reason: reason})
+					_ = ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: ok, Reason: reason})
 				case *nostr.CountEnvelope:
 					if rl.Count == nil && rl.CountHLL == nil {
-						ws.WriteJSON(nostr.ClosedEnvelope{SubscriptionID: env.SubscriptionID, Reason: "unsupported: this relay does not support NIP-45"})
+						_ = ws.WriteJSON(nostr.ClosedEnvelope{SubscriptionID: env.SubscriptionID, Reason: "unsupported: this relay does not support NIP-45"})
 						return
 					}
 
@@ -329,7 +329,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						ws.authLock.Unlock()
 						_ = ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: true})
 					} else {
-						ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "error: failed to authenticate: " + err.Error()})
+						_ = ws.WriteJSON(nostr.OKEnvelope{EventID: env.Event.ID, OK: false, Reason: "error: failed to authenticate: " + err.Error()})
 					}
 				case *nip77.OpenEnvelope:
 					if !rl.Negentropy {
@@ -343,7 +343,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						if strings.HasPrefix(reason, "auth-required:") {
 							RequestAuth(ctx)
 						}
-						ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: reason})
+						_ = ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: reason})
 						return
 					}
 
@@ -351,10 +351,10 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					neg := negentropy.New(vec, 1024*1024, false, false)
 					out, err := neg.Reconcile(env.Message)
 					if err != nil {
-						ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: err.Error()})
+						_ = ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: err.Error()})
 						return
 					}
-					ws.WriteJSON(nip77.MessageEnvelope{SubscriptionID: env.SubscriptionID, Message: out})
+					_ = ws.WriteJSON(nip77.MessageEnvelope{SubscriptionID: env.SubscriptionID, Message: out})
 
 					// if the message is not empty that means we'll probably have more reconciliation sessions, so store this
 					if out != "" {
@@ -375,24 +375,24 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					negSession, ok := ws.negentropySessions.Load(env.SubscriptionID)
 					if !ok {
 						// bad luck, your request was destroyed
-						ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: "CLOSED"})
+						_ = ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: "CLOSED"})
 						return
 					}
 					// reconcile to get the next message and return it
 					out, err := negSession.neg.Reconcile(env.Message)
 					if err != nil {
-						ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: err.Error()})
+						_ = ws.WriteJSON(nip77.ErrorEnvelope{SubscriptionID: env.SubscriptionID, Reason: err.Error()})
 						ws.negentropySessions.Delete(env.SubscriptionID)
 						return
 					}
-					ws.WriteJSON(nip77.MessageEnvelope{SubscriptionID: env.SubscriptionID, Message: out})
+					_ = ws.WriteJSON(nip77.MessageEnvelope{SubscriptionID: env.SubscriptionID, Message: out})
 
 					// if there is more reconciliation to do, postpone this
 					if out != "" {
 						negSession.postponeClose() // we will close this session after 2 minutes of no activity
 					} else {
 						// otherwise we can just close it
-						ws.WriteJSON(nip77.CloseEnvelope{SubscriptionID: env.SubscriptionID})
+						_ = ws.WriteJSON(nip77.CloseEnvelope{SubscriptionID: env.SubscriptionID})
 						ws.negentropySessions.Delete(env.SubscriptionID)
 					}
 				case *nip77.CloseEnvelope:
