@@ -294,13 +294,10 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if reader != nil || redirectURL != nil {
-			w.Header().Set("ETag", hash)
-			w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
-		}
-
 		if reader != nil {
 			defer reader.Close()
+			w.Header().Set("ETag", hash)
+			w.Header().Set("Cache-Control", "public, max-age=604800, must-revalidate")
 			http.ServeContent(w, r, hash+blossom.ExtensionByMimeType(mimeType), modtime, reader)
 			return
 		}
@@ -310,6 +307,10 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 				blossomError(w, "redirect url doesn't contain the file hash", http.StatusInternalServerError)
 				return
 			}
+
+			w.Header().Set("Expires", "0")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
 
 			http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
 			return
