@@ -2,6 +2,7 @@ package negentropy
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
@@ -85,7 +86,7 @@ func (n *Negentropy) Start() string {
 
 func (n *Negentropy) Reconcile(msg string) (string, error) {
 	n.initialized = true
-	msgb, err := nostr.HexDecodeString(msg)
+	msgb, err := hex.DecodeString(msg)
 	if err != nil {
 		return "", err
 	}
