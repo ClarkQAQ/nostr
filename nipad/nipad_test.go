@@ -11,33 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseURL(t *testing.T) {
-	tests := []struct {
-		input          string
-		expectedDomain string
-		expectedPath   string
-		expectError    bool
-	}{
-		{"https://golf.com/players", "golf.com", "/players", false},
-		{"golf.com/players", "golf.com", "/players", false},
-		{"https://golf.com", "golf.com", "/", false},
-		{"https://groups.com/quiche", "groups.com", "/quiche", false},
-		{"https://a.b.co.uk/foo/bar?x=1", "a.b.co.uk", "/foo/bar", false},
-		{"////", "", "", true},
-	}
-
-	for _, test := range tests {
-		domain, path, err := ParseURL(test.input)
-		if test.expectError {
-			assert.Error(t, err, "expected error for input: %s", test.input)
-		} else {
-			assert.NoError(t, err, "did not expect error for input: %s", test.input)
-			assert.Equal(t, test.expectedDomain, domain)
-			assert.Equal(t, test.expectedPath, path)
-		}
-	}
-}
-
 func TestResolve(t *testing.T) {
 	pk := nostr.Generate().Public()
 

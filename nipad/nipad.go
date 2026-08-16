@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"fiatjaf.com/nostr"
 	"github.com/mailru/easyjson"
@@ -18,27 +17,6 @@ type WellKnownResponse map[string]Path
 type Path struct {
 	Filter nostr.Filter `json:"filter"`
 	Relays []string     `json:"relays,omitempty"`
-}
-
-func ParseURL(rawurl string) (domain string, path string, err error) {
-	if !strings.Contains(rawurl, "://") {
-		rawurl = "https://" + rawurl
-	}
-
-	u, err := url.Parse(rawurl)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to parse '%s': %w", rawurl, err)
-	}
-
-	if u.Host == "" {
-		return "", "", fmt.Errorf("no domain in '%s'", rawurl)
-	}
-
-	if u.Path == "" {
-		u.Path = "/"
-	}
-
-	return u.Host, u.Path, nil
 }
 
 func Resolve(ctx context.Context, rawurl string) (*Path, error) {
@@ -62,18 +40,32 @@ var httpClient = &http.Client{
 }
 
 func Fetch(ctx context.Context, rawurl string) (resp WellKnownResponse, path string, err error) {
-	domain, path, err := ParseURL(rawurl)
+	normalized, err := nostr.NormalizeHTTPURL(rawurl)
 	if err != nil {
 		return resp, path, fmt.Errorf("failed to parse '%s': %w", rawurl, err)
 	}
 
+	u, err := url.Parse(normalized)
+	if err != nil {
+		return resp, path, fmt.Errorf("failed to parse '%s': %w", rawurl, err)
+	}
+
+	if u.Host == "" {
+		return resp, path, fmt.Errorf("no domain in '%s'", rawurl)
+	}
+
+	if u.Path == "" {
+		u.Path = "/"
+	}
+	path = u.Path
+
 	scheme := "https"
-	if u, err := url.Parse(rawurl); err == nil && u.Scheme != "" {
+	if u.Scheme != "" {
 		scheme = u.Scheme
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET",
-		fmt.Sprintf("%s://%s/.well-known/nostr.json?path=%s", scheme, domain, url.QueryEscape(path)), nil)
+		fmt.Sprintf("%s://%s/.well-known/nostr.json?path=%s", scheme, u.Host, url.QueryEscape(u.Path)), nil)
 	if err != nil {
 		return resp, path, fmt.Errorf("failed to create a request: %w", err)
 	}
