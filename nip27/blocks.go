@@ -19,7 +19,7 @@ type Block struct {
 
 var (
 	noCharacter    = regexp.MustCompile(`(?m)\W`)
-	noURLCharacter = regexp.MustCompile(`(?m)\W |\W$|$|,| `)
+	noURLCharacter = regexp.MustCompile(`(?m)[^\w/] |[^\w/]$|$|,| `)
 )
 
 func Parse(content string) iter.Seq[Block] {
