@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -114,9 +115,6 @@ var (
 	// index keys than Options.MaxScanKeys allows. It protects a small
 	// node from pathological filters (e.g. COUNT over a huge time range).
 	ErrScanBudgetExceeded = errors.New("relaystore: scan budget exceeded")
-	// ErrIncompatibleFormat is returned by Open when the on-disk format
-	// version doesn't match FormatVersion in keys.go.
-	ErrIncompatibleFormat = errors.New("relaystore: incompatible on-disk format version; recreate the database")
 )
 
 // Stats are cumulative counters since Open.
@@ -207,6 +205,7 @@ func (h *hist) snapshot() [9]int64 {
 type writeReq struct {
 	ev      *nostr.Event
 	raw     []byte
+	bloom   []byte // content bloom signature ('F' value); nil when content <3B
 	del     bool
 	replace bool
 	res     chan writeRes
@@ -231,6 +230,13 @@ type PebbleStore struct {
 	closed  atomic.Bool
 
 	qsem chan struct{} // query concurrency gate
+
+	// bloomMinTS is the created_at of the oldest content-signature key, or
+	// MaxInt64 when none exist. Every event with content >= 3 bytes and
+	// created_at >= bloomMinTS has an 'F' entry, so search scans can trust
+	// the signature index from this point on (see computeBloomMinTS /
+	// noteBloomMin).
+	bloomMinTS atomic.Int64
 
 	commitHist    hist
 	loadBodyHist  hist
@@ -331,24 +337,6 @@ func Open(opts Options) (*PebbleStore, error) {
 		return nil, fmt.Errorf("relaystore: open pebble: %w", err)
 	}
 
-	// Check or write format version.
-	ver := enc64(FormatVersion)
-	if v, cl, err := db.Get(versionKey); err == nil {
-		if string(v) != string(ver) {
-			cl.Close()
-			db.Close()
-			cch.Unref()
-			return nil, ErrIncompatibleFormat
-		}
-		cl.Close()
-	} else if errors.Is(err, pebble.ErrNotFound) {
-		_ = db.Set(versionKey, ver, pebble.Sync)
-	} else {
-		db.Close()
-		cch.Unref()
-		return nil, fmt.Errorf("relaystore: version check: %w", err)
-	}
-
 	s := &PebbleStore{
 		opts:    opts,
 		db:      db,
@@ -356,6 +344,8 @@ func Open(opts Options) (*PebbleStore, error) {
 		writeCh: make(chan *writeReq, opts.WriteGroupMax*4),
 		qsem:    make(chan struct{}, opts.MaxConcurrentQueries),
 	}
+	s.bloomMinTS.Store(math.MaxInt64)
+	s.bloomMinTS.Store(s.computeBloomMinTS())
 	s.wg.Add(1)
 	go s.writerLoop()
 	return s, nil
@@ -406,6 +396,40 @@ func (s *PebbleStore) Compact() error {
 	return s.db.Compact(context.Background(), []byte{0x00}, []byte{0xFF}, true)
 }
 
+// computeBloomMinTS finds the created_at of the oldest content-signature key,
+// or MaxInt64 when no signatures exist yet (e.g. a database created before
+// the feature). Two iterator seeks make this cheap even on huge databases.
+func (s *PebbleStore) computeBloomMinTS() int64 {
+	it, err := s.db.NewIter(&pebble.IterOptions{LowerBound: bloomPrefix()})
+	if err != nil {
+		return math.MaxInt64
+	}
+	defer it.Close()
+	if !it.First() {
+		return math.MaxInt64
+	}
+	k := it.Key()
+	if len(k) < 1+tsLen {
+		return math.MaxInt64
+	}
+	return int64(binary.BigEndian.Uint64(k[1 : 1+tsLen]))
+}
+
+// noteBloomMin lowers bloomMinTS to ts when a new signature key is written
+// with an older created_at than any seen so far. Called from the writer
+// goroutine so the signature index stays trustworthy between opens.
+func (s *PebbleStore) noteBloomMin(ts uint64) {
+	for {
+		cur := s.bloomMinTS.Load()
+		if cur <= int64(ts) {
+			return
+		}
+		if s.bloomMinTS.CompareAndSwap(cur, int64(ts)) {
+			return
+		}
+	}
+}
+
 func (s *PebbleStore) indexedTag(name string) bool {
 	if s.opts.IndexedTags == nil {
 		return len(name) == 1
@@ -440,7 +464,7 @@ func (s *PebbleStore) save(ev *nostr.Event) (bool, error) {
 	if err := betterbinary.Marshal(*ev, bin); err != nil {
 		return false, err
 	}
-	req := &writeReq{ev: ev, raw: bin, res: make(chan writeRes, 1)}
+	req := &writeReq{ev: ev, raw: bin, bloom: contentBloom(ev.Content), res: make(chan writeRes, 1)}
 	select {
 	case s.writeCh <- req:
 	default:
@@ -681,6 +705,11 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 			for _, k := range indexKeysFor(req.ev, s.indexedTag) {
 				_ = batch.Set(k, nil, nil)
 			}
+			if req.bloom != nil {
+				_ = batch.Set(bloomKey(ts, id[:]), req.bloom, nil)
+				s.noteBloomMin(ts)
+			}
+			addHLLMerges(batch, req.ev)
 			bump(req.ev, 1)
 			// Apply deletions for the versions we just superseded. We delete
 			// their locator, body, and index keys, and decrement counters.
@@ -690,6 +719,7 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 				oldTs := uint64(old.CreatedAt)
 				_ = batch.Delete(oldLk, nil)
 				_ = batch.Delete(bodyKey(oldTs, old.ID[:]), nil)
+				_ = batch.Delete(bloomKey(oldTs, old.ID[:]), nil)
 				for _, k := range indexKeysFor(old, s.indexedTag) {
 					_ = batch.Delete(k, nil)
 				}
@@ -725,6 +755,11 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 			for _, k := range indexKeysFor(req.ev, s.indexedTag) {
 				_ = batch.Set(k, nil, nil)
 			}
+			if req.bloom != nil {
+				_ = batch.Set(bloomKey(ts, id[:]), req.bloom, nil)
+				s.noteBloomMin(ts)
+			}
+			addHLLMerges(batch, req.ev)
 			bump(req.ev, 1)
 			pend = append(pend, pending{req: req})
 		} else {
@@ -748,6 +783,7 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 
 			_ = batch.Delete(lk, nil)
 			_ = batch.Delete(bodyKey(ts, id[:]), nil)
+			_ = batch.Delete(bloomKey(ts, id[:]), nil)
 			for _, k := range indexKeysFor(req.ev, s.indexedTag) {
 				_ = batch.Delete(k, nil)
 			}
@@ -900,7 +936,7 @@ func (s *PebbleStore) replace(ev *nostr.Event) ([]nostr.Event, error) {
 	if err := betterbinary.Marshal(*ev, bin); err != nil {
 		return nil, err
 	}
-	req := &writeReq{ev: ev, raw: bin, replace: true, res: make(chan writeRes, 1)}
+	req := &writeReq{ev: ev, raw: bin, bloom: contentBloom(ev.Content), replace: true, res: make(chan writeRes, 1)}
 	select {
 	case s.writeCh <- req:
 	default:

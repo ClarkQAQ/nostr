@@ -5,7 +5,6 @@ import (
 	"container/heap"
 	"context"
 	"encoding/binary"
-	"errors"
 	"iter"
 	"math"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/eventstore"
 	"fiatjaf.com/nostr/eventstore/codec/betterbinary"
+	"fiatjaf.com/nostr/eventstore/searcher"
 	"github.com/cockroachdb/pebble/v2"
 )
 
@@ -34,11 +34,6 @@ const (
 	modeTime
 )
 
-// ErrSearchUnsupported is yielded/returned when a Filter carries a NIP-50
-// Search string: this backend does not implement full-text search and
-// refuses to silently return unfiltered results.
-var ErrSearchUnsupported = errors.New("relaystore: NIP-50 search is not supported by this backend")
-
 var _ eventstore.Store = (*PebbleStore)(nil)
 
 // QueryEvents streams events matching the filter, newest first, capped by
@@ -51,10 +46,6 @@ func (s *PebbleStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxL
 	return func(yield func(nostr.Event, error) bool) {
 		t0 := time.Now()
 		defer func() { s.queryHist.record(time.Since(t0).Microseconds()) }()
-		if filter.Search != "" {
-			yield(nostr.Event{}, ErrSearchUnsupported)
-			return
-		}
 		if err := s.acquire(ctx); err != nil {
 			yield(nostr.Event{}, err)
 			return
@@ -62,7 +53,20 @@ func (s *PebbleStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxL
 		defer s.release()
 		s.stats.queries.Add(1)
 
-		c, err := s.newFilterRun(&filter, true, maxLimit).openCursor(ctx)
+		fr := s.newFilterRun(&filter, true, maxLimit)
+		if fr.search != nil && fr.plan() == modeTime && len(fr.searchGrams) > 0 {
+			evs, _, err := fr.searchRun(ctx)
+			for _, ev := range evs {
+				if !yield(ev, nil) {
+					return
+				}
+			}
+			if err != nil {
+				yield(nostr.Event{}, err)
+			}
+			return
+		}
+		c, err := fr.openCursor(ctx)
 		if err != nil {
 			yield(nostr.Event{}, err)
 			return
@@ -84,16 +88,18 @@ func (s *PebbleStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxL
 
 // CountEvents returns the exact NIP-45 count for the filter.
 func (s *PebbleStore) CountEvents(ctx context.Context, filter nostr.Filter) (int64, error) {
-	if filter.Search != "" {
-		return 0, ErrSearchUnsupported
-	}
 	if err := s.acquire(ctx); err != nil {
 		return 0, err
 	}
 	defer s.release()
 	s.stats.counts.Add(1)
 	f := filter
-	return s.newFilterRun(&f, false, 0).count(ctx)
+	fr := s.newFilterRun(&f, false, 0)
+	if fr.search != nil && fr.plan() == modeTime && len(fr.searchGrams) > 0 {
+		_, n, err := fr.searchRun(ctx)
+		return n, err
+	}
+	return fr.count(ctx)
 }
 
 // candidate is one accepted event at the cursor. ev is nil on count-only
@@ -112,6 +118,9 @@ type filterRun struct {
 	budget int64
 	query  bool // true: bodies are loaded; false: count only
 
+	search      *searcher.Searcher // non-nil when filter.Search != ""
+	searchGrams [][3]byte          // bloom-test trigrams of the pattern
+
 	scanned int64
 }
 
@@ -127,7 +136,12 @@ func (s *PebbleStore) newFilterRun(f *nostr.Filter, forQuery bool, maxClamp int)
 	} else {
 		limit = 0 // COUNT ignores limit: exact match count
 	}
-	return &filterRun{s: s, f: f, limit: limit, budget: int64(s.opts.MaxScanKeys), query: forQuery}
+	fr := &filterRun{s: s, f: f, limit: limit, budget: int64(s.opts.MaxScanKeys), query: forQuery}
+	if f.Search != "" {
+		fr.search = searcher.NewSearcher(f.Search)
+		fr.searchGrams = buildSearchGrams(f.Search)
+	}
+	return fr
 }
 
 // plan picks the driving index. Priority: ids > authors > tags > kinds > time.
@@ -183,7 +197,7 @@ func (q *filterRun) count(ctx context.Context) (int64, error) {
 		return int64(len(cands)), nil
 	}
 	// Fast path 1: unbounded author+kind counts are pure counter point reads.
-	if q.plan() == modeAuthors && countTagPreds(q.f) == 0 &&
+	if q.search == nil && q.plan() == modeAuthors && countTagPreds(q.f) == 0 &&
 		q.f.Since <= 0 && q.f.Until <= 0 && len(q.f.Kinds) > 0 {
 		var sum int64
 		for _, a := range q.f.Authors {
@@ -200,7 +214,7 @@ func (q *filterRun) count(ctx context.Context) (int64, error) {
 	// Fast path 2: kind/time-only counts use the two-tier (hour+day) rollup
 	// counters — a 24h COUNT is a handful of counter reads plus at most two
 	// partial-hour scans, instead of a 250k-key full scan.
-	if q.plan() == modeKinds || q.plan() == modeTime {
+	if q.search == nil && (q.plan() == modeKinds || q.plan() == modeTime) {
 		if n, ok, err := q.countRollup(ctx); ok || err != nil {
 			return n, err
 		}
@@ -619,7 +633,7 @@ func (q *filterRun) openCursor(ctx context.Context) (*filterCursor, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.postCheck = postCheck
+	c.postCheck = postCheck || q.search != nil
 	c.srcs = srcs
 	for _, s := range srcs {
 		if s.valid {
@@ -734,6 +748,18 @@ func (c *filterCursor) advance() {
 				defer wg.Done()
 				for j := range jobs {
 					rc := rawCands[j]
+					// Signature prefilter: skip bodies whose bloom cannot
+					// contain the pattern (missing blooms are passed through).
+					if q.search != nil && len(q.searchGrams) > 0 {
+						bloom, cl, err := q.s.db.Get(bloomKey(rc.ts, rc.id[:]))
+						if err == nil {
+							pass := len(bloom) != bloomBytes || bloomMaybeContains(bloom, q.searchGrams)
+							cl.Close()
+							if !pass {
+								continue
+							}
+						}
+					}
 					ev, err := q.s.loadBody(rc.ts, rc.id)
 					if err != nil {
 						results <- loaded{idx: j, err: err}
@@ -743,6 +769,9 @@ func (c *filterCursor) advance() {
 						continue
 					}
 					if c.postCheck && !q.f.Matches(*ev) {
+						continue
+					}
+					if q.search != nil && !q.search.Contains(ev.Content) {
 						continue
 					}
 					results <- loaded{cand: candidate{ts: rc.ts, id: rc.id, ev: ev}, idx: j}
@@ -896,6 +925,9 @@ func (q *filterRun) runIDs(ctx context.Context) ([]candidate, error) {
 			continue
 		}
 		if !q.f.Matches(*r.cand.ev) {
+			continue
+		}
+		if q.search != nil && !q.search.Contains(r.cand.ev.Content) {
 			continue
 		}
 		out = append(out, r.cand)

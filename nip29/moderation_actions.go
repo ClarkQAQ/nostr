@@ -135,6 +135,12 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 				case "open":
 					edit.ClosedValue = &n
 					ok = true
+				case "approval":
+					if len(tag) >= 2 {
+						v := tag[1] == "manual"
+						edit.ApprovalValue = &v
+						ok = true
+					}
 				case "restricted":
 					edit.RestrictedValue = &y
 					if hasName {
@@ -293,6 +299,7 @@ type EditMetadata struct {
 	AboutValue          *string
 	RestrictedValue     *bool
 	ClosedValue         *bool
+	ApprovalValue       *bool
 	HiddenValue         *bool
 	PrivateValue        *bool
 	LiveKitValue        *bool
@@ -332,6 +339,9 @@ func (a EditMetadata) Apply(group *Group) {
 	}
 	if a.ClosedValue != nil {
 		group.Closed = *a.ClosedValue
+	}
+	if a.ApprovalValue != nil {
+		group.ManualApproval = *a.ApprovalValue
 	}
 	if a.HiddenValue != nil {
 		group.Hidden = *a.HiddenValue

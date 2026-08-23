@@ -48,7 +48,7 @@ func (rl *Relay) HandleMatcher(w http.ResponseWriter, r *http.Request) (http.Han
 }
 
 func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx := context.WithoutCancel(r.Context())
 
 	if nil != rl.RejectConnection {
 		if rl.RejectConnection(r) {
@@ -82,12 +82,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	rl.clients[ws] = make([]listenerSpec, 0, 2)
 	rl.clientsMutex.Unlock()
 
-	ctx, cancel := context.WithCancel(
-		context.WithValue(
-			context.WithoutCancel(ctx),
-			wsKey, ws,
-		),
-	)
+	ctx, cancel := context.WithCancel(context.WithValue(ctx, wsKey, ws))
 
 	kill := sync.OnceFunc(func() {
 		if nil != rl.OnDisconnect {

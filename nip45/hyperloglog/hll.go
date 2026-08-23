@@ -5,6 +5,16 @@ import (
 	"fmt"
 )
 
+// invPow2[v] == 2^(-v) for v in [0, 63]. Register values are tiny (<=57), so
+// the table makes Count() division-free and allocation-free per register.
+var invPow2 [64]float64
+
+func init() {
+	for i := range invPow2 {
+		invPow2[i] = 1.0 / float64(uint64(1)<<uint(i))
+	}
+}
+
 // Everything is hardcoded to use precision 8, i.e. 256 registers.
 type HyperLogLog struct {
 	offset    int
@@ -49,16 +59,20 @@ func (hll *HyperLogLog) Clear() {
 	}
 }
 
+// RegisterForPubkey returns the register index and value an event pubkey maps
+// to under the given offset, without mutating any sketch. offset must be in
+// [0, 24] so the 8-byte window stays inside the 32-byte pubkey.
+func RegisterForPubkey(pubkey [32]byte, offset int) (idx uint8, val uint8) {
+	x := pubkey[offset : offset+8]
+	w := binary.BigEndian.Uint64(x)
+	return x[0], clz56(w) + 1
+}
+
 // Add takes a Nostr event pubkey which will be used as the item "key" (that combined with the offset)
 func (hll *HyperLogLog) Add(pubkey [32]byte) {
-	x := pubkey[hll.offset : hll.offset+8]
-	j := x[0] // register address (first 8 bits, i.e. first byte)
-
-	w := binary.BigEndian.Uint64(x) // number that we will use
-	zeroBits := clz56(w) + 1        // count zeroes (skip the first byte, so only use 56 bits)
-
-	if zeroBits > hll.registers[j] {
-		hll.registers[j] = zeroBits
+	idx, val := RegisterForPubkey(pubkey, hll.offset)
+	if val > hll.registers[idx] {
+		hll.registers[idx] = val
 	}
 }
 
@@ -70,8 +84,13 @@ func (hll *HyperLogLog) Merge(other *HyperLogLog) {
 	}
 }
 
-func (hll *HyperLogLog) Count() uint64 {
-	v := countZeros(hll.registers)
+// CountRegisters estimates the cardinality from a raw 256-register sketch,
+// using the same estimation logic as HyperLogLog.Count.
+func CountRegisters(registers []byte) uint64 {
+	if len(registers) != 256 {
+		return 0
+	}
+	v := countZeros(registers)
 
 	if v != 0 {
 		lc := linearCounting(256 /* nregisters */, v)
@@ -81,7 +100,7 @@ func (hll *HyperLogLog) Count() uint64 {
 		}
 	}
 
-	est := hll.calculateEstimate()
+	est := estimateRegisters(registers)
 	if est <= 256 /* nregisters */ *3 {
 		if v != 0 {
 			return uint64(linearCounting(256 /* nregisters */, v))
@@ -91,10 +110,14 @@ func (hll *HyperLogLog) Count() uint64 {
 	return uint64(est)
 }
 
-func (hll HyperLogLog) calculateEstimate() float64 {
+func (hll *HyperLogLog) Count() uint64 {
+	return CountRegisters(hll.registers)
+}
+
+func estimateRegisters(registers []byte) float64 {
 	sum := 0.0
-	for _, val := range hll.registers {
-		sum += 1.0 / float64(uint64(1)<<val) // this is the same as 2^(-val)
+	for _, val := range registers {
+		sum += invPow2[val]
 	}
 
 	return 0.7182725932495458 /* alpha for 256 registers */ * 256 /* nregisters */ * 256 /* nregisters */ / sum

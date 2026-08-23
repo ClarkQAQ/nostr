@@ -20,6 +20,8 @@ import (
 //	'k' + kind(4) + ts(8) + id(32)                -> kind timeline          (kind, created_at)
 //	't' + nl(1) + name + vl(2) + value + ts(8) + id(32) -> tag index        (tag name+value, created_at)
 //	'T' + ts(8) + id(32)                          -> global timeline        (created_at)
+//	'F' + ts(8) + id(32)                          -> content bloom signature (128B, see bloom.go)
+//	'H' + tagKey(1) + kind(4) + ref(32)           -> NIP-45 HLL sketch (merged value, see keys.go)
 //
 // Bodies are keyed by (ts, id) instead of id so that events created close
 // in time share SST blocks. Relay traffic is heavily recency-biased: feed,
@@ -39,6 +41,8 @@ const (
 	pfxKind      = 'k'
 	pfxTag       = 't'
 	pfxTime      = 'T'
+	pfxBloom     = 'F'
+	pfxHLL       = 'H'
 )
 
 const (
@@ -46,13 +50,6 @@ const (
 	tsLen   = 8
 	tailLen = tsLen + idLen // every secondary index key ends with ts+id
 )
-
-// FormatVersion is written as a sentinel key at DB creation; changing
-// it signals an incompatible on-disk format.
-const FormatVersion int64 = 2
-
-// versionKey is the magic key storing the format version.
-var versionKey = []byte{0xFF, 0xFF, 'V', 'E', 'R', 'S', 'I', 'O', 'N'}
 
 // encTS encodes a uint64 timestamp in 8 big-endian bytes for key encoding.
 func encTS(ts uint64) []byte {
@@ -114,6 +111,34 @@ func tagPrefix(name, value string) []byte {
 }
 
 func timePrefix() []byte { return []byte{pfxTime} }
+
+func bloomPrefix() []byte { return []byte{pfxBloom} }
+
+// bloomKey is the content-signature index key: ts+id locate the event, the
+// value is the 128-byte bloom signature built from its content (see
+// contentBloom). Missing keys mean "no signature available — read the body".
+func bloomKey(ts uint64, id []byte) []byte {
+	k := make([]byte, 1+tsLen+idLen)
+	k[0] = pfxBloom
+	binary.BigEndian.PutUint64(k[1:], ts)
+	copy(k[1+tsLen:], id)
+	return k
+}
+
+// hllKey addresses the NIP-45 HyperLogLog sketch for one (tag key, kind,
+// reference) tuple. tagKey is the single-letter tag name ('e', 'q', 'E', 'p');
+// kind is the referencing event kind (two sketches share a ref for '#q');
+// ref is the 32-byte binary target id. The value is the 257-byte dense
+// register dump (0x00 + 256 registers) once merged, and merge operands are
+// sparse 3-byte updates (see CounterMerger).
+func hllKey(tagKey byte, kind uint32, ref []byte) []byte {
+	k := make([]byte, 1+1+4+idLen)
+	k[0] = pfxHLL
+	k[1] = tagKey
+	binary.BigEndian.PutUint32(k[2:], kind)
+	copy(k[6:], ref)
+	return k
+}
 
 // ---- rollup counters (NIP-45 fast COUNT) ----
 //
@@ -220,11 +245,64 @@ func (m *counterValueMerger) Finish(includesBase bool) ([]byte, io.Closer, error
 	return enc64(m.sum), nil, nil
 }
 
-// CounterMerger is the pebble.Merger for all rollup counter keys (those
-// under pfxCounter). Its name is persisted in the DB manifest; changing it
-// later is a format-breaking change.
+// HLL merge operand/value formats. Dense is the canonical stored form
+// (produced by reads and compactions); sparse is what the write path merges.
+const (
+	hllDense  = 0x00
+	hllSparse = 0x01
+)
+
+// hllValueMerger implements pebble.ValueMerger for HLL sketch keys (those
+// under pfxHLL): every operand is either a dense 257-byte register dump or a
+// sparse 3-byte update (type + register index + value). Merging takes the
+// element-wise max, which is the HyperLogLog union.
+type hllValueMerger struct {
+	registers [256]uint8
+}
+
+func (m *hllValueMerger) apply(value []byte) {
+	if len(value) == 0 {
+		return
+	}
+	switch value[0] {
+	case hllDense:
+		if len(value) == 1+256 {
+			for i, v := range value[1:] {
+				if v > m.registers[i] {
+					m.registers[i] = v
+				}
+			}
+		}
+	case hllSparse:
+		if len(value) == 3 {
+			idx, v := value[1], value[2]
+			if v > m.registers[idx] {
+				m.registers[idx] = v
+			}
+		}
+	}
+}
+
+func (m *hllValueMerger) MergeNewer(value []byte) error { m.apply(value); return nil }
+func (m *hllValueMerger) MergeOlder(value []byte) error { m.apply(value); return nil }
+func (m *hllValueMerger) Finish(includesBase bool) ([]byte, io.Closer, error) {
+	out := make([]byte, 1+256)
+	out[0] = hllDense
+	copy(out[1:], m.registers[:])
+	return out, nil, nil
+}
+
+// CounterMerger is the pebble.Merger for all rollup keys: 'N'-prefixed
+// counters sum int64 deltas, 'H'-prefixed HLL sketches take the register-wise
+// max. Its name is persisted in the DB manifest; changing it later is a
+// format-breaking change.
 var CounterMerger = &pebble.Merger{
 	Merge: func(key, value []byte) (pebble.ValueMerger, error) {
+		if len(key) > 0 && key[0] == pfxHLL {
+			m := &hllValueMerger{}
+			m.apply(value)
+			return m, nil
+		}
 		m := &counterValueMerger{}
 		if len(value) == 8 {
 			m.sum = dec64(value)

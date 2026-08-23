@@ -54,6 +54,10 @@ type Group struct {
 	// indicates that join requests are ignored unless they include an invite code
 	Closed bool
 
+	// indicates that join requests are queued for manual approval instead of
+	// being automatically accepted by the relay
+	ManualApproval bool
+
 	// indicates that relays should hide group metadata from non-members
 	Hidden bool
 
@@ -190,6 +194,9 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	if group.Closed {
 		evt.Tags = append(evt.Tags, nostr.Tag{"closed"})
 	}
+	if group.ManualApproval {
+		evt.Tags = append(evt.Tags, nostr.Tag{"approval", "manual"})
+	}
 	if group.LiveKit {
 		evt.Tags = append(evt.Tags, nostr.Tag{"livekit"})
 	}
@@ -301,6 +308,8 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 				group.Restricted = true
 			case "closed":
 				group.Closed = true
+			case "approval":
+				group.ManualApproval = len(tag) >= 2 && tag[1] == "manual"
 			case "hidden":
 				group.Hidden = true
 			case "livekit":

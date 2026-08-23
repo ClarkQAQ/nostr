@@ -11,14 +11,14 @@ import (
 // HyperLogLogFilterIsEligible returns true if the filter matches one of the
 // explicitly supported NIP-45 common filter cases for HyperLogLog computation.
 func HyperLogLogFilterIsEligible(filter nostr.Filter) bool {
-	_, _, ok := extractHLLFilterTag(filter)
+	_, _, ok := HyperLogLogFilterTag(filter)
 	return ok
 }
 
-// extractHLLFilterTag extracts tag key and value from a filter eligible for
+// HyperLogLogFilterTag extracts tag key and value from a filter eligible for
 // HyperLogLog. Returns (tagKey, tagValue, true) when the filter matches one
 // of the explicitly supported NIP-45 cases.
-func extractHLLFilterTag(filter nostr.Filter) (string, string, bool) {
+func HyperLogLogFilterTag(filter nostr.Filter) (string, string, bool) {
 	if filter.IDs != nil || filter.Since != 0 || filter.Until != 0 || filter.Authors != nil ||
 		filter.Search != "" {
 		return "", "", false
@@ -75,7 +75,7 @@ func extractHLLFilterTag(filter nostr.Filter) (string, string, bool) {
 //
 // It returns -1 when the filter is not eligible for hyperloglog calculation.
 func HyperLogLogEventPubkeyOffsetForFilter(filter nostr.Filter) int {
-	_, tagValue, ok := extractHLLFilterTag(filter)
+	_, tagValue, ok := HyperLogLogFilterTag(filter)
 	if !ok {
 		return -1
 	}

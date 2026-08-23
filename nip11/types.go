@@ -31,6 +31,14 @@ type RelayInformationDocument struct {
 
 	// nip-34 grasp stuff
 	SupportedGrasps []string `json:"supported_grasps,omitempty"`
+
+	Nip29 *Nip29Document `json:"nip29,omitempty"`
+}
+
+// Nip29Document advertises NIP-29 relay capabilities.
+type Nip29Document struct {
+	Subgroups bool `json:"subgroups,omitempty"`
+	LiveKit   bool `json:"livekit,omitempty"`
 }
 
 func (info *RelayInformationDocument) AddSupportedNIP(number int) {

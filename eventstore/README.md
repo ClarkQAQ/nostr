@@ -33,6 +33,10 @@ type Store interface {
 
 - **bleve**: Full-text search and indexing using the Bleve search library
 - **boltdb**: Embedded key-value database using BoltDB
+- **badgerdb**: Embedded key-value database using Badger
+- **pebbledb2**: Embedded LSM database using Pebble, with rollup counters,
+  NIP-45 HyperLogLog cardinality estimates (`CountEventsHLL`) and NIP-50
+  content search accelerated by a bloom-signature index
 - **lmdb**: High-performance embedded database using LMDB
 - **mmm**: Custom memory-mapped storage with advanced indexing
 - **nullstore**: No-op store for testing and development
