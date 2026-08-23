@@ -12,52 +12,87 @@ import (
 	"github.com/cockroachdb/pebble/v2"
 )
 
-// searchTask is one time-bounded piece of a signature-scan search. useBloom
-// scans the 'F' signature index (skipping bodies whose bloom cannot contain
-// the pattern); otherwise the plain timeline is scanned and every body is
-// read (events predating the signature index, or too short to have one).
+// searchTask is one time-bounded piece of a signature-scan search.
 type searchTask struct {
-	lo, hi   int64
-	useBloom bool
+	lo, hi int64
 }
 
-// searchTasks splits the filter's time range based on signature coverage:
-// everything before the oldest signature key is scanned via the timeline,
-// everything at or after it is covered by 'F' entries. Each segment is split
-// into up to 8 pieces for parallel scanning.
+// splitRange divides [dMin, dMax] into n contiguous pieces with no overlap
+// and full coverage. The per-piece width is added repeatedly (never
+// multiplied by the piece index), so a full-width range (dMin=0,
+// dMax=MaxInt64, i.e. 2^63+1 points) does not overflow uint64.
+func splitRange(dMin, dMax int64, n int) [][2]int64 {
+	if dMax < dMin {
+		return nil
+	}
+	width := uint64(dMax) - uint64(dMin) + 1
+	// width == 0 only when the range covers all 2^64 values
+	// ([MinInt64, MaxInt64]): keep the requested piece count.
+	if width != 0 && width < uint64(n) {
+		n = int(width)
+	}
+	w := width / uint64(n)
+	if w == 0 {
+		w = 1
+	}
+	out := make([][2]int64, 0, n)
+	for i := 0; i < n; i++ {
+		lo := uint64(dMin) + uint64(i)*w
+		hi := lo + w - 1
+		if i == n-1 {
+			hi = uint64(dMax) // last piece absorbs the remainder
+		}
+		out = append(out, [2]int64{int64(lo), int64(hi)})
+	}
+	return out
+}
+
+// dataTimeRange returns the [min, max] created_at of stored bodies, or
+// (0, -1) when the store is empty. Two seeks on the body index locate the
+// extremes cheaply.
+func (s *PebbleStore) dataTimeRange() (int64, int64) {
+	it, err := s.db.NewIter(&pebble.IterOptions{LowerBound: timePrefix()})
+	if err != nil {
+		return 0, -1
+	}
+	defer it.Close()
+	if !it.First() {
+		return 0, -1
+	}
+	k := it.Key()
+	min := int64(binary.BigEndian.Uint64(k[len(k)-tailLen : len(k)-idLen]))
+	if !it.Last() {
+		return min, min
+	}
+	k = it.Key()
+	max := int64(binary.BigEndian.Uint64(k[len(k)-tailLen : len(k)-idLen]))
+	return min, max
+}
+
+// searchTasks splits the filter's time range into up to 8 pieces for parallel
+// scanning. Pieces are carved from the intersection of the filter range and
+// the actual stored data range, so a mostly-uniform distribution spreads the
+// work across shards instead of lumping it into one. Every piece scans the
+// body index merged with the signature index, so coverage does not depend on
+// how many signature keys exist.
 func (q *filterRun) searchTasks() []searchTask {
-	bloomMin := q.s.bloomMinTS.Load()
 	since, until := q.sinceUntil()
-	var segs []searchTask
 	if since > until {
 		return nil
 	}
-	if until < bloomMin {
-		segs = append(segs, searchTask{since, until, false})
-	} else {
-		if since < bloomMin {
-			segs = append(segs, searchTask{since, bloomMin - 1, false})
-		}
-		lo := bloomMin
-		if since > lo {
-			lo = since
-		}
-		segs = append(segs, searchTask{lo, until, true})
+	dMin, dMax := q.s.dataTimeRange()
+	if dMax < 0 || dMax < since || dMin > until {
+		return nil
 	}
-
-	const pieces = 8
-	var tasks []searchTask
+	lo := max(since, dMin)
+	hi := min(until, dMax)
+	if lo > hi {
+		return nil
+	}
+	segs := splitRange(lo, hi, 8)
+	tasks := make([]searchTask, 0, len(segs))
 	for _, seg := range segs {
-		width := uint64(seg.hi) - uint64(seg.lo) + 1
-		n := uint64(pieces)
-		if width < n {
-			n = width
-		}
-		for i := uint64(0); i < n; i++ {
-			lo := int64(uint64(seg.lo) + width*i/n)
-			hi := int64(uint64(seg.lo) + width*(i+1)/n - 1)
-			tasks = append(tasks, searchTask{lo, hi, seg.useBloom})
-		}
+		tasks = append(tasks, searchTask{seg[0], seg[1]})
 	}
 	return tasks
 }
@@ -147,65 +182,106 @@ sendTasks:
 	return evs, 0, nil
 }
 
-// searchTask scans one time-bounded piece, testing content signatures (when
-// available) and resolving survivors with a body read + exact substring
-// match. Query mode retains at most q.limit candidates per task.
+// searchTask scans one time-bounded piece by merging the body index (every
+// event) with the content-signature index (events whose content is at least 3
+// bytes). A body without a signature — a legacy row or short content — is read
+// directly; a body with a signature is skipped when the bloom cannot contain
+// the pattern. Every body is visited exactly once, so the result is exact
+// regardless of signature coverage.
 func (q *filterRun) searchTask(ctx context.Context, t searchTask, scanned *atomic.Int64) ([]candidate, int64, error) {
-	prefix := timePrefix()
-	if t.useBloom {
-		prefix = bloomPrefix()
-	}
-	lower, upper := timeBounds(prefix, t.lo, t.hi)
-	it, err := q.s.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
+	lower, upper := timeBounds(timePrefix(), t.lo, t.hi)
+	itB, err := q.s.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
 	if err != nil {
 		return nil, 0, err
 	}
-	defer it.Close()
+	defer itB.Close()
+
+	fLower, fUpper := timeBounds(bloomPrefix(), t.lo, t.hi)
+	itF, err := q.s.db.NewIter(&pebble.IterOptions{LowerBound: fLower, UpperBound: fUpper})
+	if err != nil {
+		return nil, 0, err
+	}
+	defer itF.Close()
+
+	parseTail := func(k []byte) (uint64, nostr.ID) {
+		var id nostr.ID
+		copy(id[:], k[len(k)-idLen:])
+		return binary.BigEndian.Uint64(k[len(k)-tailLen : len(k)-idLen]), id
+	}
 
 	var cands []candidate
 	var count int64
-	for valid := it.First(); valid; valid = it.Next() {
+	step := func() error {
 		n := scanned.Add(1)
 		if n > q.budget {
-			return nil, 0, ErrScanBudgetExceeded
+			return ErrScanBudgetExceeded
 		}
 		if n&0x3FF == 0 {
 			if err := ctx.Err(); err != nil {
-				return nil, 0, err
+				return err
 			}
 		}
-		k := it.Key()
-		ts := binary.BigEndian.Uint64(k[len(k)-tailLen : len(k)-idLen])
-		var id nostr.ID
-		copy(id[:], k[len(k)-idLen:])
+		return nil
+	}
 
-		if t.useBloom {
-			v := it.Value()
-			if len(v) == bloomBytes && !bloomMaybeContains(v, q.searchGrams) {
-				continue
+	// Both streams are ordered by (ts, id); the signature stream is a subset
+	// of the body stream (every signature key was written together with its
+	// body and is deleted with it), so a linear merge visits each body once.
+	bOK := itB.First()
+	fOK := itF.First()
+	var bTS uint64
+	var bID nostr.ID
+	var fTS uint64
+	var fID nostr.ID
+	if bOK {
+		bTS, bID = parseTail(itB.Key())
+	}
+	if fOK {
+		fTS, fID = parseTail(itF.Key())
+	}
+
+	for bOK {
+		if err := step(); err != nil {
+			return nil, 0, err
+		}
+		// advance the signature stream to the current body
+		for fOK && (fTS < bTS || (fTS == bTS && bytes.Compare(fID[:], bID[:]) < 0)) {
+			fOK = itF.Next()
+			if fOK {
+				fTS, fID = parseTail(itF.Key())
 			}
 		}
+		hasSig := fOK && fTS == bTS && bytes.Equal(fID[:], bID[:])
+		if hasSig && !bloomMaybeContains(itF.Value(), q.searchGrams) {
+			// signature says the pattern cannot be present; skip the body
+			bOK = itB.Next()
+			if bOK {
+				bTS, bID = parseTail(itB.Key())
+			}
+			continue
+		}
 
-		ev, err := q.s.loadBody(ts, id)
+		ev, err := q.s.loadBody(bTS, bID)
 		if err != nil {
 			return nil, 0, err
 		}
 		if ev == nil {
-			continue
+		} else if q.search.Contains(ev.Content) && q.f.Matches(*ev) {
+			if q.query {
+				cands = append(cands, candidate{ts: bTS, id: bID, ev: ev})
+			} else {
+				count++
+			}
 		}
-		if !q.search.Contains(ev.Content) {
-			continue
-		}
-		if !q.f.Matches(*ev) {
-			continue
-		}
-		if q.query {
-			cands = append(cands, candidate{ts: ts, id: id, ev: ev})
-		} else {
-			count++
+		bOK = itB.Next()
+		if bOK {
+			bTS, bID = parseTail(itB.Key())
 		}
 	}
-	if err := it.Error(); err != nil {
+	if err := itB.Error(); err != nil {
+		return nil, 0, err
+	}
+	if err := itF.Error(); err != nil {
 		return nil, 0, err
 	}
 	if q.query && q.limit > 0 && len(cands) > q.limit {

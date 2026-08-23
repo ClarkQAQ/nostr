@@ -222,12 +222,13 @@ func TestHyperLogLogOffsetConsistency(t *testing.T) {
 }
 
 func TestHyperLogLogWithGeneratedEvents(t *testing.T) {
-	rng := rand.New(rand.NewPCG(10, 0))
-
 	for _, count := range []int{10, 100, 1000, 5000} {
 		count := count
 		t.Run("", func(t *testing.T) {
 			t.Parallel()
+			// each parallel subtest gets its own source; the shared rng used
+			// before was a data race
+			rng := rand.New(rand.NewPCG(10, uint64(count)))
 			ref := randomHex(rng)
 			offset := offsetFromHex(rng, ref)
 			hll := hyperloglog.New(offset)

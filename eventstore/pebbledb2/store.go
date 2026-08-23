@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -231,12 +230,13 @@ type PebbleStore struct {
 
 	qsem chan struct{} // query concurrency gate
 
-	// bloomMinTS is the created_at of the oldest content-signature key, or
-	// MaxInt64 when none exist. Every event with content >= 3 bytes and
-	// created_at >= bloomMinTS has an 'F' entry, so search scans can trust
-	// the signature index from this point on (see computeBloomMinTS /
-	// noteBloomMin).
-	bloomMinTS atomic.Int64
+	// sendMu serializes Close against in-flight sends on writeCh. Writers
+	// hold RLock while sending; Close holds Lock before closing the channel,
+	// so no send can race a close (which would panic). Writers that passed
+	// the closed check before Close runs either already delivered their send
+	// or block until the channel is closed and the writerLoop drains the
+	// group; the reply channel stays open, so they never deadlock.
+	sendMu sync.RWMutex
 
 	commitHist    hist
 	loadBodyHist  hist
@@ -344,8 +344,6 @@ func Open(opts Options) (*PebbleStore, error) {
 		writeCh: make(chan *writeReq, opts.WriteGroupMax*4),
 		qsem:    make(chan struct{}, opts.MaxConcurrentQueries),
 	}
-	s.bloomMinTS.Store(math.MaxInt64)
-	s.bloomMinTS.Store(s.computeBloomMinTS())
 	s.wg.Add(1)
 	go s.writerLoop()
 	return s, nil
@@ -359,7 +357,9 @@ func (s *PebbleStore) Close() error {
 	if s.closed.Swap(true) {
 		return nil
 	}
+	s.sendMu.Lock()
 	close(s.writeCh)
+	s.sendMu.Unlock()
 	s.wg.Wait()
 	err := s.db.Close()
 	s.cch.Unref()
@@ -399,37 +399,6 @@ func (s *PebbleStore) Compact() error {
 // computeBloomMinTS finds the created_at of the oldest content-signature key,
 // or MaxInt64 when no signatures exist yet (e.g. a database created before
 // the feature). Two iterator seeks make this cheap even on huge databases.
-func (s *PebbleStore) computeBloomMinTS() int64 {
-	it, err := s.db.NewIter(&pebble.IterOptions{LowerBound: bloomPrefix()})
-	if err != nil {
-		return math.MaxInt64
-	}
-	defer it.Close()
-	if !it.First() {
-		return math.MaxInt64
-	}
-	k := it.Key()
-	if len(k) < 1+tsLen {
-		return math.MaxInt64
-	}
-	return int64(binary.BigEndian.Uint64(k[1 : 1+tsLen]))
-}
-
-// noteBloomMin lowers bloomMinTS to ts when a new signature key is written
-// with an older created_at than any seen so far. Called from the writer
-// goroutine so the signature index stays trustworthy between opens.
-func (s *PebbleStore) noteBloomMin(ts uint64) {
-	for {
-		cur := s.bloomMinTS.Load()
-		if cur <= int64(ts) {
-			return
-		}
-		if s.bloomMinTS.CompareAndSwap(cur, int64(ts)) {
-			return
-		}
-	}
-}
-
 func (s *PebbleStore) indexedTag(name string) bool {
 	if s.opts.IndexedTags == nil {
 		return len(name) == 1
@@ -465,6 +434,11 @@ func (s *PebbleStore) save(ev *nostr.Event) (bool, error) {
 		return false, err
 	}
 	req := &writeReq{ev: ev, raw: bin, bloom: contentBloom(ev.Content), res: make(chan writeRes, 1)}
+	s.sendMu.RLock()
+	defer s.sendMu.RUnlock()
+	if s.closed.Load() {
+		return false, ErrClosed
+	}
 	select {
 	case s.writeCh <- req:
 	default:
@@ -558,9 +532,8 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 		dHash string // empty for replaceable; d-tag value for addressable
 	}
 	type replaceState struct {
-		newest     *nostr.Event   // running newest in DB+group
-		newestInDB bool           // whether newest came from DB (vs a prior replace in this group)
-		toDelete   []*nostr.Event // events to delete at commit
+		newest   *nostr.Event   // running newest in DB+group
+		toDelete []*nostr.Event // events to delete at commit
 	}
 	replaces := make(map[replaceKey]*replaceState, 4)
 	mkReplaceKey := func(ev *nostr.Event) replaceKey {
@@ -643,7 +616,7 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 					req.res <- writeRes{err: err}
 					continue
 				}
-				st = &replaceState{newest: newest, newestInDB: newest != nil}
+				st = &replaceState{newest: newest}
 				for _, e := range existing {
 					st.toDelete = append(st.toDelete, e)
 				}
@@ -680,7 +653,6 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 			// Reset ledger: the running newest is now req.ev; nothing else
 			// pending deletion for this key yet.
 			st.newest = req.ev
-			st.newestInDB = false
 			st.toDelete = st.toDelete[:0]
 
 			// Dedup: same id saved twice in one group is a no-op.
@@ -707,7 +679,6 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 			}
 			if req.bloom != nil {
 				_ = batch.Set(bloomKey(ts, id[:]), req.bloom, nil)
-				s.noteBloomMin(ts)
 			}
 			addHLLMerges(batch, req.ev)
 			bump(req.ev, 1)
@@ -757,7 +728,6 @@ func (s *PebbleStore) commitGroup(group []*writeReq) {
 			}
 			if req.bloom != nil {
 				_ = batch.Set(bloomKey(ts, id[:]), req.bloom, nil)
-				s.noteBloomMin(ts)
 			}
 			addHLLMerges(batch, req.ev)
 			bump(req.ev, 1)
@@ -880,6 +850,11 @@ func (s *PebbleStore) delete(id nostr.ID) (deleted bool, err error) {
 		return false, err
 	}
 	req := &writeReq{ev: ev, del: true, res: make(chan writeRes, 1)}
+	s.sendMu.RLock()
+	defer s.sendMu.RUnlock()
+	if s.closed.Load() {
+		return false, ErrClosed
+	}
 	select {
 	case s.writeCh <- req:
 	default:
@@ -937,6 +912,11 @@ func (s *PebbleStore) replace(ev *nostr.Event) ([]nostr.Event, error) {
 		return nil, err
 	}
 	req := &writeReq{ev: ev, raw: bin, bloom: contentBloom(ev.Content), replace: true, res: make(chan writeRes, 1)}
+	s.sendMu.RLock()
+	defer s.sendMu.RUnlock()
+	if s.closed.Load() {
+		return nil, ErrClosed
+	}
 	select {
 	case s.writeCh <- req:
 	default:
@@ -961,7 +941,9 @@ func (s *PebbleStore) findReplaceVersions(ev *nostr.Event) (existing []*nostr.Ev
 	// use a fresh context: we are inside the writer goroutine and the
 	// caller's ctx may already be cancelled; we still must finish the
 	// replace to keep counters consistent.
-	c, err := s.newFilterRun(&f, true, 0).openCursor(context.Background())
+	// -1 disables the limit clamp: replace semantics must consider every
+	// existing version, even when there are more than Options.MaxLimit.
+	c, err := s.newFilterRun(&f, true, -1).openCursor(context.Background())
 	if err != nil {
 		return nil, nil, err
 	}

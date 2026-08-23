@@ -46,6 +46,10 @@ func (s *PebbleStore) QueryEvents(ctx context.Context, filter nostr.Filter, maxL
 	return func(yield func(nostr.Event, error) bool) {
 		t0 := time.Now()
 		defer func() { s.queryHist.record(time.Since(t0).Microseconds()) }()
+		if filter.LimitZero {
+			// an explicit "limit":0 asks for zero events; return nothing
+			return
+		}
 		if err := s.acquire(ctx); err != nil {
 			yield(nostr.Event{}, err)
 			return
@@ -127,7 +131,10 @@ type filterRun struct {
 func (s *PebbleStore) newFilterRun(f *nostr.Filter, forQuery bool, maxClamp int) *filterRun {
 	limit := f.Limit
 	if forQuery {
-		if maxClamp <= 0 {
+		// maxClamp == 0 -> fall back to the configured MaxLimit; maxClamp < 0
+		// -> no clamping at all (used by the replace pipeline, which must
+		// enumerate every existing version of a (pubkey, kind, d) tuple).
+		if maxClamp == 0 {
 			maxClamp = s.opts.MaxLimit
 		}
 		if maxClamp > 0 && (limit <= 0 || limit > maxClamp) {
@@ -200,8 +207,18 @@ func (q *filterRun) count(ctx context.Context) (int64, error) {
 	if q.search == nil && q.plan() == modeAuthors && countTagPreds(q.f) == 0 &&
 		q.f.Since <= 0 && q.f.Until <= 0 && len(q.f.Kinds) > 0 {
 		var sum int64
+		seenA := make(map[nostr.PubKey]struct{}, len(q.f.Authors))
 		for _, a := range q.f.Authors {
+			if _, dup := seenA[a]; dup {
+				continue // a duplicated author would double-count
+			}
+			seenA[a] = struct{}{}
+			seenK := make(map[nostr.Kind]struct{}, len(q.f.Kinds))
 			for _, kind := range q.f.Kinds {
+				if _, dup := seenK[kind]; dup {
+					continue // a duplicated kind would double-count
+				}
+				seenK[kind] = struct{}{}
 				n, err := q.s.readCounter(pkKindCounterKey(a[:], uint32(kind)))
 				if err != nil {
 					return 0, err
@@ -263,7 +280,12 @@ func (q *filterRun) countRollup(ctx context.Context) (int64, bool, error) {
 			}
 			sum += n
 		} else {
+			seenK := make(map[nostr.Kind]struct{}, len(kinds))
 			for _, kind := range kinds {
+				if _, dup := seenK[kind]; dup {
+					continue // a duplicated kind would double-count
+				}
+				seenK[kind] = struct{}{}
 				n, err := q.s.sumCounters(kindDayCounterPrefix(uint32(kind)), d0+1, d1-1)
 				if err != nil {
 					return 0, true, err
@@ -293,7 +315,12 @@ func (q *filterRun) countRollup(ctx context.Context) (int64, bool, error) {
 				}
 				sum += n
 			} else {
+				seenK := make(map[nostr.Kind]struct{}, len(kinds))
 				for _, kind := range kinds {
+					if _, dup := seenK[kind]; dup {
+						continue
+					}
+					seenK[kind] = struct{}{}
 					n, err := q.s.sumCounters(kindHourCounterPrefix(uint32(kind)), h0+1, h1-1)
 					if err != nil {
 						return err
@@ -302,6 +329,8 @@ func (q *filterRun) countRollup(ctx context.Context) (int64, bool, error) {
 				}
 			}
 		}
+		// dedup kinds across the two partial edge hours of this day
+		edgeKinds := make(map[nostr.Kind]struct{}, len(kinds))
 		edgeHour := func(h uint32) error {
 			hlo := int64(h) * secondsPerHour
 			hhi := hlo + secondsPerHour - 1
@@ -319,6 +348,10 @@ func (q *filterRun) countRollup(ctx context.Context) (int64, bool, error) {
 				return err
 			}
 			for _, kind := range kinds {
+				if _, dup := edgeKinds[kind]; dup {
+					continue
+				}
+				edgeKinds[kind] = struct{}{}
 				n, err := q.scanCountKeys(ctx, kindPrefix(uint32(kind)), hlo, hhi)
 				if err != nil {
 					return err
@@ -758,6 +791,8 @@ func (c *filterCursor) advance() {
 							if !pass {
 								continue
 							}
+						} else if cl != nil {
+							cl.Close()
 						}
 					}
 					ev, err := q.s.loadBody(rc.ts, rc.id)

@@ -118,20 +118,14 @@ func (s *PebbleStore) hllFallbackCount(ctx context.Context, tagKey, tagValue str
 		kindOK[k] = struct{}{}
 	}
 
-	const shardCount = 8
-	type shard struct {
-		lo, hi int64
+	// Carve shards from the actual data range: splitting [0, MaxInt64] evenly
+	// would overflow (2^63 * i) and would also scan eight mostly-empty ranges
+	// since all real timestamps cluster near the present.
+	dMin, dMax := s.dataTimeRange()
+	if dMax < 0 {
+		return 0, nil
 	}
-	shards := make([]shard, 0, shardCount)
-	{
-		// [0, MaxInt64] holds 2^63 timestamps; split into equal ranges.
-		const total = uint64(1) << 63
-		for i := uint64(0); i < shardCount; i++ {
-			lo := total * i / shardCount
-			hi := total*(i+1)/shardCount - 1
-			shards = append(shards, shard{int64(lo), int64(hi)})
-		}
-	}
+	shards := splitRange(dMin, dMax, 8)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -145,10 +139,10 @@ func (s *PebbleStore) hllFallbackCount(ctx context.Context, tagKey, tagValue str
 	var wg sync.WaitGroup
 	for _, sh := range shards {
 		wg.Add(1)
-		go func(sh shard) {
+		go func(sh [2]int64) {
 			defer wg.Done()
 			local := make(map[nostr.PubKey]struct{})
-			lower, upper := timeBounds(prefix, sh.lo, sh.hi)
+			lower, upper := timeBounds(prefix, sh[0], sh[1])
 			it, err := s.db.NewIter(&pebble.IterOptions{LowerBound: lower, UpperBound: upper})
 			if err != nil {
 				firstErr.Store(err)
@@ -180,12 +174,15 @@ func (s *PebbleStore) hllFallbackCount(ctx context.Context, tagKey, tagValue str
 				if err != nil {
 					continue // deleted between scan and read; skip
 				}
+				// copy both values out before the closer is released: the
+				// returned buffer is only valid until Close
 				kind := betterbinary.GetKind(raw)
+				pk := betterbinary.GetPubKey(raw)
 				cl.Close()
 				if _, ok := kindOK[kind]; !ok {
 					continue
 				}
-				local[betterbinary.GetPubKey(raw)] = struct{}{}
+				local[pk] = struct{}{}
 			}
 			if err := it.Error(); err != nil && firstErr.Load() == nil {
 				firstErr.Store(err)

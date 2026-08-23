@@ -238,19 +238,21 @@ func writeJSONString(h hash.Hash, s string) {
 		return
 	}
 
-	base := uintptr(unsafe.Pointer(unsafe.StringData(s)))
+	// view the string as a byte slice once; indexing &data[i] is checked
+	// pointer arithmetic (unlike uintptr arithmetic, which checkptr rejects)
+	data := unsafe.Slice(unsafe.StringData(s), n)
 	start, i := 0, 0
 
 	for i+8 <= n {
-		w := *(*uint64)(unsafe.Pointer(base + uintptr(i)))
+		w := *(*uint64)(unsafe.Pointer(&data[i]))
 		// apply same logic as of appendJSONString()
 		if hasSpecial(w) {
 			for end := i + 8; i < end; i++ {
-				if escTable[s[i]] {
+				if escTable[data[i]] {
 					if i > start {
-						h.Write(unsafe.Slice(unsafe.StringData(s[start:i]), i-start))
+						h.Write(data[start:i])
 					}
-					h.Write(escSlice[s[i]])
+					h.Write(escSlice[data[i]])
 					start = i + 1
 				}
 			}
@@ -260,17 +262,17 @@ func writeJSONString(h hash.Hash, s string) {
 	}
 
 	for ; i < n; i++ {
-		if escTable[s[i]] {
+		if escTable[data[i]] {
 			if i > start {
-				h.Write(unsafe.Slice(unsafe.StringData(s[start:i]), i-start))
+				h.Write(data[start:i])
 			}
-			h.Write(escSlice[s[i]])
+			h.Write(escSlice[data[i]])
 			start = i + 1
 		}
 	}
 
 	if start < n {
-		h.Write(unsafe.Slice(unsafe.StringData(s[start:]), len(s)-start))
+		h.Write(data[start:])
 	}
 	h.Write(jsonQuote)
 }
