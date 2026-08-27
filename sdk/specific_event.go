@@ -76,7 +76,7 @@ func (sys *System) FetchSpecificEvent(
 	switch v := pointer.(type) {
 	case nostr.EventPointer:
 		author = v.Author
-		filter.IDs = []nostr.ID{v.ID}
+		filter = v.AsFilter()
 		relays = append(relays, v.Relays...)
 		relays = nostr.AppendUnique(relays, sys.FallbackRelays.Next())
 		fallback = append(fallback, sys.JustIDRelays.URLs...)
@@ -84,9 +84,7 @@ func (sys *System) FetchSpecificEvent(
 		priorityRelays = append(priorityRelays, v.Relays...)
 	case nostr.EntityPointer:
 		author = v.PublicKey
-		filter.Authors = []nostr.PubKey{v.PublicKey}
-		filter.Tags = nostr.TagMap{"d": []string{v.Identifier}}
-		filter.Kinds = []nostr.Kind{v.Kind}
+		filter = v.AsFilter()
 		relays = append(relays, v.Relays...)
 		relays = nostr.AppendUnique(relays, sys.FallbackRelays.Next())
 		fallback = append(fallback, sys.FallbackRelays.Next(), sys.FallbackRelays.Next())

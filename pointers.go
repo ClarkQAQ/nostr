@@ -170,11 +170,16 @@ func (ep EntityPointer) AsTagReference() string {
 }
 
 func (ep EntityPointer) AsFilter() Filter {
-	return Filter{
+	f := Filter{
 		Kinds:   []Kind{ep.Kind},
 		Authors: []PubKey{ep.PublicKey},
-		Tags:    TagMap{"d": []string{ep.Identifier}},
 	}
+
+	if ep.Kind.IsAddressable() {
+		f.Tags = TagMap{"d": []string{ep.Identifier}}
+	}
+
+	return f
 }
 
 func (ep EntityPointer) AsTag() Tag {
