@@ -17,7 +17,7 @@ import (
 	"fiatjaf.com/nostr/keyer"
 	"fiatjaf.com/nostr/khatru"
 	khatru_blossom "fiatjaf.com/nostr/khatru/blossom"
-	blossomclient "fiatjaf.com/nostr/nipb0/blossom"
+	blossomclient "fiatjaf.com/nostr/nipb7/blossom"
 )
 
 func hexTo32(s string) (h [32]byte, err error) {

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"fiatjaf.com/nostr"
-	"fiatjaf.com/nostr/nipb0/blossom"
+	"fiatjaf.com/nostr/nipb7/blossom"
 	"github.com/liamg/magic"
 )
 
