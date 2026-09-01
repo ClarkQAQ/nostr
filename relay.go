@@ -413,7 +413,7 @@ func (r *Relay) handleMessage(message string) {
 			sub.dispatchEvent(env.Event)
 		}
 	case *EOSEEnvelope:
-		if subscription, ok := r.Subscriptions.Load(subIdToSerial(string(*env))); ok {
+		if subscription, ok := r.Subscriptions.Load(subIdToSerial(env.SubscriptionID)); ok {
 			// NIP-67: EOSE may carry a hint as a third element ["EOSE", <subid>, [<hint>...]];
 			// EOSEEnvelope only holds the subid, so read it from the raw message.
 			var hint []string

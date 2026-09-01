@@ -8,7 +8,7 @@ import (
 	"github.com/templexxx/xhex"
 )
 
-func TestParseMessage(t *testing.T) {
+func TestParseMessageEnvelope(t *testing.T) {
 	testCases := []struct {
 		Name             string
 		Message          string
@@ -52,7 +52,24 @@ func TestParseMessage(t *testing.T) {
 		{
 			Name:             "EOSE envelope",
 			Message:          `["EOSE","kjasbdlasvdluiasvd\"kjasbdksab\\d"]`,
-			ExpectedEnvelope: ptr(EOSEEnvelope("kjasbdlasvdluiasvd\"kjasbdksab\\d")),
+			ExpectedEnvelope: ptr(EOSEEnvelope{SubscriptionID: "kjasbdlasvdluiasvd\"kjasbdksab\\d"}),
+		},
+		{
+			Name:    "EOSE envelope with hint",
+			Message: `["EOSE","kjasbdlasvdluiasvd\"kjasbdksab\\d", ["finish"]]`,
+			ExpectedEnvelope: ptr(EOSEEnvelope{
+				SubscriptionID: "kjasbdlasvdluiasvd\"kjasbdksab\\d",
+				Finish:         true,
+			}),
+		},
+		{
+			Name:    "EOSE envelope with hints",
+			Message: `["EOSE","3333   3 33 33", [ "auth", "more","invalidkjabndiula"]]`,
+			ExpectedEnvelope: ptr(EOSEEnvelope{
+				SubscriptionID: "3333   3 33 33",
+				More:           true,
+				Auth:           true,
+			}),
 		},
 		{
 			Name:             "COUNT envelope",
