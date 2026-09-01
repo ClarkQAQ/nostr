@@ -325,7 +325,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 
-					ws.WriteJSON(nostr.EOSEEnvelope(env.SubscriptionID))
+					ws.WriteJSON(nostr.EOSEEnvelope{SubscriptionID: env.SubscriptionID})
 				case *nostr.CloseEnvelope:
 					id := string(*env)
 					rl.removeListenerId(ws, id)
