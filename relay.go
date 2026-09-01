@@ -20,6 +20,7 @@ import (
 
 	ws "github.com/coder/websocket"
 	"github.com/puzpuzpuz/xsync/v3"
+	"github.com/tidwall/gjson"
 )
 
 var subscriptionIDCounter atomic.Int64
@@ -413,7 +414,15 @@ func (r *Relay) handleMessage(message string) {
 		}
 	case *EOSEEnvelope:
 		if subscription, ok := r.Subscriptions.Load(subIdToSerial(string(*env))); ok {
-			subscription.dispatchEose()
+			// NIP-67: EOSE may carry a hint as a third element ["EOSE", <subid>, [<hint>...]];
+			// EOSEEnvelope only holds the subid, so read it from the raw message.
+			var hint []string
+			if arr := gjson.Parse(message).Array(); len(arr) >= 3 {
+				for _, h := range arr[2].Array() {
+					hint = append(hint, h.String())
+				}
+			}
+			subscription.dispatchEose(hint)
 		}
 	case *ClosedEnvelope:
 		if subscription, ok := r.Subscriptions.Load(subIdToSerial(env.SubscriptionID)); ok {
@@ -620,7 +629,7 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 		cancel:            cancel,
 		counter:           current,
 		Events:            make(chan Event),
-		EndOfStoredEvents: make(chan struct{}, 1),
+		EndOfStoredEvents: make(chan EndOfStoredEvent, 1),
 		ClosedReason:      make(chan string, 1),
 		Filter:            filter,
 		match:             filter.Matches,
@@ -650,7 +659,7 @@ func (r *Relay) PrepareSubscription(ctx context.Context, filter Filter, opts Sub
 		go func() {
 			time.Sleep(opts.MaxWaitForEOSE)
 			close(sub.eoseTimedOut)
-			sub.dispatchEose()
+			sub.dispatchEose(nil)
 		}()
 	}
 

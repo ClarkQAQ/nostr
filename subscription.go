@@ -30,8 +30,8 @@ type Subscription struct {
 	Events chan Event
 	mu     sync.Mutex
 
-	// the EndOfStoredEvents channel gets closed when an EOSE comes for that subscription
-	EndOfStoredEvents chan struct{}
+	// the EndOfStoredEvents channel receives a value when an EOSE comes for that subscription
+	EndOfStoredEvents chan EndOfStoredEvent
 
 	// the ClosedReason channel emits the reason when a CLOSED message is received
 	ClosedReason chan string
@@ -56,6 +56,12 @@ type Subscription struct {
 	// this keeps track of the events we've received before the EOSE that we must dispatch before
 	// closing the EndOfStoredEvents channel
 	storedwg sync.WaitGroup
+}
+
+// EndOfStoredEvent is emitted on Subscription.EndOfStoredEvents when an EOSE arrives.
+type EndOfStoredEvent struct {
+	// Hint holds the NIP-67 EOSE completeness hint(s) (e.g. "more"/"finish"), or nil.
+	Hint []string
 }
 
 // All SubscriptionOptions fields are optional
@@ -106,12 +112,12 @@ func (sub *Subscription) dispatchEvent(evt Event) {
 	}()
 }
 
-func (sub *Subscription) dispatchEose() {
+func (sub *Subscription) dispatchEose(hint []string) {
 	if sub.eosed.CompareAndSwap(false, true) {
 		sub.match = sub.Filter.MatchesIgnoringTimestampConstraints
 		go func() {
 			sub.storedwg.Wait()
-			sub.EndOfStoredEvents <- struct{}{}
+			sub.EndOfStoredEvents <- EndOfStoredEvent{Hint: hint}
 		}()
 	}
 }
