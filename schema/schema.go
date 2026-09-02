@@ -172,7 +172,7 @@ func NewValidatorFromSchema(sch Schema) Validator {
 				_, err := strconv.ParseUint(value, 10, 64)
 				return err
 			},
-			"imeta": func(_ *Validator, value string, spec *ContentSpec) error {
+			"imeta": func(v *Validator, value string, spec *ContentSpec) error {
 				parts := strings.SplitN(value, " ", 2)
 				if len(parts) != 2 {
 					return fmt.Errorf("not a space-separated keyval")
@@ -215,7 +215,9 @@ func NewValidatorFromSchema(sch Schema) Validator {
 					}
 				case "blurhash", "alt", "summary", "service", "i", "thumbhash":
 				default:
-					return fmt.Errorf("unknown imeta key: %s", key)
+					if v.FailOnUnknownType {
+						return fmt.Errorf("unknown imeta key: %s", key)
+					}
 				}
 				return nil
 			},
