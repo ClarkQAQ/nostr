@@ -23,7 +23,7 @@ func (es EventStoreBlobIndexWrapper) Keep(
 	pubkey nostr.PubKey,
 ) error {
 	next, stop := iter.Pull2(
-		es.Store.QueryEvents(ctx, nostr.Filter{Authors: []nostr.PubKey{pubkey}, Kinds: []nostr.Kind{24242}, Tags: nostr.TagMap{"x": []string{blob.SHA256}}}, 1),
+		es.QueryEvents(ctx, nostr.Filter{Authors: []nostr.PubKey{pubkey}, Kinds: []nostr.Kind{24242}, Tags: nostr.TagMap{"x": []string{blob.SHA256}}}, 1),
 	)
 	defer stop()
 
@@ -40,7 +40,7 @@ func (es EventStoreBlobIndexWrapper) Keep(
 			CreatedAt: blob.Uploaded,
 		}
 		evt.ID = evt.GetID()
-		if e := es.Store.SaveEvent(ctx, evt); e != nil {
+		if e := es.SaveEvent(ctx, evt); e != nil {
 			return fmt.Errorf("save event: %w", e)
 		}
 	}
@@ -50,7 +50,7 @@ func (es EventStoreBlobIndexWrapper) Keep(
 
 func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubKey, publicURL *url.URL) iter.Seq[blossom.BlobDescriptor] {
 	return func(yield func(blossom.BlobDescriptor) bool) {
-		for evt := range es.Store.QueryEvents(ctx, nostr.Filter{
+		for evt := range es.QueryEvents(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
 			Kinds:   []nostr.Kind{24242},
 		}, 1000) {
@@ -61,7 +61,7 @@ func (es EventStoreBlobIndexWrapper) List(ctx context.Context, pubkey nostr.PubK
 
 func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, publicURL *url.URL) (*blossom.BlobDescriptor, error) {
 	next, stop := iter.Pull2(
-		es.Store.QueryEvents(ctx, nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
+		es.QueryEvents(ctx, nostr.Filter{Tags: nostr.TagMap{"x": []string{sha256}}, Kinds: []nostr.Kind{24242}, Limit: 1}, 1),
 	)
 
 	defer stop()
@@ -76,7 +76,7 @@ func (es EventStoreBlobIndexWrapper) Get(ctx context.Context, sha256 string, pub
 
 func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, pubkey nostr.PubKey) error {
 	next, stop := iter.Pull2(
-		es.Store.QueryEvents(ctx, nostr.Filter{
+		es.QueryEvents(ctx, nostr.Filter{
 			Authors: []nostr.PubKey{pubkey},
 			Tags:    nostr.TagMap{"x": []string{sha256}},
 			Kinds:   []nostr.Kind{24242},
@@ -87,7 +87,7 @@ func (es EventStoreBlobIndexWrapper) Delete(ctx context.Context, sha256 string, 
 	defer stop()
 
 	if evt, _, found := next(); found {
-		return es.Store.DeleteEvent(ctx, evt.ID)
+		return es.DeleteEvent(ctx, evt.ID)
 	}
 
 	return nil

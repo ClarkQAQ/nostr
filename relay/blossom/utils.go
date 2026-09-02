@@ -27,7 +27,7 @@ func parseHashPath(path string) (string, string, bool) {
 		path = path[i+1:]
 	}
 
-	if i := strings.IndexByte(path, '.'); i > -1 {
+	if i := strings.LastIndexByte(path, '.'); i > -1 {
 		return path[:i], mime.TypeByExtension(path[i:]),
 			isValid32ByteHex(path[:i])
 	}
@@ -55,7 +55,7 @@ func isValid32ByteHex(s string) bool {
 	for i := 0; i < 64; i++ {
 		c := s[i]
 		// only allow digits and letters a-f
-		if !((c-'0' < 10) || (c-'a' < 6)) {
+		if (c-'0' >= 10) && (c-'a' >= 6) {
 			return false
 		}
 	}

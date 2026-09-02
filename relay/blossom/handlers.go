@@ -145,7 +145,9 @@ func (bs BlossomServer) handleMirror(w http.ResponseWriter, r *http.Request) {
 		blossomError(w, "failed to download from url: "+e.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		blossomError(w, fmt.Sprintf("upstream server returned error: %d %s", resp.StatusCode, resp.Status), http.StatusBadGateway)
@@ -295,7 +297,9 @@ func (bs BlossomServer) handleGetBlob(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if reader != nil {
-			defer reader.Close()
+			defer func() {
+				_ = reader.Close()
+			}()
 			w.Header().Set("ETag", hash)
 			w.Header().Set("Cache-Control", "public, max-age=604800, must-revalidate")
 			http.ServeContent(w, r, hash+blossom.ExtensionByMimeType(mimeType), modtime, reader)
