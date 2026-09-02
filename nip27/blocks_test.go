@@ -42,6 +42,14 @@ and a regular link: https://regular.com/page?ok=true. and now a broken link: htt
 				{Text: "!", Start: 419},
 			},
 		},
+		{
+			"go to https://ok.com/ now",
+			[]Block{
+				{Text: "go to ", Start: 0},
+				{Text: "https://ok.com/", Start: 6, Pointer: nip73.ExternalPointer{Thing: "https://ok.com/"}},
+				{Text: " now", Start: 21},
+			},
+		},
 	} {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			require.Equal(t, tc.expected, slices.Collect(Parse(tc.content)))

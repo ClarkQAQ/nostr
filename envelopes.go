@@ -41,7 +41,7 @@ func ParseMessage(message string) (Envelope, error) {
 		x := NoticeEnvelope("")
 		v = &x
 	case "EOSE":
-		x := EOSEEnvelope("")
+		x := EOSEEnvelope{}
 		v = &x
 	case "OK":
 		v = &OKEnvelope{}
@@ -149,11 +149,20 @@ func (v *ReqEnvelope) FromJSON(data string) error {
 }
 
 func (v ReqEnvelope) MarshalJSON() ([]byte, error) {
+	if len(v.Filters) == 0 {
+		return nil, fmt.Errorf("failed to encode REQ envelope: missing filters")
+	}
+
 	w := jwriter.Writer{NoEscapeHTML: true}
 	w.RawString(`["REQ","`)
 	w.RawString(v.SubscriptionID)
 	w.RawString(`",`)
-	v.Filters[0].MarshalEasyJSON(&w)
+	for i, filter := range v.Filters {
+		if i > 0 {
+			w.RawByte(',')
+		}
+		filter.MarshalEasyJSON(&w)
+	}
 	w.RawString(`]`)
 	return w.BuildBytes()
 }
@@ -254,7 +263,12 @@ func (v NoticeEnvelope) MarshalJSON() ([]byte, error) {
 }
 
 // EOSEEnvelope represents an EOSE (End of Stored Events) message.
-type EOSEEnvelope string
+type EOSEEnvelope struct {
+	SubscriptionID string
+	Auth           bool
+	Finish         bool
+	More           bool
+}
 
 func (_ EOSEEnvelope) Label() string { return "EOSE" }
 func (e EOSEEnvelope) String() string {
@@ -268,15 +282,54 @@ func (v *EOSEEnvelope) FromJSON(data string) error {
 	if len(arr) < 2 {
 		return fmt.Errorf("failed to decode EOSE envelope")
 	}
-	*v = EOSEEnvelope(string(unsafe.Slice(unsafe.StringData(arr[1].Str), len(arr[1].Str))))
+
+	*v = EOSEEnvelope{
+		SubscriptionID: arr[1].Str,
+	}
+
+	if len(arr) >= 3 {
+		// NIP-67: EOSE may carry a hint as a third element ["EOSE", <subid>, [<hint>...]];
+		for _, h := range arr[2].Array() {
+			switch h.Str {
+			case "auth":
+				v.Auth = true
+			case "finish":
+				v.Finish = true
+			case "more":
+				v.More = true
+			}
+		}
+	}
+
 	return nil
 }
 
 func (v EOSEEnvelope) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{NoEscapeHTML: true}
 	w.RawString(`["EOSE",`)
-	w.Raw(json.Marshal(string(v)))
-	w.RawString(`]`)
+	w.Raw(json.Marshal(v.SubscriptionID))
+	if v.Auth || v.More || v.Finish {
+		w.RawByte(',')
+		w.RawByte('[')
+		if v.Auth {
+			w.RawString(`"auth"`)
+		}
+		if v.Finish {
+			if v.Auth {
+				w.RawString(`,"finish"`)
+			} else {
+				w.RawString(`"finish"`)
+			}
+		} else {
+			if v.Auth {
+				w.RawString(`,"more"`)
+			} else {
+				w.RawString(`"more"`)
+			}
+		}
+		w.RawByte(']')
+	}
+	w.RawByte(']')
 	return w.BuildBytes()
 }
 

@@ -160,6 +160,8 @@ func (kind Kind) Name() string {
 		return "SimpleGroupDeleteGroup"
 	case KindSimpleGroupCreateInvite:
 		return "SimpleGroupCreateInvite"
+	case KindSimpleGroupUpdatePinList:
+		return "SimpleGroupUpdatePinList"
 	case KindSimpleGroupJoinRequest:
 		return "SimpleGroupJoinRequest"
 	case KindSimpleGroupLeaveRequest:
@@ -370,6 +372,8 @@ func (kind Kind) Name() string {
 		return "SimpleGroupRoles"
 	case KindSimpleGroupLiveKitParticipants:
 		return "SimpleGroupLiveKitParticipants"
+	case KindSimpleGroupPinnedEvents:
+		return "SimpleGroupPinnedEvents"
 	case KindStarterPacks:
 		return "StarterPacks"
 	case KindMediaStarterPacks:
@@ -437,6 +441,7 @@ const (
 	KindSimpleGroupCreateGroup         Kind = 9007
 	KindSimpleGroupDeleteGroup         Kind = 9008
 	KindSimpleGroupCreateInvite        Kind = 9009
+	KindSimpleGroupUpdatePinList       Kind = 9010
 	KindSimpleGroupJoinRequest         Kind = 9021
 	KindSimpleGroupLeaveRequest        Kind = 9022
 	KindZapGoal                        Kind = 9041
@@ -502,6 +507,7 @@ const (
 	KindSimpleGroupMembers             Kind = 39002
 	KindSimpleGroupRoles               Kind = 39003
 	KindSimpleGroupLiveKitParticipants Kind = 39004
+	KindSimpleGroupPinnedEvents        Kind = 39005
 	KindWikiArticle                    Kind = 30818
 	KindRedirects                      Kind = 30819
 	KindFeed                           Kind = 31890

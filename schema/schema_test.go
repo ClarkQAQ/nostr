@@ -680,6 +680,7 @@ func TestValidateIMetaEvents(t *testing.T) {
 func TestValidateIMetaTagItems(t *testing.T) {
 	v, err := NewValidatorFromURL(DefaultSchemaURL)
 	require.NoError(t, err)
+	v.FailOnUnknownType = true
 
 	tests := []struct {
 		name  string
@@ -727,6 +728,22 @@ func TestValidateIMetaTagItems(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateIMetaTagTolerant(t *testing.T) {
+	// default validator tolerates unknown imeta keys
+	v, err := NewValidatorFromURL(DefaultSchemaURL)
+	require.NoError(t, err)
+
+	spec := &ContentSpec{Type: "imeta", Required: true}
+
+	// unknown key passes
+	_, err = v.validateNext(nostr.Tag{"imeta", "unknown value"}, 1, spec)
+	require.NoError(t, err, "unknown imeta key should be tolerated by default")
+
+	// known keys still validated
+	_, err = v.validateNext(nostr.Tag{"imeta", "x abc123"}, 1, spec)
+	require.Error(t, err, "known imeta key must still be validated")
 }
 
 func TestValidateEvent_DTagPresence(t *testing.T) {

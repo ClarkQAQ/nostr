@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"fiatjaf.com/nostr/eventstore/boltdb"
-	blossomclient "fiatjaf.com/nostr/nipb0/blossom"
+	blossomclient "fiatjaf.com/nostr/nipb7/blossom"
 	"fiatjaf.com/nostr/relay"
 	"fiatjaf.com/nostr/relay/blossom"
 )

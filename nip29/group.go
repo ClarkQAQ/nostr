@@ -8,16 +8,27 @@ import (
 	"strings"
 
 	"fiatjaf.com/nostr"
+	"fiatjaf.com/nostr/nip19"
 )
 
 type GroupAddress struct {
+	// URL of the relay that is hosting the group
 	Relay string
-	ID    string
+
+	// Group identifier ("d"/"h" tag)
+	ID string
+
+	// Public key of the relay, used to publish kind:39000/etc events
+	Self nostr.PubKey
 }
 
 func (gid GroupAddress) String() string {
 	p, _ := url.Parse(gid.Relay)
 	return fmt.Sprintf("%s'%s", p.Host, gid.ID)
+}
+
+func (gid GroupAddress) Code() string {
+	return nip19.EncodeNaddr(gid.Self, 39000, gid.ID, []string{gid.Relay})
 }
 
 func (gid GroupAddress) IsValid() bool {
@@ -28,19 +39,12 @@ func (gid GroupAddress) Equals(gid2 GroupAddress) bool {
 	return gid.Relay == gid2.Relay && gid.ID == gid2.ID
 }
 
-func ParseGroupAddress(raw string) (GroupAddress, error) {
-	spl := strings.Split(raw, "'")
-	if len(spl) != 2 {
-		return GroupAddress{}, fmt.Errorf("invalid group id")
-	}
-	return GroupAddress{ID: spl[1], Relay: nostr.NormalizeURL(spl[0])}, nil
-}
-
 type Group struct {
 	Address GroupAddress
 
 	Name                string
 	Picture             string
+	Banner              string
 	About               string
 	Members             map[nostr.PubKey][]*Role
 	LiveKitParticipants []nostr.PubKey
@@ -54,10 +58,6 @@ type Group struct {
 	// indicates that join requests are ignored unless they include an invite code
 	Closed bool
 
-	// indicates that join requests are queued for manual approval instead of
-	// being automatically accepted by the relay
-	ManualApproval bool
-
 	// indicates that relays should hide group metadata from non-members
 	Hidden bool
 
@@ -67,14 +67,23 @@ type Group struct {
 	// indicates which event kinds this group supports
 	SupportedKinds []nostr.Kind
 
+	// arbitrary string indicating the parent group
+	Parent string
+
+	// ordered list of identifiers of child groups
+	Children []string
+
 	Roles       []*Role
 	InviteCodes []string
+
+	Pinned []nostr.Pointer
 
 	LastMetadataUpdate            nostr.Timestamp
 	LastAdminsUpdate              nostr.Timestamp
 	LastMembersUpdate             nostr.Timestamp
 	LastRolesUpdate               nostr.Timestamp
 	LastLiveKitParticipantsUpdate nostr.Timestamp
+	LastPinnedEventsUpdate        nostr.Timestamp
 }
 
 func (group Group) String() string {
@@ -134,15 +143,15 @@ func (group Group) String() string {
 }
 
 // NewGroup takes a group address in the form "<id>'<relay-hostname>"
-func NewGroup(gadstr string) (Group, error) {
-	gad, err := ParseGroupAddress(gadstr)
-	if err != nil {
-		return Group{}, fmt.Errorf("invalid group id '%s': %w", gadstr, err)
-	}
+func NewGroup(relayHost, groupId string) (Group, error) {
+	relayHost = nostr.NormalizeURL(relayHost)
 
 	return Group{
-		Address:             gad,
-		Name:                gad.ID,
+		Address: GroupAddress{
+			Relay: relayHost,
+			ID:    groupId,
+		},
+		Name:                groupId,
 		Members:             make(map[nostr.PubKey][]*Role),
 		LiveKitParticipants: make([]nostr.PubKey, 0),
 	}, nil
@@ -180,6 +189,9 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	if group.Picture != "" {
 		evt.Tags = append(evt.Tags, nostr.Tag{"picture", group.Picture})
 	}
+	if group.Banner != "" {
+		evt.Tags = append(evt.Tags, nostr.Tag{"banner", group.Banner})
+	}
 
 	// status
 	if group.Private {
@@ -194,9 +206,6 @@ func (group Group) ToMetadataEvent() nostr.Event {
 	if group.Closed {
 		evt.Tags = append(evt.Tags, nostr.Tag{"closed"})
 	}
-	if group.ManualApproval {
-		evt.Tags = append(evt.Tags, nostr.Tag{"approval", "manual"})
-	}
 	if group.LiveKit {
 		evt.Tags = append(evt.Tags, nostr.Tag{"livekit"})
 	}
@@ -208,6 +217,14 @@ func (group Group) ToMetadataEvent() nostr.Event {
 			tag = append(tag, strconv.Itoa(int(kind)))
 		}
 		evt.Tags = append(evt.Tags, tag)
+	}
+
+	if group.Parent != "" {
+		evt.Tags = append(evt.Tags, nostr.Tag{"parent", group.Parent})
+	}
+
+	for _, child := range group.Children {
+		evt.Tags = append(evt.Tags, nostr.Tag{"child", child})
 	}
 
 	return evt
@@ -288,6 +305,21 @@ func (group Group) ToLiveKitParticipantsEvent() nostr.Event {
 	return evt
 }
 
+func (group Group) ToPinnedEventsEvent() nostr.Event {
+	evt := nostr.Event{
+		Kind:      nostr.KindSimpleGroupPinnedEvents,
+		CreatedAt: group.LastPinnedEventsUpdate,
+		Tags:      make(nostr.Tags, 1, 1+len(group.Pinned)),
+	}
+	evt.Tags[0] = nostr.Tag{"d", group.Address.ID}
+
+	for _, pointer := range group.Pinned {
+		evt.Tags = append(evt.Tags, pointer.AsTag())
+	}
+
+	return evt
+}
+
 func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 	if evt.Kind != nostr.KindSimpleGroupMetadata {
 		return fmt.Errorf("expected kind %d, got %d", nostr.KindSimpleGroupMetadata, evt.Kind)
@@ -308,8 +340,6 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 				group.Restricted = true
 			case "closed":
 				group.Closed = true
-			case "approval":
-				group.ManualApproval = len(tag) >= 2 && tag[1] == "manual"
 			case "hidden":
 				group.Hidden = true
 			case "livekit":
@@ -333,6 +363,12 @@ func (group *Group) MergeInMetadataEvent(evt *nostr.Event) error {
 						group.About = tag[1]
 					case "picture":
 						group.Picture = tag[1]
+					case "banner":
+						group.Banner = tag[1]
+					case "parent":
+						group.Parent = tag[1]
+					case "child":
+						group.Children = append(group.Children, tag[1])
 					}
 				}
 			}
@@ -464,6 +500,39 @@ func (group *Group) MergeInLiveKitParticipantsEvent(evt *nostr.Event) error {
 			continue
 		}
 		group.LiveKitParticipants = append(group.LiveKitParticipants, member)
+	}
+
+	return nil
+}
+
+func (group *Group) MergeInPinnedEventsEvent(evt *nostr.Event) error {
+	if evt.Kind != nostr.KindSimpleGroupPinnedEvents {
+		return fmt.Errorf("expected kind %d, got %d", nostr.KindSimpleGroupPinnedEvents, evt.Kind)
+	}
+	if evt.CreatedAt < group.LastPinnedEventsUpdate {
+		return fmt.Errorf("event is older than our last update (%d vs %d)", evt.CreatedAt, group.LastPinnedEventsUpdate)
+	}
+
+	group.LastPinnedEventsUpdate = evt.CreatedAt
+	group.Pinned = nil
+	for _, tag := range evt.Tags {
+		if len(tag) < 2 {
+			continue
+		}
+		switch tag[0] {
+		case "e":
+			pointer, err := nostr.EventPointerFromTag(tag)
+			if err != nil {
+				continue
+			}
+			group.Pinned = append(group.Pinned, pointer)
+		case "a":
+			pointer, err := nostr.EntityPointerFromTag(tag)
+			if err != nil {
+				continue
+			}
+			group.Pinned = append(group.Pinned, pointer)
+		}
 	}
 
 	return nil

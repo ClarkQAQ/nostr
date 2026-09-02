@@ -74,11 +74,12 @@ type ContentSpec struct {
 }
 
 type Validator struct {
-	Schema            Schema                                                 `json:"schema,omitempty"`
-	FailOnUnknownKind bool                                                   `json:"fail_on_unknown_kind,omitempty"`
-	FailOnUnknownType bool                                                   `json:"fail_on_unknown_type,omitempty"`
-	TypeValidators    map[string]func(value string, spec *ContentSpec) error `json:"type_validators,omitempty"`
-	UnknownTypes      []string                                               `json:"unknown_types,omitempty"`
+	Schema            Schema                                                               `json:"schema,omitempty"`
+	FailOnUnknownKind bool                                                                 `json:"fail_on_unknown_kind,omitempty"`
+	FailOnUnknownType bool                                                                 `json:"fail_on_unknown_type,omitempty"`
+	FailOnNonEmpty    bool                                                                 `json:"fail_on_non_empty,omitempty"`
+	TypeValidators    map[string]func(v *Validator, value string, spec *ContentSpec) error `json:"type_validators,omitempty"`
+	UnknownTypes      []string                                                             `json:"unknown_types,omitempty"`
 }
 
 func NewValidatorFromBytes(schemaData []byte) (Validator, error) {
@@ -110,8 +111,8 @@ func NewSchemaFromBytes(schemaData []byte) (Schema, error) {
 func NewValidatorFromSchema(sch Schema) Validator {
 	validator := Validator{
 		Schema: sch,
-		TypeValidators: map[string]func(value string, spec *ContentSpec) error{
-			"id": func(value string, spec *ContentSpec) error {
+		TypeValidators: map[string]func(v *Validator, value string, spec *ContentSpec) error{
+			"id": func(_ *Validator, value string, spec *ContentSpec) error {
 				if len(value) != 64 {
 					return fmt.Errorf("needed 64 hex chars")
 				}
@@ -119,39 +120,39 @@ func NewValidatorFromSchema(sch Schema) Validator {
 				_, err := hex.Decode(hexdummydecoder, unsafe.Slice(unsafe.StringData(value), len(value)))
 				return err
 			},
-			"pubkey": func(value string, spec *ContentSpec) error {
+			"pubkey": func(_ *Validator, value string, spec *ContentSpec) error {
 				_, err := nostr.PubKeyFromHex(value)
 				return err
 			},
-			"addr": func(value string, spec *ContentSpec) error {
+			"addr": func(_ *Validator, value string, spec *ContentSpec) error {
 				_, err := nostr.ParseAddrString(value)
 				return err
 			},
-			"kind": func(value string, spec *ContentSpec) error {
+			"kind": func(_ *Validator, value string, spec *ContentSpec) error {
 				if _, err := strconv.ParseUint(value, 10, 16); err != nil {
 					return fmt.Errorf("not an unsigned integer: %w", err)
 				}
 				return nil
 			},
-			"relay": func(value string, spec *ContentSpec) error {
+			"relay": func(_ *Validator, value string, spec *ContentSpec) error {
 				if url, err := url.Parse(value); err != nil || (url.Scheme != "ws" && url.Scheme != "wss") {
 					return fmt.Errorf("must be ws or wss URL")
 				}
 				return nil
 			},
-			"json": func(value string, spec *ContentSpec) error {
+			"json": func(_ *Validator, value string, spec *ContentSpec) error {
 				if !json.Valid(unsafe.Slice(unsafe.StringData(value), len(value))) {
 					return ErrInvalidJson
 				}
 				return nil
 			},
-			"constrained": func(value string, spec *ContentSpec) error {
+			"constrained": func(_ *Validator, value string, spec *ContentSpec) error {
 				if !slices.Contains(spec.Either, value) {
 					return fmt.Errorf("not in allowed list")
 				}
 				return nil
 			},
-			"hex": func(value string, spec *ContentSpec) error {
+			"hex": func(_ *Validator, value string, spec *ContentSpec) error {
 				if spec.Min > 0 && len(value) < spec.Min {
 					return fmt.Errorf("hex value too short: %d < %d", len(value), spec.Min)
 				}
@@ -161,17 +162,17 @@ func NewValidatorFromSchema(sch Schema) Validator {
 				_, err := hex.Decode(hexdummydecoder, unsafe.Slice(unsafe.StringData(value), len(value)))
 				return err
 			},
-			"lowercase": func(value string, spec *ContentSpec) error {
+			"lowercase": func(_ *Validator, value string, spec *ContentSpec) error {
 				if strings.ToLower(value) != value {
 					return fmt.Errorf("not lowercase")
 				}
 				return nil
 			},
-			"timestamp": func(value string, spec *ContentSpec) error {
+			"timestamp": func(_ *Validator, value string, spec *ContentSpec) error {
 				_, err := strconv.ParseUint(value, 10, 64)
 				return err
 			},
-			"imeta": func(value string, spec *ContentSpec) error {
+			"imeta": func(v *Validator, value string, spec *ContentSpec) error {
 				parts := strings.SplitN(value, " ", 2)
 				if len(parts) != 2 {
 					return fmt.Errorf("not a space-separated keyval")
@@ -214,17 +215,19 @@ func NewValidatorFromSchema(sch Schema) Validator {
 					}
 				case "blurhash", "alt", "summary", "service", "i", "thumbhash":
 				default:
-					return fmt.Errorf("unknown imeta key: %s", key)
+					if v.FailOnUnknownType {
+						return fmt.Errorf("unknown imeta key: %s", key)
+					}
 				}
 				return nil
 			},
-			"empty": func(value string, spec *ContentSpec) error {
-				if len(value) > 0 {
+			"empty": func(v *Validator, value string, spec *ContentSpec) error {
+				if len(value) > 0 && v.FailOnNonEmpty {
 					return fmt.Errorf("not empty")
 				}
 				return nil
 			},
-			"free": func(value string, spec *ContentSpec) error {
+			"free": func(_ *Validator, value string, spec *ContentSpec) error {
 				return nil // accepts anything
 			},
 		},
@@ -307,7 +310,7 @@ func (rte RequiredTagError) Error() string {
 func (v *Validator) ValidateEvent(evt nostr.Event) error {
 	if sch, ok := v.Schema.Kinds[strconv.FormatUint(uint64(evt.Kind), 10)]; ok {
 		if validator, ok := v.TypeValidators[sch.Content.Type]; ok {
-			if err := validator(evt.Content, &sch.Content); err != nil {
+			if err := validator(v, evt.Content, &sch.Content); err != nil {
 				return ContentError{err}
 			}
 		} else {
@@ -447,7 +450,7 @@ func (v *Validator) validateNext(tag nostr.Tag, index int, this *ContentSpec) (f
 	if tag[index] == "" && !this.Required {
 		// empty string ok for non-required items
 	} else if validator, ok := v.TypeValidators[this.Type]; ok {
-		if err := validator(tag[index], this); err != nil {
+		if err := validator(v, tag[index], this); err != nil {
 			return index, fmt.Errorf("invalid %s value '%s' at tag '%s', index %d: %w",
 				this.Type, tag[index], tag[0], index, err)
 		}

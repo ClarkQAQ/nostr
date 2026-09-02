@@ -8,7 +8,7 @@ import (
 	"github.com/templexxx/xhex"
 )
 
-func TestParseMessage(t *testing.T) {
+func TestParseMessageEnvelope(t *testing.T) {
 	testCases := []struct {
 		Name             string
 		Message          string
@@ -52,7 +52,24 @@ func TestParseMessage(t *testing.T) {
 		{
 			Name:             "EOSE envelope",
 			Message:          `["EOSE","kjasbdlasvdluiasvd\"kjasbdksab\\d"]`,
-			ExpectedEnvelope: ptr(EOSEEnvelope("kjasbdlasvdluiasvd\"kjasbdksab\\d")),
+			ExpectedEnvelope: ptr(EOSEEnvelope{SubscriptionID: "kjasbdlasvdluiasvd\"kjasbdksab\\d"}),
+		},
+		{
+			Name:    "EOSE envelope with hint",
+			Message: `["EOSE","kjasbdlasvdluiasvd\"kjasbdksab\\d", ["finish"]]`,
+			ExpectedEnvelope: ptr(EOSEEnvelope{
+				SubscriptionID: "kjasbdlasvdluiasvd\"kjasbdksab\\d",
+				Finish:         true,
+			}),
+		},
+		{
+			Name:    "EOSE envelope with hints",
+			Message: `["EOSE","3333   3 33 33", [ "auth", "more","invalidkjabndiula"]]`,
+			ExpectedEnvelope: ptr(EOSEEnvelope{
+				SubscriptionID: "3333   3 33 33",
+				More:           true,
+				Auth:           true,
+			}),
 		},
 		{
 			Name:             "COUNT envelope",
@@ -95,9 +112,15 @@ func TestParseMessage(t *testing.T) {
 			ExpectedEnvelope: &AuthEnvelope{Event: Event{Kind: 1, ID: MustIDFromHex("ae1fc7154296569d87ca4663f6bdf448c217d1590d28c85d158557b8b43b4d69"), PubKey: MustPubKeyFromHex("79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"), CreatedAt: 1683660344, Tags: Tags{}, Content: "hello world", Sig: mustSigFromHex("94e10947814b1ebe38af42300ecd90c7642763896c4f69506ae97bfdf54eec3c0c21df96b7d95daa74ff3d414b1d758ee95fc258125deebc31df0c6ba9396a51")}},
 		},
 		{
-			Name:             "REQ envelope",
-			Message:          `["REQ","million", {"kinds": [1]}, {"kinds": [30023 ], "#d": ["buteko",    "batuke"]}]`,
-			ExpectedEnvelope: &ReqEnvelope{SubscriptionID: "million", Filters: []Filter{{Kinds: []Kind{1}}, {Kinds: []Kind{30023}, Tags: TagMap{"d": []string{"buteko", "batuke"}}}}},
+			Name:    "REQ envelope",
+			Message: `["REQ","million", {"kinds": [1]}, {"kinds": [30023 ], "#d": ["buteko",    "batuke"]}]`,
+			ExpectedEnvelope: &ReqEnvelope{
+				SubscriptionID: "million",
+				Filters: []Filter{
+					{Kinds: []Kind{1}},
+					{Kinds: []Kind{30023}, Tags: TagMap{"d": []string{"buteko", "batuke"}}},
+				},
+			},
 		},
 		{
 			Name:             "CLOSE envelope",
@@ -132,6 +155,12 @@ func TestParseMessage(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, envelope, "expected non-nil envelope but got nil")
 				require.Equal(t, testCase.ExpectedEnvelope.String(), envelope.String())
+
+				rejson, err := json.Marshal(envelope)
+				require.NoError(t, err)
+				reparsed, err := ParseMessage(string(rejson))
+				require.NoError(t, err)
+				require.Equal(t, reparsed, envelope, "reparsed %s into %v but expected %v (from initial %s)", rejson, reparsed, envelope, testCase.Message)
 			})
 		}
 	})

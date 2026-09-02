@@ -82,7 +82,15 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 	rl.clients[ws] = make([]listenerSpec, 0, 2)
 	rl.clientsMutex.Unlock()
 
-	ctx, cancel := context.WithCancel(context.WithValue(ctx, wsKey, ws))
+	ctx, cancel := context.WithCancel(
+		context.WithValue(
+			context.WithValue(
+				ctx,
+				wsKey, ws,
+			),
+			httpRequestKey, r,
+		),
+	)
 
 	kill := sync.OnceFunc(func() {
 		if nil != rl.OnDisconnect {
@@ -297,7 +305,7 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 					go func() {
 						// when all events have been loaded from databases and dispatched we can fire the EOSE message
 						eose.Wait()
-						_ = ws.WriteJSON(nostr.EOSEEnvelope(env.SubscriptionID))
+						_ = ws.WriteJSON(nostr.EOSEEnvelope{SubscriptionID: env.SubscriptionID})
 					}()
 				case *nostr.CloseEnvelope:
 					id := string(*env)

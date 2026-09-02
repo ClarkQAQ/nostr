@@ -22,6 +22,7 @@ var (
 	_ Action = DeleteEvent{}
 	_ Action = EditMetadata{}
 	_ Action = CreateInvite{}
+	_ Action = UpdatePinList{}
 )
 
 func PrepareModerationAction(evt nostr.Event) (Action, error) {
@@ -79,40 +80,28 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 	nostr.KindSimpleGroupEditMetadata: func(evt nostr.Event) (Action, error) {
 		ok := false
 		edit := EditMetadata{When: evt.CreatedAt}
-		y := true
-		n := false
-
-		hasName := false
-
-		// DEPRECATED: remove all the fields not tagged with Replace = true eventually
-		// edit-metadata to become a PUT rather than a PATCH
 
 		for _, tag := range evt.Tags {
 			if len(tag) >= 1 {
 				switch tag[0] {
 				case "name":
 					if len(tag) >= 2 {
-						edit.NameValue = &tag[1]
-						if ok {
-							edit.Replace = true
-						}
+						edit.Group.Name = tag[1]
 						ok = true
-						hasName = true
 					}
 				case "picture":
 					if len(tag) >= 2 {
-						edit.PictureValue = &tag[1]
-						if hasName {
-							edit.Replace = true
-						}
+						edit.Group.Picture = tag[1]
+						ok = true
+					}
+				case "banner":
+					if len(tag) >= 2 {
+						edit.Group.Banner = tag[1]
 						ok = true
 					}
 				case "about":
 					if len(tag) >= 2 {
-						edit.AboutValue = &tag[1]
-						if hasName {
-							edit.Replace = true
-						}
+						edit.Group.About = tag[1]
 						ok = true
 					}
 				case "supported_kinds":
@@ -124,70 +113,35 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 							kinds = append(kinds, nostr.Kind(kind))
 						}
 					}
-					edit.SupportedKindsValue = &kinds
-					edit.Replace = true
+					edit.Group.SupportedKinds = kinds
+					ok = true
 				case "closed":
-					edit.ClosedValue = &y
-					if hasName {
-						edit.Replace = true
-					}
+					edit.Group.Closed = true
 					ok = true
-				case "open":
-					edit.ClosedValue = &n
-					ok = true
-				case "approval":
-					if len(tag) >= 2 {
-						v := tag[1] == "manual"
-						edit.ApprovalValue = &v
-						ok = true
-					}
 				case "restricted":
-					edit.RestrictedValue = &y
-					if hasName {
-						edit.Replace = true
-					}
-					ok = true
-				case "unrestricted":
-					edit.RestrictedValue = &n
+					edit.Group.Restricted = true
 					ok = true
 				case "hidden":
-					edit.HiddenValue = &y
-					if hasName {
-						edit.Replace = true
-					}
-					ok = true
-				case "visible":
-					edit.HiddenValue = &n
+					edit.Group.Hidden = true
 					ok = true
 				case "private":
-					edit.PrivateValue = &y
-					if hasName {
-						edit.Replace = true
+					edit.Group.Private = true
+					ok = true
+				case "parent":
+					if len(tag) >= 2 {
+						edit.Group.Parent = tag[1]
+						ok = true
 					}
-					ok = true
-				case "public":
-					edit.PrivateValue = &n
-					ok = true
 				case "livekit":
-					edit.LiveKitValue = &y
-					edit.Replace = true
+					edit.Group.LiveKit = true
 					ok = true
-				case "no-livekit":
-					edit.LiveKitValue = &n
-					ok = true
-				case "no-text":
-					edit.SupportedKindsValue = nil
-					ok = true
+				case "child":
+					if len(tag) >= 2 {
+						edit.Group.Children = append(edit.Group.Children, tag[1])
+						ok = true
+					}
 				}
 			}
-		}
-		if evt.Tags.Has("restricted") {
-			edit.RestrictedValue = &y
-			ok = true
-		}
-		if evt.Tags.Has("hidden") {
-			edit.HiddenValue = &y
-			ok = true
 		}
 
 		if ok {
@@ -229,6 +183,27 @@ var moderationActionFactories = map[nostr.Kind]func(nostr.Event) (Action, error)
 			return nil, fmt.Errorf("too many 'code' tags")
 		}
 		return CreateInvite{Codes: codes}, nil
+	},
+	nostr.KindSimpleGroupUpdatePinList: func(evt nostr.Event) (Action, error) {
+		update := UpdatePinList{When: evt.CreatedAt}
+
+		for tag := range evt.Tags.FindAll("e") {
+			pointer, err := nostr.EventPointerFromTag(tag)
+			if err != nil {
+				return nil, fmt.Errorf("invalid event id hex")
+			}
+			update.Pinned = append(update.Pinned, pointer)
+		}
+
+		for tag := range evt.Tags.FindAll("a") {
+			pointer, err := nostr.EntityPointerFromTag(tag)
+			if err != nil {
+				return nil, fmt.Errorf("invalid event address")
+			}
+			update.Pinned = append(update.Pinned, pointer)
+		}
+
+		return update, nil
 	},
 }
 
@@ -294,67 +269,27 @@ func (a RemoveUser) Apply(group *Group) {
 }
 
 type EditMetadata struct {
-	NameValue           *string
-	PictureValue        *string
-	AboutValue          *string
-	RestrictedValue     *bool
-	ClosedValue         *bool
-	ApprovalValue       *bool
-	HiddenValue         *bool
-	PrivateValue        *bool
-	LiveKitValue        *bool
-	SupportedKindsValue *[]nostr.Kind
+	Group
 
-	Replace bool
-	When    nostr.Timestamp
+	When nostr.Timestamp
 }
 
 func (_ EditMetadata) Name() string { return "edit-metadata" }
 func (a EditMetadata) Apply(group *Group) {
 	group.LastMetadataUpdate = a.When
 
-	if a.Replace {
-		group.Name = ""
-		group.Picture = ""
-		group.About = ""
-		group.Restricted = false
-		group.Closed = false
-		group.Hidden = false
-		group.Private = false
-		group.LiveKit = false
-		group.SupportedKinds = nil
-	}
-
-	if a.NameValue != nil {
-		group.Name = *a.NameValue
-	}
-	if a.PictureValue != nil {
-		group.Picture = *a.PictureValue
-	}
-	if a.AboutValue != nil {
-		group.About = *a.AboutValue
-	}
-	if a.RestrictedValue != nil {
-		group.Restricted = *a.RestrictedValue
-	}
-	if a.ClosedValue != nil {
-		group.Closed = *a.ClosedValue
-	}
-	if a.ApprovalValue != nil {
-		group.ManualApproval = *a.ApprovalValue
-	}
-	if a.HiddenValue != nil {
-		group.Hidden = *a.HiddenValue
-	}
-	if a.PrivateValue != nil {
-		group.Private = *a.PrivateValue
-	}
-	if a.LiveKitValue != nil {
-		group.LiveKit = *a.LiveKitValue
-	}
-	if a.SupportedKindsValue != nil {
-		group.SupportedKinds = *a.SupportedKindsValue
-	}
+	group.Name = a.Group.Name
+	group.Picture = a.Group.Picture
+	group.Banner = a.Group.Banner
+	group.About = a.Group.About
+	group.Restricted = a.Group.Restricted
+	group.Closed = a.Group.Closed
+	group.Hidden = a.Group.Hidden
+	group.Private = a.Group.Private
+	group.LiveKit = a.Group.LiveKit
+	group.SupportedKinds = a.Group.SupportedKinds
+	group.Parent = a.Group.Parent
+	group.Children = a.Group.Children
 }
 
 type CreateGroup struct {
@@ -368,6 +303,7 @@ func (a CreateGroup) Apply(group *Group) {
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
 	group.LastLiveKitParticipantsUpdate = a.When
+	group.LastPinnedEventsUpdate = a.When
 }
 
 type DeleteGroup struct {
@@ -378,6 +314,7 @@ func (_ DeleteGroup) Name() string { return "delete-group" }
 func (a DeleteGroup) Apply(group *Group) {
 	group.Members = make(map[nostr.PubKey][]*Role)
 	group.LiveKitParticipants = make([]nostr.PubKey, 0)
+	group.Pinned = nil
 	group.Closed = true
 	group.Private = true
 	group.Restricted = true
@@ -385,11 +322,13 @@ func (a DeleteGroup) Apply(group *Group) {
 	group.Name = "[deleted]"
 	group.About = ""
 	group.Picture = ""
+	group.Banner = ""
 	group.LiveKit = false
 	group.LastMetadataUpdate = a.When
 	group.LastAdminsUpdate = a.When
 	group.LastMembersUpdate = a.When
 	group.LastLiveKitParticipantsUpdate = a.When
+	group.LastPinnedEventsUpdate = a.When
 }
 
 type CreateInvite struct {
@@ -399,4 +338,15 @@ type CreateInvite struct {
 func (_ CreateInvite) Name() string { return "create-invite" }
 func (a CreateInvite) Apply(group *Group) {
 	group.InviteCodes = append(group.InviteCodes, a.Codes...)
+}
+
+type UpdatePinList struct {
+	Pinned []nostr.Pointer
+	When   nostr.Timestamp
+}
+
+func (_ UpdatePinList) Name() string { return "update-pin-list" }
+func (a UpdatePinList) Apply(group *Group) {
+	group.Pinned = a.Pinned
+	group.LastPinnedEventsUpdate = a.When
 }

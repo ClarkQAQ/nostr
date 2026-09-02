@@ -12,7 +12,9 @@ import (
 
 // MirrorBlob mirrors a blob from a remote URL to the media server
 func (c *Client) MirrorBlob(ctx context.Context, remoteBlobURL string) (*BlobDescriptor, error) {
-	bodyBytes, err := json.Marshal(struct{ URL string }{URL: remoteBlobURL})
+	bodyBytes, err := json.Marshal(struct {
+		URL string `json:"url"`
+	}{URL: remoteBlobURL})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal mirror request: %w", err)
 	}

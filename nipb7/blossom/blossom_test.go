@@ -12,7 +12,7 @@ import (
 
 	"fiatjaf.com/nostr"
 	"fiatjaf.com/nostr/keyer"
-	blossomclient "fiatjaf.com/nostr/nipb0/blossom"
+	blossomclient "fiatjaf.com/nostr/nipb7/blossom"
 	relay_blossom "fiatjaf.com/nostr/relay/blossom"
 )
 
